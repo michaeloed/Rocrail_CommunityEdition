@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -114,7 +117,7 @@ static iONode __transact( iOZimo zimo, char* out, int outsize, char* in, int ins
                  out, outsize, insize );
 
     /* Transact */
-    if( rc = SerialOp.write( data->serial, out, outsize ) ) {
+    if( (rc = SerialOp.write( data->serial, out, outsize )) ) {
       if( insize > 0 && in != NULL ) {
         char c;
         int i = 0;
@@ -334,7 +337,7 @@ static iONode _cmd( obj inst ,const iONode nodeA ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   char out[32];
   if( poweroff ) {
     sprintf( out, "SA;\r" );

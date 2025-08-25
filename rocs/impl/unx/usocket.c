@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -83,6 +86,15 @@ Boolean rocs_socket_init( iOSocketData o ) {
   return False;
 #endif
 }
+
+Boolean rocs_socket_istimedout( iOSocketData o ) {
+#ifdef __ROCS_SOCKET__
+  if( o->rc == EAGAIN || o->rc == ETIMEDOUT )
+    return True;
+#endif
+  return False;
+}
+
 
 /* OS dependent */
 static Boolean __resolveHost( iOSocketData o, const char* hostname ) {
@@ -214,7 +226,7 @@ Boolean rocs_socket_create( iOSocketData o ) {
 
   TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "creating socket udp=%d", o->udp );
 
-  o->sh = socket( AF_INET, o->udp ? SOCK_DGRAM:SOCK_STREAM, 0 );
+  o->sh = socket( AF_INET, o->udp ? SOCK_DGRAM:SOCK_STREAM, o->udp ? IPPROTO_UDP:IPPROTO_TCP );
   if( o->sh < 0 ) {
     o->rc = errno;
     TraceOp.terrno( name, TRCLEVEL_EXCEPTION, __LINE__, 8015, o->rc, "socket() failed" );
@@ -711,7 +723,7 @@ Boolean rocs_socket_readpeek( iOSocket inst, char* buf, int size, Boolean peek )
       #endif
       }
       else
-        TraceOp.terrno( name, TRCLEVEL_EXCEPTION, __LINE__, 8035, o->rc, "recv() failed" );
+        TraceOp.terrno( name, o->rc == EAGAIN ? TRCLEVEL_DEBUG:TRCLEVEL_EXCEPTION, __LINE__, 8035, o->rc, "recv() failed" );
       return False;
     }
     treaded += readed;
@@ -729,8 +741,15 @@ Boolean rocs_socket_readpeek( iOSocket inst, char* buf, int size, Boolean peek )
 int rocs_socket_recvfrom( iOSocket inst, char* buf, int size, char* client, int* port ) {
   iOSocketData o = Data(inst);
   struct sockaddr_in sin;
-  int sin_len = sizeof(sin);
-  int rc = recvfrom ( o->sh, buf, size, 0, (struct sockaddr *) &sin, &sin_len);
+  socklen_t sin_len = sizeof(sin);
+  int rc = 0;
+  if( buf == NULL ) {
+    char l_buf[256];
+    size = 256;
+    rc = recvfrom ( o->sh, l_buf, size, MSG_PEEK, (struct sockaddr *) &sin, &sin_len);
+  }
+  else
+    rc = recvfrom ( o->sh, buf, size, 0, (struct sockaddr *) &sin, &sin_len);
   o->rc = errno;
   if( rc < 0 ) {
     TraceOp.terrno( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, o->rc, "recvfrom() failed" );
@@ -854,6 +873,26 @@ Boolean rocs_socket_setKeepalive( iOSocket inst, Boolean alive ) {
 }
 
 
+Boolean rocs_socket_setBroadcast( iOSocket inst, Boolean broadcast ) {
+#ifdef __ROCS_SOCKET__
+  iOSocketData o = Data(inst);
+  int rc   = 0;
+  int size = sizeof( broadcast );
+  rc = setsockopt( o->sh, SOL_SOCKET, SO_BROADCAST, (void*)&broadcast, size );
+
+  if( rc != 0 ) {
+    o->rc = errno;
+    TraceOp.terrno( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, o->rc, "setsockopt() failed" );
+    return False;
+  }
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "rocs_socket_setBroadcast() OK." );
+  return True;
+#else
+  return False;
+#endif
+}
+
+
 Boolean rocs_socket_setNodelay( iOSocket inst, Boolean flag ) {
 #ifdef __ROCS_SOCKET__
   iOSocketData o = Data(inst);
@@ -882,6 +921,8 @@ Boolean rocs_socket_CreateCTX( iOSocket inst ) {
   /* The method describes which SSL protocol we will be using. */
   SSL_METHOD *method;
 
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "SSL_library_init()..." );
+  SSL_library_init();
   /* Load algorithms and error strings. */
   OpenSSL_add_all_algorithms();
   SSL_load_error_strings();
@@ -942,6 +983,16 @@ Boolean rocs_socket_LoadCerts( iOSocket inst, const char *cFile, const char *kFi
 #endif
 }
 
+const char* rocs_socket_getsockname(iOSocket inst) {
+  iOSocketData data = Data(inst);
+  struct sockaddr_in sa;
+  socklen_t sa_len;
+  sa_len = sizeof(sa);
+  if (getsockname(data->sh, (struct sockaddr*)&sa, &sa_len) != -1) {
+    return inet_ntoa(sa.sin_addr);
+  }
+  return "";
+}
 
 static char __hostname[256];
 const char* rocs_socket_gethostaddr( void ) {
@@ -951,7 +1002,7 @@ const char* rocs_socket_gethostaddr( void ) {
 
   gethostname( __hostname, sizeof( __hostname ) );
   he = gethostbyname (__hostname);
-  while(he->h_addr_list[i] != NULL ) {
+  while( he!=NULL && he->h_addr_list[i] != NULL ) {
     const char* s = inet_ntoa (*(struct in_addr *)he->h_addr_list[i]);
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "address %d = %s", i, s );
     i++;

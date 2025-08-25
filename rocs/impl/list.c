@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -69,7 +72,7 @@ static struct OBase* __clone( void* inst ) {
   for( i = 0; i < ListOp.size(inst); i++) {
     ListOp.add(list, ListOp.get(inst, i));
   }
-   return list;
+   return (obj)list;
 }
 
 static Boolean __equals( void* inst1, void* inst2 ) {

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -57,6 +60,7 @@ protected:
 	void onWriteAll( wxCommandEvent& event );
 	void onReadAll( wxCommandEvent& event );
 	void onOK( wxCommandEvent& event );
+	void onHelp( wxCommandEvent& event );
   void initLabels();
 
 public:

@@ -1,7 +1,7 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -26,12 +26,9 @@
 Boolean rnUDPConnect( obj inst ) {
   iOrocNetData data = Data(inst);
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  multicast address [%s]", wRocNet.getaddr(data->rnini) );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  multicast port    [%d]", wRocNet.getport(data->rnini) );
   data->readUDP = SocketOp.inst( wRocNet.getaddr(data->rnini), wRocNet.getport(data->rnini), False, True, True );
   SocketOp.bind(data->readUDP);
   data->writeUDP = SocketOp.inst( wRocNet.getaddr(data->rnini), wRocNet.getport(data->rnini), False, True, True );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   return True;
 }
 
@@ -43,7 +40,7 @@ void rnUDPDisconnect( obj inst ) {
 
 int rnUDPRead ( obj inst, unsigned char *msg ) {
   iOrocNetData data = Data(inst);
-  SocketOp.recvfrom( data->readUDP, msg, 0x7F, NULL, NULL );
+  SocketOp.recvfrom( data->readUDP, (char*)msg, 0x7F, NULL, NULL );
   return 0;
 }
 
@@ -51,7 +48,7 @@ int rnUDPRead ( obj inst, unsigned char *msg ) {
 Boolean rnUDPWrite( obj inst, unsigned char *msg, int len ) {
   iOrocNetData data = Data(inst);
 
-  SocketOp.sendto( data->writeUDP, msg, len, NULL, 0 );
+  SocketOp.sendto( data->writeUDP, (char*)msg, len, NULL, 0 );
 
   return True;
 }

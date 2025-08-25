@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -200,8 +203,6 @@ static int __sortID(obj* _a, obj* _b)
 
 void WaybillDlg::initIndex(){
   TraceOp.trc( "waybilldlg", TRCLEVEL_INFO, __LINE__, 9999, "initIndex" );
-  iONode l_Props = m_Props;
-
   SetTitle(wxGetApp().getMsg( "waybilltable" ));
 
   m_WaybillList->Clear();
@@ -230,10 +231,9 @@ void WaybillDlg::initIndex(){
       /* clean up the temp. list */
       ListOp.base.del(list);
 
-      if( l_Props != NULL ) {
-        m_WaybillList->SetStringSelection( wxString(wWaybill.getid( l_Props ),wxConvUTF8) );
-        m_WaybillList->SetFirstItem( wxString(wWaybill.getid( l_Props ),wxConvUTF8) );
-        m_Props = l_Props;
+      if( m_Props != NULL ) {
+        m_WaybillList->SetStringSelection( wxString(wWaybill.getid( m_Props ),wxConvUTF8) );
+        m_WaybillList->SetFirstItem( wxString(wWaybill.getid( m_Props ),wxConvUTF8) );
         char* title = StrOp.fmt( "%s %s", (const char*)wxGetApp().getMsg("waybill").mb_str(wxConvUTF8), wWaybill.getid( m_Props ) );
         SetTitle( wxString(title,wxConvUTF8) );
         StrOp.free( title );
@@ -279,6 +279,8 @@ void WaybillDlg::initValues() {
   else
     m_Status->SetSelection(2);
 
+  m_Routing->SetValue(wxString(wWaybill.getrouting( m_Props ),wxConvUTF8));
+
 }
 
 
@@ -304,7 +306,8 @@ bool WaybillDlg::evaluate(){
   wWaybill.setconsignee( m_Props, m_Consignee->GetValue().mb_str(wxConvUTF8) );
   wWaybill.setdestination( m_Props, m_Destination->GetStringSelection().mb_str(wxConvUTF8) );
   wWaybill.setcommodity( m_Props, m_Commodity->GetValue().mb_str(wxConvUTF8) );
-  wWaybill.setcartype( m_Props, (char*)((wxItemContainer*)m_Cartype)->GetClientData( m_Cartype->GetSelection()) );
+  if( m_Cartype->GetSelection() != wxNOT_FOUND )
+    wWaybill.setcartype( m_Props, (char*)((wxItemContainer*)m_Cartype)->GetClientData( m_Cartype->GetSelection()) );
 
 
   if( m_Status->GetSelection() == 0 )
@@ -313,6 +316,8 @@ bool WaybillDlg::evaluate(){
     wWaybill.setstatus( m_Props, wWaybill.status_shipping );
   else
     wWaybill.setstatus( m_Props, wWaybill.status_delivered );
+
+  wWaybill.setrouting( m_Props, m_Routing->GetValue().mb_str(wxConvUTF8));
 
   return true;
 }
@@ -333,12 +338,15 @@ iONode WaybillDlg::getSelectedWaybill() {
   return m_Props;
 }
 
+bool WaybillDlg::isDelivered() {
+  return (m_Status->GetSelection() == 2 ? true:false);
+}
+
 
 
 void WaybillDlg::onNewWaybill( wxCommandEvent& event ){
   int i = m_WaybillList->FindString( _T("NEW") );
   if( i == wxNOT_FOUND ) {
-    m_WaybillList->Append( _T("NEW") );
     iONode model = wxGetApp().getModel();
     if( model != NULL ) {
       iONode waybilllist = wPlan.getwaybilllist( model );
@@ -352,6 +360,7 @@ void WaybillDlg::onNewWaybill( wxCommandEvent& event ){
         wWaybill.setid( waybill, "NEW" );
         m_Props = waybill;
         initValues();
+        m_WaybillList->Append( _T("NEW"), m_Props );
       }
     }
   }
@@ -427,6 +436,9 @@ void WaybillDlg::onApply( wxCommandEvent& event ){
     wxGetApp().sendToRocrail( cmd );
     cmd->base.del(cmd);
   }
+  else {
+    wxGetApp().setLocalModelModified(true);
+  }
   initIndex();
 }
 
@@ -443,4 +455,12 @@ void WaybillDlg::onOK( wxCommandEvent& event ){
 }
 
 
+void WaybillDlg::onHelp( wxCommandEvent& event ) {
+  switch( m_WaybillBook->GetSelection() ) {
+  case 0: wxGetApp().openLink( "waybill-index" ); break;
+  case 1: wxGetApp().openLink( "waybill-gen" ); break;
+  case 2: wxGetApp().openLink( "waybill-routing" ); break;
+  default: wxGetApp().openLink( "waybill" ); break;
+  }
+}
 

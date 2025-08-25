@@ -1,14 +1,9 @@
-/////////////////////////////////////////////////////////////////////////////
-// Name:        lenzdlg.h
-// Purpose:
-// Author:
-// Modified by:
-// Created:     Tue 06 Jan 2009 04:49:35 PM CET
-// RCS-ID:
-// Copyright:
-// Licence:
-/////////////////////////////////////////////////////////////////////////////
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
+ 
+
+ */
 #ifndef _LENZDLG_H_
 #define _LENZDLG_H_
 
@@ -66,7 +61,7 @@ class LenzDlg: public wxDialog
 public:
     /// Constructors
     LenzDlg();
-    LenzDlg( wxWindow* parent, iONode props );
+    LenzDlg( wxWindow* parent, iONode props, const char* devices=NULL );
 
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_LENZDLG_IDNAME, const wxString& caption = SYMBOL_LENZDLG_TITLE, const wxPoint& pos = SYMBOL_LENZDLG_POSITION, const wxSize& size = SYMBOL_LENZDLG_SIZE, long style = SYMBOL_LENZDLG_STYLE );
@@ -91,6 +86,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end LenzDlg event handler declarations
 
 ////@begin LenzDlg member function declarations
@@ -110,7 +108,7 @@ public:
     wxStaticText* m_labIID;
     wxTextCtrl* m_IID;
     wxStaticText* m_labDevice;
-    wxTextCtrl* m_Device;
+    wxComboBox* m_Device;
     wxStaticText* m_labHost;
     wxTextCtrl* m_Host;
     wxStaticText* m_labPort;
@@ -122,13 +120,12 @@ public:
     wxCheckBox* m_PowerAtStartup;
     wxCheckBox* m_FastClock;
     wxCheckBox* m_AccPower;
-    wxCheckBox* m_IgnoreBusy;
-    wxStaticText* m_labSensorOffset;
-    wxSpinCtrl* m_SensorOffset;
+    wxCheckBox* m_V2;
     wxStaticText* m_labSwitchTime;
     wxSpinCtrl* m_SwitchTime;
 ////@end LenzDlg member variables
     iONode m_Props;
+    const char* m_Devices;
 };
 
 #endif

@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -17,7 +20,10 @@
  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
+#include <errno.h>
 
 #include "rocs/impl/serial_impl.h"
 #include "rocs/public/system.h"
@@ -131,6 +137,18 @@ static Boolean _writecSerial( iOSerial inst, char c ) {
   return rocs_serial_write( inst, &c, 1 );
 }
 
+static Boolean _fmt( iOSerial inst, const char* fmt, ... ) {
+  va_list args;
+  char s[4096] = {'\0'};
+
+  va_start(args, fmt);
+  vsprintf(s, fmt, args);
+  va_end(args);
+
+  return rocs_serial_write( inst, s, strlen(s) );
+}
+
+
 
 static char _readcSerial( iOSerial inst ) {
   char buf[1] = { '\0' };
@@ -156,6 +174,26 @@ static void _setPortBase( iOSerial inst, int addr ) {
   iOSerialData data = Data(inst);
   data->portbase = addr;
 }
+
+static char* _readln( iOSerial inst, char* buf ) {
+  iOSerialData data = Data(inst);
+  Boolean ok = False;
+  int idx = 0;
+  buf[idx] = '\0';
+
+  while( idx < 1024 ) {
+    if( !rocs_serial_read( inst, &buf[idx], 1 ) ) {
+      return NULL;
+    }
+    if( buf[idx] == '\n' || buf[idx] == '\0' ) {
+      break;
+    }
+    idx++;
+  };
+
+  return buf;
+}
+
 
 
 static iOSerial _inst( const char* device ) {

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -55,6 +58,8 @@ class wxSpinCtrl;
 #define ID_LISTBOX_LOCATIONS_BLOCKS 10302
 #define ID__LOCATIONS_BLOCK_ADD 10278
 #define ID__LOCATIONS_BLOCK_DELETE 10279
+#define ID_LOCATION_BLOCK_UP 10423
+#define ID_LOCATION_BLOCK_DOWN 10422
 #define ID_BUTTON_LOCATIONS_NEW 10303
 #define ID_BUTTON_LOCATIONS_MODIFY 10310
 #define ID_BUTTON_LOCATIONS_DELETE 10304
@@ -86,12 +91,13 @@ class LocationsDialog: public wxDialog
   void initValues();
   bool evaluate();
   int m_TabAlign;
+  bool m_ReadOnly;
 
 public:
     /// Constructors
     LocationsDialog( );
     LocationsDialog( wxWindow* parent, wxWindowID id = SYMBOL_LOCATIONSDIALOG_IDNAME, const wxString& caption = SYMBOL_LOCATIONSDIALOG_TITLE, const wxPoint& pos = SYMBOL_LOCATIONSDIALOG_POSITION, const wxSize& size = SYMBOL_LOCATIONSDIALOG_SIZE, long style = SYMBOL_LOCATIONSDIALOG_STYLE );
-    LocationsDialog( wxWindow* parent, iONode p_Props );
+    LocationsDialog( wxWindow* parent, iONode p_Props, bool readonly=false );
 
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_LOCATIONSDIALOG_IDNAME, const wxString& caption = SYMBOL_LOCATIONSDIALOG_TITLE, const wxPoint& pos = SYMBOL_LOCATIONSDIALOG_POSITION, const wxSize& size = SYMBOL_LOCATIONSDIALOG_SIZE, long style = SYMBOL_LOCATIONSDIALOG_STYLE );
@@ -113,6 +119,12 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID__LOCATIONS_BLOCK_DELETE
     void OnLocationsBlockDeleteClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_LOCATION_BLOCK_UP
+    void OnBlockUp( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_LOCATION_BLOCK_DOWN
+    void OnBlockDown( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_LOCATIONS_NEW
     void OnButtonLocationsNewClick( wxCommandEvent& event );
 
@@ -130,6 +142,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_APPLY
     void OnApplyClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end LocationsDialog event handler declarations
 
@@ -155,6 +170,8 @@ public:
     wxComboBox* m_BlockCombo;
     wxButton* m_AddBlock;
     wxButton* m_DeleteBlock;
+    wxButton* m_BlockUp;
+    wxButton* m_BlockDown;
     wxStaticBox* m_OptionsBox;
     wxStaticText* m_labMinOcc;
     wxSpinCtrl* m_MinOcc;

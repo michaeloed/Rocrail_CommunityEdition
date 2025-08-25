@@ -1,16 +1,6 @@
 /*
--------------------------------------------------------------------
- Project     Rocrail - Model Railroad Software
--------------------------------------------------------------------
- File name   rocdigs/impl/loconet/locoio.c
--------------------------------------------------------------------
- Author      Rob Versluis
--------------------------------------------------------------------
- License:    This piece of code is part of the Rocrail
-             project (http://www.rocrail.net) and therefore
-             published under the terms of the GNU General Public
-             Licence (http://www.gnu.org/licenses/gpl.html).
--------------------------------------------------------------------
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
 */
 #include "rocs/public/rocs.h"
 #include "rocs/public/objbase.h"
@@ -60,7 +50,7 @@ Boolean isLNOPSW(byte* msg) {
   D3       Lower 7 bits of LocoIO Version
   D4
   PXCT2    High order bit of requested data
-  D5
+  D5       sub address
   D6       Requested Data
   D7       Requested Data + 1
   D8       Requested Data + 2

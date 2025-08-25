@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -24,7 +27,7 @@
 #include "rocrail/impl/signal_impl.h"
 #include "rocrail/public/app.h"
 
-#include "rocrail/wrapper/public/RocRail.h"
+#include "rocrail/wrapper/public/FreeRail.h"
 #include "rocrail/wrapper/public/Ctrl.h"
 
 #include "rocint/public/blockbase.h"
@@ -41,8 +44,14 @@
 #include "rocrail/wrapper/public/Output.h"
 #include "rocrail/wrapper/public/ActionCtrl.h"
 #include "rocrail/wrapper/public/ModelCmd.h"
+#include "rocrail/wrapper/public/Accessory.h"
+#include "rocrail/wrapper/public/Item.h"
+
+#include "rocutils/public/addr.h"
 
 static int instCnt = 0;
+
+static void __checkAction( iOSignal inst, Boolean event );
 
 /*
  ***** OBase functions.
@@ -107,6 +116,226 @@ static void* _getProperties( void* inst ) {
   return data->props;
 }
 
+static const char* __getPatternState(iOSignal inst, int pattern, int gate) {
+  iOSignalData o = Data(inst);
+  int pattern1, pattern2;
+  const char* state = wSignal.getstate(o->props);
+  int pattern1green = wSignal.getgreen( o->props ) & 0x0F;
+  int pattern2green = (wSignal.getgreen( o->props ) & 0xF0) >> 4;
+  int pattern1red = wSignal.getred( o->props ) & 0x0F;
+  int pattern2red = (wSignal.getred( o->props ) & 0xF0) >> 4;
+  int pattern1yellow = wSignal.getyellow( o->props ) & 0x0F;
+  int pattern2yellow = (wSignal.getyellow( o->props ) & 0xF0) >> 4;
+  int pattern1white = wSignal.getwhite( o->props ) & 0x0F;
+  int pattern2white = (wSignal.getwhite( o->props ) & 0xF0) >> 4;
+  int pattern1blank = wSignal.getblank( o->props ) & 0x0F;
+  int pattern2blank = (wSignal.getblank( o->props ) & 0xF0) >> 4;
+
+  if( StrOp.equals( state, wSignal.green ) ) {
+    pattern1 = pattern1green;
+    pattern2 = pattern2green;
+  }
+  else if( StrOp.equals( state, wSignal.red ) ) {
+    pattern1 = pattern1red;
+    pattern2 = pattern2red;
+  }
+  else if( StrOp.equals( state, wSignal.yellow ) ) {
+    pattern1 = pattern1yellow;
+    pattern2 = pattern2yellow;
+  }
+  else if( StrOp.equals( state, wSignal.white ) ) {
+    pattern1 = pattern1white;
+    pattern2 = pattern2white;
+  }
+  else if( StrOp.equals( state, wSignal.blank ) ) {
+    pattern1 = pattern1blank;
+    pattern2 = pattern2blank;
+  }
+
+  if( pattern == 1 ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "event for signal %s, pattern1 ", wSignal.getid( o->props ), gate);
+    pattern1 = gate;
+  }
+  else if( pattern == 2 ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "event for signal %s, pattern2 ", wSignal.getid( o->props ), gate);
+    pattern2 = gate;
+  }
+
+  /*
+    OSignal  0167 p=2, pg1=0 pg2=0, pr1=1 pr2=0, py1=0 py2=1, pw1=0 pw2=0, pb1=0 pb2=0, state=green gate=1, p1=0 p2=1
+    OSignal  0307 set sg3p to aspect green
+   */
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+      "p=%d, pg1=%d pg2=%d, pr1=%d pr2=%d, py1=%d py2=%d, pw1=%d pw2=%d, pb1=%d pb2=%d, state=%s gate=%d, p1=%d p2=%d",
+      pattern, pattern1green, pattern2green, pattern1red, pattern2red, pattern1yellow, pattern2yellow,
+      pattern1white, pattern2white, pattern1blank, pattern2blank, state, gate, pattern1, pattern2);
+
+  if( (pattern1 == pattern1green || pattern1green == 2) && (pattern2 == pattern2green || pattern2green == 2) ) {
+    return wSignal.green;
+  }
+  else if( (pattern1 == pattern1red || pattern1red == 2) && (pattern2 == pattern2red || pattern2red == 2) ) {
+    return wSignal.red;
+  }
+  else if( (pattern1 == pattern1yellow || pattern1yellow == 2) && (pattern2 == pattern2yellow || pattern2yellow == 2) ) {
+    return wSignal.yellow;
+  }
+  else if( (pattern1 == pattern1white || pattern1white == 2) && (pattern2 == pattern2white || pattern2white == 2) ) {
+    return wSignal.white;
+  }
+  else if( (pattern1 == pattern1blank || pattern1blank == 2) && (pattern2 == pattern2blank || pattern2blank == 2) ) {
+    return wSignal.blank;
+  }
+
+  /* Default red. */
+  return wSignal.red;
+}
+
+
+static void _event( iOSignal inst, iONode nodeC ) {
+  iOSignalData data = Data(inst);
+  Boolean update = False;
+  int val = wAccessory.getval1( nodeC );
+  const char* state = wSwitch.getstate(nodeC);
+  const char* id  = wSignal.getid( data->props );
+
+  if( wSwitch.getgatevalue(nodeC) == 0 ) {
+    /* Ignore off events */
+    return;
+  }
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+      "event for signal %s acc=%d state=%s active=%d...", id, val, state, wSwitch.getgatevalue(nodeC));
+
+  if( TraceOp.getLevel(NULL) & TRCLEVEL_DEBUG ) {
+    char* strNode = (char*)NodeOp.base.toString( nodeC );
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "signal event: %s", strNode );
+    StrOp.free( strNode );
+  }
+
+  if( wSignal.getaspects(data->props) == 2 && wSignal.isasswitch(data->props) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,"%s two aspect as switch", id);
+    if( wSignal.isinv(data->props) )
+      wSignal.setstate( data->props, StrOp.equals( state, wSwitch.turnout ) ? wSignal.red:wSignal.green );
+    else
+      wSignal.setstate( data->props, StrOp.equals( state, wSwitch.turnout ) ? wSignal.green:wSignal.red );
+    update = True;
+  }
+  else {
+    int bus = wSwitch.getbus( nodeC );
+    int addr = wSwitch.getaddr1( nodeC );
+    int port = wSwitch.getport1( nodeC );
+    int gate = StrOp.equals( state, wSwitch.turnout ) ? 0:1;
+    int pada, fada;
+
+    int matchaddr1 = wSignal.getaddr(data->props);
+    int matchport1 = wSignal.getport1(data->props);
+    int matchaddr2 = wSignal.getaddr2(data->props);
+    int matchport2 = wSignal.getport2(data->props);
+    int matchaddr3 = wSignal.getaddr3(data->props);
+    int matchport3 = wSignal.getport3(data->props);
+    int matchaddr4 = wSignal.getaddr4(data->props);
+    int matchport4 = wSignal.getport4(data->props);
+
+    if( addr > 0 && port == 0 ) {
+      /* flat */
+      fada = matchaddr1;
+      matchaddr1 = fada / 8 + 1;
+      matchport1 = (fada % 8) /2 + 1;
+      fada = matchaddr2;
+      matchaddr2 = fada / 8 + 1;
+      matchport2 = (fada % 8) /2 + 1;
+      fada = matchaddr3;
+      matchaddr3 = fada / 8 + 1;
+      matchport3 = (fada % 8) /2 + 1;
+      fada = matchaddr4;
+      matchaddr4 = fada / 8 + 1;
+      matchport4 = (fada % 8) /2 + 1;
+    }
+    else if( matchaddr1 == 0 && matchport1 > 0 ) {
+      pada = matchport1;
+      matchaddr1 = (pada - 1) / 4 + 1;
+      matchport1 = (pada - 1) % 4 + 1;
+      pada = matchport2;
+      matchaddr2 = (pada - 1) / 4 + 1;
+      matchport2 = (pada - 1) % 4 + 1;
+      pada = matchport3;
+      matchaddr3 = (pada - 1) / 4 + 1;
+      matchport3 = (pada - 1) % 4 + 1;
+      pada = matchport4;
+      matchaddr4 = (pada - 1) / 4 + 1;
+      matchport4 = (pada - 1) % 4 + 1;
+    }
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "addr=%d port=%d gate=%d, ma1=%d mp1=%d, ma2=%d mp2=%d, ma3=%d mp3=%d, ma4=%d mp4=%d",
+        addr, port, gate, matchaddr1, matchport1, matchaddr2, matchport2, matchaddr3, matchport3, matchaddr4, matchport4);
+
+    if( wSignal.getusepatterns(data->props)  == 0 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,"%s multi aspect", id);
+      if( matchaddr1 == addr && matchport1 == port && wSignal.getgate1(data->props) == gate ) {
+        wSignal.setstate( data->props, wSignal.red );
+        update = True;
+      }
+      else if( matchaddr2 == addr && matchport2 == port && wSignal.getgate2(data->props) == gate ) {
+        if( wSignal.getaspects(data->props) == 2 )
+          wSignal.setstate( data->props, wSignal.green );
+        else
+          wSignal.setstate( data->props, wSignal.yellow );
+        update = True;
+      }
+      else if( matchaddr3 == addr && matchport3 == port && wSignal.getgate3(data->props) == gate ) {
+        wSignal.setstate( data->props, wSignal.green );
+        update = True;
+      }
+      else if( matchaddr4 == addr && matchport4 == port && wSignal.getgate4(data->props) == gate ) {
+        wSignal.setstate( data->props, wSignal.white );
+        update = True;
+      }
+      if( update )
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,"set %s to aspect %s", id, wSignal.getstate(data->props) );
+    }
+
+    /* Patterns */
+    else if( wSignal.getusepatterns(data->props)  == 1 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,"%s multi aspect with patterns", id);
+      if( matchaddr1 == addr && matchport1 == port ) {
+        wSignal.setstate( data->props, __getPatternState( inst, 1, gate ^ 1 ) );
+        update = True;
+      }
+      else if( matchaddr2 == addr && matchport2 == port ) {
+        wSignal.setstate( data->props, __getPatternState( inst, 2, gate ^ 1 ) );
+        update = True;
+      }
+      if( update )
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,"set %s to aspect %s", id, wSignal.getstate(data->props) );
+    }
+
+
+  }
+
+  __checkAction( inst, True );
+
+  /* Broadcast to clients. */
+  if( update ) {
+    iONode nodeF = NodeOp.inst( wSignal.name(), NULL, ELEMENT_NODE );
+    wSignal.setid( nodeF, wSignal.getid( data->props ) );
+    wSignal.setstate( nodeF, wSignal.getstate( data->props ) );
+    wSignal.setaspect( nodeF, wSignal.getaspect( data->props ) );
+    wSignal.setmanual( nodeF, wSignal.ismanual( data->props ) );
+    if( wSignal.getiid( data->props ) != NULL )
+      wSignal.setiid( nodeF, wSignal.getiid( data->props ) );
+    AppOp.broadcastEvent( nodeF );
+  }
+
+
+  /* Cleanup Node3 */
+  if( nodeC != NULL )
+    NodeOp.base.del(nodeC);
+}
+
 
 static void _green( iOSignal inst ) {
   if( inst != NULL && !SignalOp.isManualOperated(inst) ) {
@@ -167,6 +396,18 @@ static void _blank( iOSignal inst ) {
 }
 
 
+static void _aspect( iOSignal inst, int nr ) {
+  if( inst != NULL && !SignalOp.isManualOperated(inst) ) {
+    iOSignalData data = Data(inst);
+    iONode node = NodeOp.inst( wSignal.name(), NULL, ELEMENT_NODE );
+    wSignal.setcmd( node, wSignal.aspect );
+    wSignal.setaspect( node, nr );
+    wSignal.setid( node, SignalOp.getId( inst ) );
+    SignalOp.cmd( inst, node, True );
+  }
+}
+
+
 static Boolean __processPairCmd( iOSignal inst, const char* state, Boolean invert ) {
   iOSignalData o = Data(inst);
   iOControl control = AppOp.getControl(  );
@@ -182,6 +423,7 @@ static Boolean __processPairCmd( iOSignal inst, const char* state, Boolean inver
     wSwitch.setiid( swcmd, iid );
 
   wSwitch.setbus( swcmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(swcmd, wItem.getuidname(o->props));
   wSwitch.setprot( swcmd, wSignal.getprot( o->props ) );
   wSwitch.setactdelay( swcmd, False );
 
@@ -189,13 +431,17 @@ static Boolean __processPairCmd( iOSignal inst, const char* state, Boolean inver
   wSwitch.setaddr1( swcmd, wSignal.getaddr( o->props ) );
   wSwitch.setport1( swcmd, wSignal.getport1( o->props ) );
   wSwitch.setcmd( swcmd, invert?wSwitch.straight:wSwitch.turnout );
+  wOutput.setaccessory( swcmd, wSignal.isaccessory(o->props) );
+  wSwitch.setporttype( swcmd, wSwitch.getporttype( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(swcmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
   if( wSignal.getaddr2( o->props ) > 0 || wSignal.getport2( o->props ) > 0 ) {
     if( wSignal.getaddr2( o->props ) > 0 )
       wSwitch.setaddr1( swcmd, wSignal.getaddr2( o->props ) );
     wSwitch.setport1( swcmd, wSignal.getport2( o->props ) );
     ControlOp.cmd( control, (iONode)NodeOp.base.clone(swcmd), NULL );
+  	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
   }
 
   if( wSignal.getaddr3( o->props ) > 0 || wSignal.getport3( o->props ) > 0 ) {
@@ -203,6 +449,7 @@ static Boolean __processPairCmd( iOSignal inst, const char* state, Boolean inver
       wSwitch.setaddr1( swcmd, wSignal.getaddr3( o->props ) );
     wSwitch.setport1( swcmd, wSignal.getport3( o->props ) );
     ControlOp.cmd( control, (iONode)NodeOp.base.clone(swcmd), NULL );
+	  ThreadOp.sleep(wSignal.getcmdtime( o->props ));
   }
 
   if( wSignal.getaddr4( o->props ) > 0 || wSignal.getport4( o->props ) > 0 ) {
@@ -210,6 +457,7 @@ static Boolean __processPairCmd( iOSignal inst, const char* state, Boolean inver
       wSwitch.setaddr1( swcmd, wSignal.getaddr4( o->props ) );
     wSwitch.setport1( swcmd, wSignal.getport4( o->props ) );
     ControlOp.cmd( control, (iONode)NodeOp.base.clone(swcmd), NULL );
+  	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
   }
 
   wSwitch.setcmd( swcmd, invert?wSwitch.turnout:wSwitch.straight );
@@ -329,6 +577,8 @@ static Boolean __processPatternCmd( iOSignal inst, const char* state ) {
     wOutput.setport( cmd, port1 );
     wOutput.setgate( cmd, gate1 );
     wOutput.setcmd ( cmd, wOutput.on);
+    wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+    wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
 
     /* invoke the command by calling the control */
     if(  !ControlOp.cmd( control, cmd, NULL ) ) {
@@ -336,6 +586,7 @@ static Boolean __processPatternCmd( iOSignal inst, const char* state ) {
           "Signal [%s] could not be set!", wSignal.getid( o->props ) );
       return False;
     }
+  	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
   }
 
   if( addr2 != 0 || port2 != 0 ) {
@@ -347,6 +598,8 @@ static Boolean __processPatternCmd( iOSignal inst, const char* state ) {
     wOutput.setport( cmd, port2 );
     wOutput.setgate( cmd, gate2 );
     wOutput.setcmd ( cmd, wOutput.on);
+    wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+    wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
 
     /* invoke the command by calling the control */
     if( !ControlOp.cmd( control, cmd, NULL ) ) {
@@ -355,6 +608,109 @@ static Boolean __processPatternCmd( iOSignal inst, const char* state ) {
       return False;
     }
   }
+
+  return True;
+}
+
+
+static Boolean __processMultiAspectsCmd( iOSignal inst, const char* state, int nr ) {
+  iOSignalData o = Data(inst);
+  iOControl control = AppOp.getControl(  );
+  const char* iid = wSignal.getiid( o->props );
+
+  iONode cmd = NodeOp.inst( wOutput.name(), NULL, ELEMENT_NODE );
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+      "multi aspects processing for signal [%s][%d]...", wSignal.getid( o->props ), nr );
+
+  if( iid != NULL )
+    wOutput.setiid( cmd, iid );
+
+  if( nr == -1 ) {
+    /* Use default aspects: */
+    if( StrOp.equals( wSignal.green, state ) )
+      nr = wSignal.getgreennr(o->props);
+    else if( StrOp.equals( wSignal.red, state ) )
+      nr = wSignal.getrednr(o->props);
+    else if( StrOp.equals( wSignal.yellow, state ) )
+      nr = wSignal.getyellownr(o->props);
+    else if( StrOp.equals( wSignal.white, state ) )
+      nr = wSignal.getwhitenr(o->props);
+    else if( StrOp.equals( wSignal.blank, state ) )
+      nr = wSignal.getblanknr(o->props);
+  }
+
+  wOutput.setbus( cmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(cmd, wItem.getuidname(o->props));
+  wOutput.setprot( cmd, wSignal.getprot( o->props ) );
+  wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+  wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
+
+  if( wSignal.getusepatterns( o->props ) == wSignal.use_linear ) {
+    wOutput.setcmd( cmd, wOutput.on );
+    if( wSignal.getaddr( o->props ) == 0 && wSignal.getport1( o->props ) > 0 ) {
+      wOutput.setaddr( cmd, 0);
+      wOutput.setport( cmd, wSignal.getport1( o->props ) + (nr / 2) );
+    }
+    else if( wSignal.getaddr( o->props ) > 0 && wSignal.getport1( o->props ) == 0 ) {
+      /* FLAT */
+      if( wSignal.isasswitch(o->props) ) {
+        NodeOp.setName(cmd, wSwitch.name());
+        wSwitch.setaddr1( cmd, wSignal.getaddr( o->props ) + (nr / 2) );
+        wSwitch.setcmd( cmd, (nr%2) == 0 ? wSwitch.turnout:wSwitch.straight );
+      }
+      else
+        wOutput.setaddr( cmd, wSignal.getaddr( o->props ) + nr );
+      wOutput.setport( cmd, 0 );
+    }
+    else {
+      int pada = AddrOp.toPADA( wSignal.getaddr( o->props ) ,wSignal.getport1( o->props ) );
+      int addr = 0;
+      int port = 0;
+      pada += (nr / 2);
+      AddrOp.fromPADA( pada , &addr, &port );
+      wOutput.setaddr( cmd, addr);
+      wOutput.setport( cmd, port);
+    }
+    wOutput.setgate( cmd, nr % 2 );
+    wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+    wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep(wSignal.getcmdtime( o->props ));
+  }
+  else {
+    wOutput.setcmd( cmd, (nr & 0x01) ? wOutput.on:wOutput.off );
+    wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
+    wOutput.setport( cmd, wSignal.getport1( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
+    wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+    wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep(wSignal.getcmdtime( o->props ));
+
+    wOutput.setcmd( cmd, (nr & 0x02) ? wOutput.on:wOutput.off );
+    wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
+    wOutput.setport( cmd, wSignal.getport2( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate2( o->props ) );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep(wSignal.getcmdtime( o->props ));
+
+    wOutput.setcmd( cmd, (nr & 0x04) ? wOutput.on:wOutput.off );
+    wOutput.setaddr( cmd, wSignal.getaddr3( o->props ) );
+    wOutput.setport( cmd, wSignal.getport3( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate3( o->props ) );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep(wSignal.getcmdtime( o->props ));
+
+    wOutput.setcmd( cmd, (nr & 0x08) ? wOutput.on:wOutput.off );
+    wOutput.setaddr( cmd, wSignal.getaddr4( o->props ) );
+    wOutput.setport( cmd, wSignal.getport4( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate4( o->props ) );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep(wSignal.getcmdtime( o->props ));
+  }
+
+  NodeOp.base.del(cmd);
 
   return True;
 }
@@ -375,13 +731,17 @@ static Boolean __process4AspectsCmd( iOSignal inst, const char* state ) {
     wOutput.setiid( cmd, iid );
 
   wOutput.setbus( cmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(cmd, wItem.getuidname(o->props));
 
   wOutput.setprot( cmd, wSignal.getprot( o->props ) );
   wOutput.setcmd( cmd, wOutput.off );
   wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
   wOutput.setport( cmd, wSignal.getport1( o->props ) );
   wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
+  wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+  wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
   if( wSignal.getaddr2( o->props ) > 0 )
     wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
@@ -390,6 +750,7 @@ static Boolean __process4AspectsCmd( iOSignal inst, const char* state ) {
   wOutput.setport( cmd, wSignal.getport2( o->props ) );
   wOutput.setgate( cmd, wSignal.getgate2( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
   if( wSignal.getaddr3( o->props ) > 0 )
     wOutput.setaddr( cmd, wSignal.getaddr3( o->props ) );
@@ -398,6 +759,7 @@ static Boolean __process4AspectsCmd( iOSignal inst, const char* state ) {
   wOutput.setport( cmd, wSignal.getport3( o->props ) );
   wOutput.setgate( cmd, wSignal.getgate3( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
 
   if( wSignal.getaddr4( o->props ) > 0 )
@@ -407,6 +769,7 @@ static Boolean __process4AspectsCmd( iOSignal inst, const char* state ) {
   wOutput.setport( cmd, wSignal.getport4( o->props ) );
   wOutput.setgate( cmd, wSignal.getgate4( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
 
   wOutput.setcmd( cmd, wOutput.on );
@@ -468,13 +831,17 @@ static Boolean __process3AspectsCmd( iOSignal inst, const char* state ) {
     wOutput.setiid( cmd, iid );
 
   wOutput.setbus( cmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(cmd, wItem.getuidname(o->props));
 
   wOutput.setprot( cmd, wSignal.getprot( o->props ) );
   wOutput.setcmd( cmd, wOutput.off );
   wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
   wOutput.setport( cmd, wSignal.getport1( o->props ) );
   wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
+  wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+  wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
   if( wSignal.getaddr2( o->props ) > 0 )
     wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
@@ -483,6 +850,7 @@ static Boolean __process3AspectsCmd( iOSignal inst, const char* state ) {
   wOutput.setport( cmd, wSignal.getport2( o->props ) );
   wOutput.setgate( cmd, wSignal.getgate2( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
   if( wSignal.getaddr3( o->props ) > 0 )
     wOutput.setaddr( cmd, wSignal.getaddr3( o->props ) );
@@ -491,6 +859,7 @@ static Boolean __process3AspectsCmd( iOSignal inst, const char* state ) {
   wOutput.setport( cmd, wSignal.getport3( o->props ) );
   wOutput.setgate( cmd, wSignal.getgate3( o->props ) );
   ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
 
   wOutput.setcmd( cmd, wOutput.on );
@@ -544,38 +913,52 @@ static Boolean __process2AspectsCmd( iOSignal inst, const char* state ) {
     wOutput.setiid( cmd, iid );
 
   wOutput.setbus( cmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(cmd, wItem.getuidname(o->props));
 
   wOutput.setprot( cmd, wSignal.getprot( o->props ) );
   wOutput.setcmd( cmd, wOutput.off );
-  wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
-  wOutput.setport( cmd, wSignal.getport1( o->props ) );
-  wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
-  ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
 
-  if( wSignal.getaddr2( o->props ) > 0 )
-    wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
-  else
+  /* reset only if two addresses have been setup */
+  if( wSignal.getaddr2( o->props ) > 0 || wSignal.getport2( o->props ) > 0 ) {
     wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
-  wOutput.setport( cmd, wSignal.getport2( o->props ) );
-  wOutput.setgate( cmd, wSignal.getgate2( o->props ) );
-  ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, wSignal.getport1( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
+    wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+    wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep(wSignal.getcmdtime( o->props ));
 
-  wOutput.setcmd( cmd, wOutput.on );
+    wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
+    wOutput.setport( cmd, wSignal.getport2( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate2( o->props ) );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+	  ThreadOp.sleep(wSignal.getcmdtime( o->props ));
+  }
 
-  if( StrOp.equals( wSignal.green, state ) ) {
-    if( wSignal.getaddr2( o->props ) > 0 )
-      wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
-    else
-      wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
+  if( StrOp.equals( wSignal.green, state ) && (wSignal.getaddr2( o->props ) > 0 || wSignal.getport2( o->props ) > 0) ) {
+    /* two address signal */
+    wOutput.setcmd( cmd, wOutput.on );
+    wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
     wOutput.setport( cmd, wSignal.getport2( o->props ) );
     wOutput.setgate( cmd, wSignal.getgate2( o->props ) );
   }
+  else if( StrOp.equals( wSignal.green, state ) && (wSignal.getaddr2( o->props ) == 0 && wSignal.getport2( o->props ) == 0) ) {
+    /* single address signal */
+    wOutput.setcmd( cmd, wOutput.off );
+    wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
+    wOutput.setport( cmd, wSignal.getport1( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
+  }
   else if( !StrOp.equals( wSignal.blank, state ) ) {
+    /* set red */
+    wOutput.setcmd( cmd, wOutput.on );
     wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
     wOutput.setport( cmd, wSignal.getport1( o->props ) );
     wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
   }
 
+  wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+  wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
 
   /* invoke the command by calling the control */
   if( !ControlOp.cmd( control, cmd, NULL ) ) {
@@ -589,19 +972,92 @@ static Boolean __process2AspectsCmd( iOSignal inst, const char* state ) {
 
 
 
+static Boolean __processBinaryCmd( iOSignal inst, const char* state, int nr ) {
+  iOSignalData o = Data(inst);
+  iOControl control = AppOp.getControl(  );
+  int aspect = 0;
+  const char* iid = wSignal.getiid( o->props );
 
-static Boolean __processAspectNrCmd( iOSignal inst, const char* state ) {
+  if( nr != -1 )
+    aspect = nr;
+  else if( StrOp.equals( wSignal.green, state ) )
+    aspect = wSignal.getgreennr(o->props);
+  else if( StrOp.equals( wSignal.red, state ) )
+    aspect = wSignal.getrednr(o->props);
+  else if( StrOp.equals( wSignal.yellow, state ) )
+    aspect = wSignal.getyellownr(o->props);
+  else if( StrOp.equals( wSignal.white, state ) )
+    aspect = wSignal.getwhitenr(o->props);
+  else if( StrOp.equals( wSignal.blank, state ) )
+    aspect = wSignal.getblanknr(o->props);
+
+  iONode cmd = NodeOp.inst( wOutput.name(), NULL, ELEMENT_NODE );
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+      "binary processing for signal [%s][%s]...", wSignal.getid( o->props ), state );
+
+  /* reset all outputs */
+  if( iid != NULL )
+    wOutput.setiid( cmd, iid );
+
+  wOutput.setbus( cmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(cmd, wItem.getuidname(o->props));
+  wOutput.setprot( cmd, wSignal.getprot( o->props ) );
+  wOutput.setaccessory( cmd, wSignal.isaccessory(o->props) );
+  wOutput.setporttype( cmd, wSignal.getporttype( o->props ) );
+
+  if( wSignal.getaddr( o->props ) > 0 || wSignal.getport1( o->props ) > 0 ) {
+    wOutput.setaddr( cmd, wSignal.getaddr( o->props ) );
+    wOutput.setport( cmd, wSignal.getport1( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate1( o->props ) );
+    wOutput.setcmd( cmd, aspect&0x01?wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+  }
+
+  if( wSignal.getaddr2( o->props ) > 0 || wSignal.getport2( o->props ) > 0 ) {
+    wOutput.setaddr( cmd, wSignal.getaddr2( o->props ) );
+    wOutput.setport( cmd, wSignal.getport2( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate2( o->props ) );
+    wOutput.setcmd( cmd, aspect&0x02?wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+  }
+
+  if( wSignal.getaddr3( o->props ) > 0 || wSignal.getport3( o->props ) > 0 ) {
+    wOutput.setaddr( cmd, wSignal.getaddr3( o->props ) );
+    wOutput.setport( cmd, wSignal.getport3( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate3( o->props ) );
+    wOutput.setcmd( cmd, aspect&0x04?wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+  }
+
+  if( wSignal.getaddr4( o->props ) > 0 || wSignal.getport4( o->props ) > 0 ) {
+    wOutput.setaddr( cmd, wSignal.getaddr4( o->props ) );
+    wOutput.setport( cmd, wSignal.getport4( o->props ) );
+    wOutput.setgate( cmd, wSignal.getgate4( o->props ) );
+    wOutput.setcmd( cmd, aspect&0x08?wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+  }
+
+  NodeOp.base.del(cmd);
+  return True;
+}
+
+
+static Boolean __processAspectNrCmd( iOSignal inst, const char* state, int nr ) {
   iOSignalData o = Data(inst);
   iOControl control = AppOp.getControl(  );
   const char* iid = wSignal.getiid( o->props );
   int aspect = 0;
+  char saspect[32] = {'\0'};
 
   iONode cmd = NodeOp.inst( wSignal.name(), NULL, ELEMENT_NODE );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-      "aspect number processing for signal [%s][%s]...", wSignal.getid( o->props ), state );
+      "aspect number processing for signal [%s] state=%s aspect=%d", wSignal.getid( o->props ), state, nr );
 
-  if( StrOp.equals( wSignal.green, state ) )
+  if( nr != -1 )
+    aspect = nr;
+  else if( StrOp.equals( wSignal.green, state ) )
     aspect = wSignal.getgreennr(o->props);
   else if( StrOp.equals( wSignal.red, state ) )
     aspect = wSignal.getrednr(o->props);
@@ -616,7 +1072,12 @@ static Boolean __processAspectNrCmd( iOSignal inst, const char* state ) {
   if( iid != NULL )
     wSignal.setiid( cmd, iid );
 
+  StrOp.fmtb(saspect, "%d", aspect);
+  wSignal.setstate(o->props, saspect);
+  wSignal.setaspect(o->props, aspect);
+
   wSignal.setbus( cmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(cmd, wItem.getuidname(o->props));
 
   wSignal.setprot( cmd, wSignal.getprot( o->props ) );
   wSignal.setcmd( cmd, wSignal.aspect );
@@ -652,9 +1113,11 @@ static Boolean __process2AspectsAsSwitchCmd( iOSignal inst, const char* state ) 
   if( iid != NULL )
     wSwitch.setiid( cmd, iid );
 
+  wSwitch.setaccessory( cmd, wSignal.isaccessory( o->props ) );
   wSwitch.setprot( cmd, wSignal.getprot( o->props ) );
   wSwitch.setcmd( cmd, wOutput.on );
   wSwitch.setbus( cmd, wSignal.getbus( o->props ) );
+  wItem.setuidname(cmd, wItem.getuidname(o->props));
   wSwitch.setaddr1( cmd, wSignal.getaddr( o->props ) );
   wSwitch.setport1( cmd, wSignal.getport1( o->props ) );
 
@@ -671,18 +1134,21 @@ static Boolean __process2AspectsAsSwitchCmd( iOSignal inst, const char* state ) 
 }
 
 
-static void __checkAction( iOSignal inst ) {
+static void __checkAction( iOSignal inst, Boolean event ) {
 
   iOSignalData data     = Data(inst);
   iOModel      model    = AppOp.getModel();
   iONode       sgaction = wSignal.getactionctrl( data->props );
   iIBlockBase  bk       = NULL;
 
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "signal action check for state: [%s]", wSignal.getstate(data->props));
   while( sgaction != NULL) {
-      if( StrOp.len( wActionCtrl.getstate(sgaction) ) == 0 ||
-          StrOp.equals(wActionCtrl.getstate(sgaction), wSignal.getstate(data->props) ) )
-      {
+    Boolean atcmd = wActionCtrl.isatcmd(sgaction);
+    Boolean atevt = wActionCtrl.isatevt(sgaction);
 
+    if( (!event && atcmd) || (event && atevt) ) {
+      if( StrOp.len( wActionCtrl.getstate(sgaction) ) == 0 || StrOp.equals(wActionCtrl.getstate(sgaction), wSignal.getstate(data->props) ) )
+      {
         iOAction action = ModelOp.getAction( AppOp.getModel(), wActionCtrl.getid( sgaction ));
         if( action != NULL ) {
           TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "signal action: %s", wActionCtrl.getid( sgaction ));
@@ -691,63 +1157,96 @@ static void __checkAction( iOSignal inst ) {
           if( bk != NULL ) {
             TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "signal in block %s with loco %s", bk->base.id(bk), bk->getLoc(bk) );
             wActionCtrl.setlcid(sgaction, bk->getLoc(bk) );
+
+            if(wActionCtrl.getlcid(sgaction) != NULL && StrOp.len(wActionCtrl.getlcid(sgaction)) > 0 ) {
+              iOLoc lc = ModelOp.getLoc( AppOp.getModel(), wActionCtrl.getlcid(sgaction), NULL, False );
+              if( lc != NULL ) {
+                wActionCtrl.setlcclass(sgaction, LocOp.getClass(lc));
+              }
+            }
+
           }
 
           ActionOp.exec(action, sgaction);
         }
       }
       else {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "action state does not match: [%s-%s]",
-            wActionCtrl.getstate( sgaction ), wSignal.getstate(data->props) );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "%s action state does not match: [%s-%s]",
+            wSignal.getid(data->props), wActionCtrl.getstate( sgaction ), wSignal.getstate(data->props) );
       }
+    }
     sgaction = wSignal.nextactionctrl( data->props, sgaction );
   }
 
 }
 
 
-static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
+static Boolean __doCmd( iOSignal inst, iONode nodeA, Boolean update ) {
   iOSignalData o = Data(inst);
   iOControl control = AppOp.getControl(  );
   Boolean ok = True;
 
   const char* state      = wSignal.getcmd( nodeA );
+  int          aspectnr   = -1;
   const char* iid        = wSignal.getiid( o->props );
   const char* savedState = wSignal.getstate( o->props );
-  Boolean     inv        = wSignal.isinv( o->props );
-  Boolean     chgState   = True;
+  Boolean     inv         = wSignal.isinv( o->props );
+  Boolean     chgState    = True;
 
 
   if( control == NULL ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
-        "control is not initialized" );
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "control is not initialized" );
+    NodeOp.base.del(nodeA);
     return False;
   }
 
   /* flip the signal for manual mode */
   if( StrOp.equals( wSignal.flip, state ) ) {
-    if( StrOp.equals( savedState, wSignal.green ) ) {
-      if( wSignal.getaspects( o->props ) == 4 ) {
-        state = wSignal.white;
-      }
-      else if( wSignal.getaspects( o->props ) == 3 ) {
-        state = wSignal.yellow;
-      }
-      else
-        state = wSignal.red;
-    }
-    else if( StrOp.equals( savedState, wSignal.yellow ) ) {
-      state = wSignal.red;
-    }
-    else if( StrOp.equals( savedState, wSignal.white ) ) {
-      state = wSignal.yellow;
-    }
-    else if( StrOp.equals( savedState, wSignal.blank ) ) {
-      state = wSignal.blank;
+    int nraspects = wSignal.getaspects(o->props);
+    if( nraspects > 4 || wSignal.isusesymbolprefix(o->props) || wSignal.getusepatterns( o->props ) == wSignal.use_aspectnrs ) {
+      int currentAspect = wSignal.getaspect( o->props ) + 1;
+      if( currentAspect >= nraspects )
+        currentAspect = 0;
+      wSignal.setaspect( o->props, currentAspect );
+      state = wSignal.aspect;
+      aspectnr = currentAspect;
+      chgState = True;
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "setting multi[%d] aspect signal %s to aspect %d",
+                   nraspects, wSignal.getid( o->props ), currentAspect );
     }
     else {
-      state = wSignal.green;
+      if( StrOp.equals( savedState, wSignal.green ) ) {
+        if( wSignal.getaspects( o->props ) == 4 ) {
+          state = wSignal.white;
+        }
+        else if( wSignal.getaspects( o->props ) == 3 ) {
+          state = wSignal.yellow;
+        }
+        else
+          state = wSignal.red;
+      }
+      else if( StrOp.equals( savedState, wSignal.yellow ) ) {
+        state = wSignal.red;
+      }
+      else if( StrOp.equals( savedState, wSignal.white ) ) {
+        state = wSignal.yellow;
+      }
+      else if( StrOp.equals( savedState, wSignal.blank ) ) {
+        state = wSignal.blank;
+      }
+      else {
+        state = wSignal.green;
+      }
     }
+  }
+  else if( StrOp.equals( wSignal.aspect, state ) ) {
+    wSignal.setaspect( o->props, aspectnr );
+    chgState = True;
+    state = wSignal.aspect;
+    aspectnr = wSignal.getaspect( nodeA );
+    wSignal.setaspect( o->props, aspectnr );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "setting signal %s to aspect %d",
+                 wSignal.getid( o->props ), aspectnr );
   }
   else if( StrOp.equals( wSignal.autooperated, state ) ) {
     wSignal.setmanual( o->props, False);
@@ -763,7 +1262,7 @@ static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
   }
 
   if( !NodeOp.getBool(nodeA, "force", False ) ) {
-    if( StrOp.equals(wSignal.getstate( o->props ), state) && wCtrl.isskipsetsg( wRocRail.getctrl(AppOp.getIni())) ) {
+    if( StrOp.equals(wSignal.getstate( o->props ), state) && wCtrl.isskipsetsg( wFreeRail.getctrl(AppOp.getIni())) ) {
       chgState = False;
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "skipping signal[%s] command: no change of state[%s].",
           wSignal.getid( o->props ), state);
@@ -773,9 +1272,19 @@ static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
   /* save the new state of the signal */
   if( chgState ) {
     Boolean hasAddr =  (wSignal.getaddr(o->props) == 0 && wSignal.getport1(o->props) == 0 ) ? False:True;
-    wSignal.setstate( o->props, state );
+    if( StrOp.equals(wSignal.red, state ) )
+      wSignal.setstate( o->props, wSignal.red );
+    else if( StrOp.equals(wSignal.blank, state ) )
+      wSignal.setstate( o->props, wSignal.blank );
+    else if( StrOp.equals(wSignal.green, state ) )
+      wSignal.setstate( o->props, wSignal.green );
+    else if( StrOp.equals(wSignal.yellow, state ) )
+      wSignal.setstate( o->props, wSignal.yellow );
+    else if( StrOp.equals(wSignal.white, state ) )
+      wSignal.setstate( o->props, wSignal.white );
+
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "setting signal %s to %s",
-                 wSignal.getid( o->props ), wSignal.getstate( o->props ) );
+                 wSignal.getid( o->props ), state );
 
     /* invert only 2 aspect signals */
     if( inv && wSignal.getaspects( o->props ) == 2 ) {
@@ -801,7 +1310,14 @@ static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
       }
     }
     else if( hasAddr && wSignal.getusepatterns( o->props ) == wSignal.use_aspectnrs ) {
-      if( !__processAspectNrCmd( inst, state ) ) {
+      if( !__processAspectNrCmd( inst, state, aspectnr ) ) {
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
+            "Signal [%s] could not be set!", wSignal.getid( o->props ) );
+        ok = False;
+      }
+    }
+    else if( hasAddr && wSignal.getusepatterns( o->props ) == wSignal.use_binary ) {
+      if( !__processBinaryCmd( inst, state, aspectnr ) ) {
         TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
             "Signal [%s] could not be set!", wSignal.getid( o->props ) );
         ok = False;
@@ -810,6 +1326,14 @@ static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
     /* pair processing */
     else if( hasAddr && wSignal.ispair( o->props ) ) {
       if( !__processPairCmd( inst, state, inv ) ) {
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
+            "Signal [%s] could not be set!", wSignal.getid( o->props ) );
+        ok = False;
+      }
+    }
+    else if( (hasAddr && wSignal.getusepatterns( o->props ) == wSignal.use_linear) || (hasAddr && wSignal.getaspects(o->props) > 4) ){
+      /* invoke the command by calling the control */
+      if( !__processMultiAspectsCmd( inst, state, aspectnr ) ) {
         TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
             "Signal [%s] could not be set!", wSignal.getid( o->props ) );
         ok = False;
@@ -847,9 +1371,13 @@ static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
         ok = False;
       }
     }
+    else {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+          "Signal [%s] has no address", wSignal.getid( o->props ) );
+    }
 
     if( ok )
-      __checkAction( inst );
+      __checkAction( inst, False );
   }
 
   /* Broadcast to clients. Node6 */
@@ -857,6 +1385,7 @@ static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
     iONode nodeF = NodeOp.inst( wSignal.name(), NULL, ELEMENT_NODE );
     wSignal.setid( nodeF, wSignal.getid( o->props ) );
     wSignal.setstate( nodeF, wSignal.getstate( o->props ) );
+    wSignal.setaspect( nodeF, wSignal.getaspect( o->props ) );
     wSignal.setmanual( nodeF, wSignal.ismanual( o->props ) );
     if( wSignal.getiid( o->props ) != NULL )
       wSignal.setiid( nodeF, wSignal.getiid( o->props ) );
@@ -868,6 +1397,44 @@ static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
   nodeA = NULL;
 
   return ok;
+}
+
+
+
+static void __doCmdThread( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOSignal sg = (iOSignal)ThreadOp.getParm( th );
+  iOSignalData data = Data(sg);
+
+  iONode nodeA = (iONode)ThreadOp.getPost(th);
+  if( nodeA != NULL ) {
+    Boolean update = wSwitch.iscmd_update(nodeA);
+    int error = 0;
+    if( wSignal.getpause(nodeA) > 0 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "delay command for signal[%s] %dms", SignalOp.getId(sg), wSignal.getpause(nodeA) );
+      ThreadOp.sleep(wSignal.getpause(nodeA));
+    }
+    __doCmd(sg, nodeA, update);
+  }
+  ThreadOp.base.del(th);
+}
+
+
+
+static Boolean _cmd( iOSignal inst, iONode nodeA, Boolean update ) {
+  iOSignalData data = Data(inst);
+
+  if( wSignal.getpause(nodeA) > 0 ) {
+    iOThread th = ThreadOp.inst(NULL, &__doCmdThread, inst);
+    wSwitch.setcmd_update(nodeA, update);
+    ThreadOp.post(th, (obj)nodeA);
+    ThreadOp.start(th);
+  }
+  else {
+    return __doCmd(inst, nodeA, update);
+  }
+
+  return True;
 }
 
 
@@ -897,7 +1464,10 @@ static void _modify( iOSignal inst, iONode props ) {
     cnt = NodeOp.getChildCnt( o->props );
     while( cnt > 0 ) {
       iONode child = NodeOp.getChild( o->props, 0 );
-      NodeOp.removeChild( o->props, child );
+      iONode removedChild = NodeOp.removeChild( o->props, child );
+      if( removedChild != NULL) {
+        NodeOp.base.del(removedChild);
+      }
       cnt = NodeOp.getChildCnt( o->props );
     }
 
@@ -973,7 +1543,7 @@ static iOSignal _inst( iONode props ) {
 
 static Boolean _isState( iOSignal inst, const char* state ) {
   iOSignalData data = Data(inst);
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "signal [%s] is %s (%s)",
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "signal [%s] is %s (%s)",
       _getId(inst), wSignal.getstate(data->props), state );
   return StrOp.equals( state, wSignal.getstate(data->props) );
 }
@@ -982,6 +1552,12 @@ static Boolean _isState( iOSignal inst, const char* state ) {
 static Boolean _isManualOperated( iOSignal inst ) {
   iOSignalData data = Data(inst);
   return wSignal.ismanual(data->props);
+}
+
+
+static Boolean _isResetManualOperated( iOSignal inst ) {
+  iOSignalData data = Data(inst);
+  return wSignal.ismanualreset(data->props);
 }
 
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -59,10 +62,7 @@ class wxSpinCtrl;
 #define ID_TEXTCTRL_SRCP_HOST 10024
 #define wxID_STATIC_SRCP_CMDPORT 10030
 #define ID_TEXTCTRL_SRCP_CmdPort 10035
-#define wxID_STATIC_SRCP_SENSPORT 10031
-#define ID_TEXTCTRL_SRCP_SENSPORT 10036
-#define wxID_STATIC_SRCP_INFPORT 10032
-#define ID_TEXTCTRL_SRCP_INFPORT 10037
+#define ID_SRCPSUBLIB 10031
 #define ID_PANEL_SRCP_BUSSES 10045
 #define SYMBOL_SRCPCTRLDLG_STYLE wxCAPTION|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCLOSE_BOX
 #define SYMBOL_SRCPCTRLDLG_TITLE _("SRCP")
@@ -96,7 +96,7 @@ class SRCPCtrlDlg: public wxDialog
 public:
     /// Constructors
     SRCPCtrlDlg( );
-    SRCPCtrlDlg( wxWindow* parent, iONode props );
+    SRCPCtrlDlg( wxWindow* parent, iONode props, const char* devices );
 
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_SRCPCTRLDLG_IDNAME, const wxString& caption = SYMBOL_SRCPCTRLDLG_TITLE, const wxPoint& pos = SYMBOL_SRCPCTRLDLG_POSITION, const wxSize& size = SYMBOL_SRCPCTRLDLG_SIZE, long style = SYMBOL_SRCPCTRLDLG_STYLE );
@@ -111,6 +111,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end SRCPCtrlDlg event handler declarations
 
@@ -135,11 +138,9 @@ public:
     wxTextCtrl* m_Host;
     wxStaticText* m_labCmdPort;
     wxTextCtrl* m_CmdPort;
-    wxStaticText* m_labSensPort;
-    wxTextCtrl* m_SensPort;
-    wxStaticText* m_labInfPort;
-    wxTextCtrl* m_InfPort;
-    wxCheckBox* m_UDP;
+    wxStaticText* m_labDevice;
+    wxComboBox* m_Device;
+    wxRadioBox* m_SubLibBox;
     wxPanel* m_BussesPanel;
     wxStaticText* m_labBusServer;
     wxSpinCtrl* m_BusServer;
@@ -166,6 +167,8 @@ public:
     wxButton* m_OK;
     wxButton* m_Cancel;
 ////@end SRCPCtrlDlg member variables
+    const char* m_Devices;
+
 };
 
 #endif

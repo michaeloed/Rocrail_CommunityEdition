@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -56,34 +59,34 @@ void eventPre2In( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, B
     newPre2InEvent = True;
   }
   else {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                    "Ignoring pre2in_block event from %s; it came within %d ticks!", blockId, data->ignevt );
   }
   
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                  "pre2in_block event for \"%s\" from \"%s\"...",
                  data->loc->getId( data->loc ), blockId );
   
   if( newPre2InEvent && dstBlockEvent && data->state == LC_WAIT4EVENT ) {
     /* optional state */
     data->state = LC_PRE2INBLOCK;
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "Setting state for \"%s\" to LC_PRE2INBLOCK.",
                    data->loc->getId( data->loc ) );
   }
   else if( newPre2InEvent && dstBlockEvent && data->state == LC_RE_ENTERBLOCK ) {
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "PRE2IN event in state LC_RE_ENTERBLOCK for %s",
                    data->loc->getId( data->loc ) );
                    
     if( data->next2Block == NULL ) {
-      if( !data->gomanual ) {
+      if( !data->gomanual && !wLoc.isusebbt(data->loc->base.properties( data->loc )) ) {
         iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
         wLoc.setV_hint( cmd, wLoc.min );
         wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
         data->loc->cmd( data->loc, cmd );
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
-                     "Setting velocity for \"%s\" to V_Min",
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
+                     "Setting pre2in velocity for \"%s\" to V_Min",
                      data->loc->getId( data->loc ) );
       }
     }

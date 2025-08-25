@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2011 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -36,22 +39,24 @@ class BidibDlg : public bidibdlggen
 protected:
 	// Handlers for bidibdlggen events.
 	void OnNodeList( wxCommandEvent& event );
-	void OnAddNode( wxCommandEvent& event );
-	void OnModifyNode( wxCommandEvent& event );
-	void OnDeleteNode( wxCommandEvent& event );
 	void OnCancel( wxCommandEvent& event );
 	void OnOK( wxCommandEvent& event );
-	
+  void onConfigureNodes( wxCommandEvent& event );
+  void onSubLib( wxCommandEvent& event );
+  void OnHelp( wxCommandEvent& event );
+
   void initLabels();
   void initValues();
   void initNodes();
   void evaluate();
+  void subLib();
   iONode m_Props;
+  const char* m_Devices;
 
 
 public:
 	/** Constructor */
-	BidibDlg( wxWindow* parent, iONode props );
+	BidibDlg( wxWindow* parent, iONode props, const char* devices=NULL );
 
 };
 

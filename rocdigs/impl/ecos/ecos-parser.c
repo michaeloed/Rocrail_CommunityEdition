@@ -1,7 +1,7 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -270,6 +270,10 @@ static void __parseCallParms( iONode node, const char* p_replyline ) {
  * input : <REPLY queryObjects(10, name)>
  * output: <reply cmd="queryObjects" oid="10">
  *
+ * <reply rtype="0" cmd="get" oid="202" railcom="12" rc="0" msg="OK)&gt;">
+ * <202 railcom="12, 64, 1"/>
+ * </reply>
+ *
  */
 static void __parseREPLY( iONode node, const char* replyline ) {
 
@@ -453,21 +457,17 @@ static void __parseRow( iONode node, const char* p_replyline ) {
         /* Check for empty string after name */
 
       if ( val == NULL ) {
-
-          /* unexpected */
-
-        TraceOp.trc( "ecosparser", TRCLEVEL_EXCEPTION, __LINE__, 9999, "not well formed, ends with '['" );
-        return;
+        val="";
       }
-
+      else {
         /* determine attribute value */
-
-      len = StrOp.len( val );
-      for ( i = 0; i < len; i++ ) {
-        if ( val[ i ] == ']' ) {
-          val[ i ] = '\0';         /* end attribute value */
-          lastattr  = val + i + 1;
-          break;
+        len = StrOp.len( val );
+        for ( i = 0; i < len; i++ ) {
+          if ( val[ i ] == ']' ) {
+            val[ i ] = '\0';         /* end attribute value */
+            lastattr  = val + i + 1;
+            break;
+          }
         }
       }
 
@@ -514,6 +514,11 @@ static void __parseEND( iONode node, const char* replyline ) {
  *    <REPLY/EVENT set/get/create/delete/request/release/link/unlink/queryObjects(ID, var[val], ...)>
  *    ID var[val], ...
  *    <END rc (string)>
+ *
+ *    <EVENT 1>
+ *    <END 0 (OK)>
+ *    <EVENT 100>
+ *    <END 0 (OK)>
  */
 iONode ecos_parser( const char* reply ) {
 
@@ -561,7 +566,7 @@ iONode ecos_parser( const char* reply ) {
 
         /* This is start of event */
 
-      TraceOp.trc( "ecosparser", TRCLEVEL_INFO, __LINE__, 9999, "parsing event..." );
+      TraceOp.trc( "ecosparser", TRCLEVEL_DEBUG, __LINE__, 9999, "parsing event..." );
       node = NodeOp.inst( "event", NULL, ELEMENT_NODE );
       NodeOp.setInt( node, "rtype", REPLY_TYPE_EVENT );
       __parseEVENT( node, cpreplyline );

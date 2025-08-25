@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -138,6 +141,35 @@ static void __countTokens( iOStrTok inst ) {
     };
   }
 }
+
+static char* _replaceAll( const char* str ,char sep ,const char* oldTok ,const char* newTok ) {
+  Boolean modified = False;
+  iOStrTok tok = StrTokOp.inst(str, sep );
+  char* tokids = NULL;
+  while( StrTokOp.hasMoreTokens(tok) ) {
+    const char* tokid = StrTokOp.nextToken(tok);
+    if( tokids != NULL )
+      tokids = StrOp.cat( tokids, "," );
+    if( StrOp.equals(oldTok, tokid) ) {
+      tokids = StrOp.cat( tokids, newTok );
+      modified = True;
+    }
+    else
+      tokids = StrOp.cat( tokids, tokid );
+  }
+  StrTokOp.base.del(tok);
+
+  if( modified )
+    return tokids;
+  else {
+    if( tokids != NULL )
+      StrOp.free(tokids);
+    return NULL;
+  }
+}
+
+
+
 
 /* ------------------------------------------------------------
  * StrTokOp.inst()

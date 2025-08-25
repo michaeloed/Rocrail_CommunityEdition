@@ -21,6 +21,7 @@ while 1:
       connection.send('1003 addr[5] name["DB BR64"] protocol[DCC128]\n')
       connection.send('1004 addr[7] name["NS 1302"] protocol[DCC128]\n')
       connection.send('1005 addr[10] name["Nieuw 0010"] protocol[DCC28]\n')
+      connection.send('1006 addr[20] name["V200"] protocol[DCC28]\n')
       connection.send('<END 0 (OK)>\n')
 
       time.sleep(3)
@@ -33,6 +34,18 @@ while 1:
       connection.send('100 state[0x0]\n')
       connection.send('<END 0 (OK)>\n')
 
+      connection.send('<EVENT 200>\n')
+      connection.send('200 state[0x3]\n')
+      connection.send('<END 0 (OK)>\n')
+
+      connection.send('<EVENT 200>\n')
+      connection.send('200 railcom[01, 0356, 1]\n')
+      connection.send('<END 0 (OK)>\n')
+
+      connection.send('<EVENT 200>\n')
+      connection.send('200 railcom[01, 0000, 0]\n')
+      connection.send('<END 0 (OK)>\n')
+
       connection.send('<EVENT 102>\n')
       connection.send('102 state[0x10]\n')
       connection.send('<END 0 (OK)>\n')
@@ -48,5 +61,47 @@ while 1:
       connection.send('<EVENT 1>\n')
       connection.send('102 state[0x0]\n')
       connection.send('<END 0 (OK)>\n')
-
+      
+      connection.send('<EVENT 1>\n')
+      connection.send('1 status[GO]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      connection.send('<EVENT 200>\n')
+      connection.send('200 railcom[00, 0324, 1]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      connection.send('<EVENT 201>\n')
+      connection.send('201 railcom[01, 5324, 1]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      connection.send('<EVENT 202>\n')
+      connection.send('202 railcom[02, 7324, 1]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      connection.send('<REPLY get(202, railcom[12])>\n')
+      connection.send('202 railcom[12, 64, 1]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      connection.send('<EVENT 1004>\n')
+      connection.send('1006 func[3, 1]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      time.sleep(1)
+      
+      connection.send('<EVENT 1004>\n')
+      connection.send('1006 speed[116]\n')
+      connection.send('1006 speedstep[116]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      
+      connection.send('<REPLY get(1, info)>\n')
+      connection.send('1 ECoS2\n')
+      connection.send('1 ProtocolVersion[0.2]\n')
+      connection.send('1 ApplicationVersion[4.0.2]\n')
+      connection.send('1 HardwareVersion[2.0]\n')
+      connection.send('<END 0 (OK)>\n')
+      
+      
+      time.sleep(5)
+      
 connection.close()               # close socket

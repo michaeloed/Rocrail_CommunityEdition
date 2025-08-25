@@ -1,9 +1,9 @@
-/** ------------------------------------------------------------
-  * $Author: rob $
-  * $Date: 2006/08/16 09:01:43 $
-  * $Revision: 1.28 $
-  * $Source: /home/cvs/xspooler/rocs/gen/ogen.c,v $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 
 /* ------------------------------------------------------------
@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <string.h>
 
 /* ------------------------------------------------------------
  * platform dependent interfaces.

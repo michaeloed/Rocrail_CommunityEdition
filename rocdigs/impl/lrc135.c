@@ -1,18 +1,9 @@
-/** ------------------------------------------------------------
-  * A U T O   G E N E R A T E D  (First time only!)
-  * Generator: Rocs ogen (build Feb  4 2010 17:07:35)
-  * Module: RocDigs
-  * XML: $Source: /cvsroot/rojav/rocdigs/rocdigs.xml,v $
-  * XML: $Revision: 1.14 $
-  * Object: LRc135
-  * Date: Thu Feb  4 17:26:25 2010
-  * ------------------------------------------------------------
-  * $Source$
-  * $Author$
-  * $Date$
-  * $Revision$
-  * $Name$
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 #include "rocdigs/impl/lrc135_impl.h"
 
@@ -85,7 +76,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   return;
 }
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
  Some parts are copied from the DDL project of Torsten Vogt: http://www.vogt-it.com/OpenSource/DDL
 
  This program is free software; you can redistribute it and/or
@@ -34,6 +37,7 @@ int compSpeed14(char* packetstream, int address, int direction, int speed);
 
 int compSpeed(char* packetstream, int address, Boolean longaddr, int direction, int speed, int steps);
 int compFunction(char* packetstream, int address, Boolean longaddr, int group, Boolean f[]);
+int compBinStat(char* packetstream, int address, Boolean longaddr, int nr, int val);
 
 /* short addresses */
 int compSpeed28ShortAddr(char* packetstream, int address, int direction, int speed);

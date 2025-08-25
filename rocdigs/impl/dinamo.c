@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -40,6 +43,7 @@
 #include "rocrail/wrapper/public/Link.h"
 #include "rocrail/wrapper/public/Block.h"
 #include "rocrail/wrapper/public/State.h"
+#include "rocrail/wrapper/public/Program.h"
 
 static int instCnt = 0;
 
@@ -149,6 +153,14 @@ static int __generateChecksum( byte* datagram ) {
   return checksum | 0x80;
 }
 
+static void __mapBlockID(iODINAMO dinamo, iONode node) {
+  iODINAMOData data = Data(dinamo);
+  char* sAddr = StrOp.fmt( "%d", wSysCmd.getport( node ) );
+  if( MapOp.get( data->blockMap, sAddr ) == NULL ) {
+    if( wSysCmd.getid( node ) != NULL && StrOp.len(wSysCmd.getid( node )) > 0 )
+      MapOp.put( data->blockMap, sAddr, (obj)StrOp.dup(wSysCmd.getid( node )) );
+  }
+}
 
 /** ------------------------------------------------------------
  * translate rocrail node into dinamo datagram
@@ -164,7 +176,7 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
   if( StrOp.equals( NodeOp.getName( node ), wSysCmd.name() ) ) {
     const char* cmdstr = wSysCmd.getcmd( node );
     int cmdval = wSysCmd.getval( node );
-    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "translating: cmd=%s", cmdstr );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "processing system command [%s]", cmdstr );
 
     if( StrOp.equals( cmdstr, wSysCmd.stop ) || StrOp.equals( cmdstr, wSysCmd.ebreak ) ) {
       data->header |= FAULT_FLAG;
@@ -216,8 +228,10 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
       *response = True;
     }
     else if( StrOp.equals( cmdstr, wSysCmd.link ) ) {
-      /* TODO: */
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "link %d to %d", wSysCmd.getvalA( node ), wSysCmd.getvalB( node ) );
+      wSysCmd.setport( node, wSysCmd.getvalA( node ) );
+      __mapBlockID(dinamo, node);
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "link %d(%s) to %d",
+          wSysCmd.getvalA( node ), wSysCmd.getid( node ), wSysCmd.getvalB( node ) );
       datagram[0] = 4 | VER3_FLAG | data->header;
       datagram[1] = 0x3A | ((wSysCmd.getvalA( node ) / 128) & 0x01 );
       datagram[2] = wSysCmd.getvalA( node ) % 128;
@@ -227,12 +241,40 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
       size = 6;
     }
     else if( StrOp.equals( cmdstr, wSysCmd.ulink ) ) {
-      /* TODO: */
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "unlink %d", wSysCmd.getvalA( node ) );
       datagram[0] = 3 | VER3_FLAG | data->header;
       datagram[1] = 0x38 | ((wSysCmd.getvalA( node ) / 128) & 0x01 );
       datagram[2] = wSysCmd.getvalA( node ) % 128;
       datagram[3] = 0x04 | 0x02; /* unlink up, clear blocks*/
+      datagram[4] = (byte)__generateChecksum( datagram );
+      size = 5;
+    }
+    else if( StrOp.equals( cmdstr, wSysCmd.dcc ) ) {
+      __mapBlockID(dinamo, node);
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "set trackport %d to dcc", wSysCmd.getport( node ) );
+      datagram[0] = 3 | VER3_FLAG | data->header;
+      datagram[1] = 0x3E | (wSysCmd.getport( node ) / 128) ;
+      datagram[2] = wSysCmd.getport( node ) % 128;
+      datagram[3] = 0x33; // turn dcc block on
+      datagram[4] = (byte)__generateChecksum( datagram );
+      size = 5;
+    }
+    else if( StrOp.equals( cmdstr, wSysCmd.analog ) ) {
+      __mapBlockID(dinamo, node);
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "set trackport %d to analog", wSysCmd.getport( node ) );
+      datagram[0] = 3 | VER3_FLAG | data->header;
+      datagram[1] = 0x3E | (wSysCmd.getport( node ) / 128) ;
+      datagram[2] = wSysCmd.getport( node ) % 128;
+      datagram[3] = 0x53; // turn analog block on
+      datagram[4] = (byte)__generateChecksum( datagram );
+      size = 5;
+    }
+    else if( StrOp.equals( cmdstr, wSysCmd.resetblock ) ) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "resetblock %d", wSysCmd.getport( node ) );
+      datagram[0] = 3 | VER3_FLAG | data->header;
+      datagram[1] = 0x3E | (wSysCmd.getport( node ) / 128) ;
+      datagram[2] = wSysCmd.getport( node ) % 128;
+      datagram[3] = 0x32; // turn block off, DCC clear all packet info
       datagram[4] = (byte)__generateChecksum( datagram );
       size = 5;
     }
@@ -254,8 +296,8 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
         speed = ( wLoc.getV( node ) * range) / 100;
       else  if( wLoc.getV_max( node ) > 0 )
         speed = (wLoc.getV( node ) * range) / wLoc.getV_max( node );
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "dinamo car speed=%d", speed );
     }
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "dinamo car speed=%d", speed );
     /*
      Snelheid (0000110) (00AAAAA) (aaaaaaa) (00DSSSS) [(0000 XXX)]
        ·   AAAAAaaaaaaa = decoder adres (1..4095)
@@ -284,6 +326,7 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
     int  speed = 0;
     Boolean analog = StrOp.equals( wLoc.prot_A, wLoc.getprot( node ) );
     int  range = analog ? 63:28;
+    Boolean longAddr = (addr > 127) | StrOp.equals( wLoc.prot_L, wLoc.getprot( node ) );
 
 
     if( wLoc.getV( node ) != -1 ) {
@@ -291,8 +334,11 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
         speed = ( wLoc.getV( node ) * range) / 100;
       else
         speed = (wLoc.getV( node ) * range) / wLoc.getV_max( node );
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "dinamo speed=%d", speed );
     }
+
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
+        "loco %s (%s %d%c) speed=%d dir=%s trackport=%d",
+        wLoc.getid(node), analog?"analog":"DCC", addr, longAddr?'L':'S', speed, dir?"fwd":"rev", block );
 
     if( analog ) {
       datagram[0] = 4 | VER3_FLAG | data->header;
@@ -304,12 +350,17 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
       size = 6;
     }
     else {
-      datagram[0] = 4 | VER3_FLAG | data->header;
+      datagram[0] = (longAddr ? 5:4) | VER3_FLAG | data->header;
       datagram[1] = 0x28 | (block / 128) ;
       datagram[2] = block % 128;
       datagram[3] = 0x40 | (dir ? 0x20:0x00) | (speed & 0x1F);
-      datagram[4] = addr; /* base address */
-      datagram[5] = (byte)__generateChecksum( datagram );
+      datagram[4] = addr % 128; /* base address */
+      if( longAddr ) {
+        datagram[5] = addr / 128; /* base address */
+        datagram[6] = (byte)__generateChecksum( datagram );
+      }
+      else
+        datagram[5] = (byte)__generateChecksum( datagram );
       size = 6;
     }
   }
@@ -364,20 +415,55 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
     int   addr = wLoc.getaddr( node ); /* loc decoder address */
     int  block = wLoc.getport( node ); /* block number*/
     Boolean analog = StrOp.equals( wLoc.prot_A, wLoc.getprot( node ) );
+    int fnchanged = wFunCmd.getfnchanged(node);
+    int fngroup   = wFunCmd.getgroup(node);
+    Boolean longAddr = (addr > 127) | StrOp.equals( wLoc.prot_L, wLoc.getprot( node ) );
 
-    if( ! analog ) {
-      byte f0 = wLoc.isfn( node ) ? 0x10:0x00;
-      byte f1 = wFunCmd.isf1( node ) ? 0x01:0x00;
-      byte f2 = wFunCmd.isf2( node ) ? 0x02:0x00;
-      byte f3 = wFunCmd.isf3( node ) ? 0x04:0x00;
-      byte f4 = wFunCmd.isf4( node ) ? 0x08:0x00;
+    Boolean lights = wLoc.isfn(node);
+    Boolean f1 = wFunCmd.isf1( node );
+    Boolean f2 = wFunCmd.isf2( node );
+    Boolean f3 = wFunCmd.isf3( node );
+    Boolean f4 = wFunCmd.isf4( node );
 
-      datagram[0] = 4 | VER3_FLAG | data->header;
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
+        "function %s (%s %d%c) trackport=%d lights=%s f1=%s f2=%s f3=%s f4=%s",
+        wFunCmd.getid(node), analog?"analog":"DCC", addr, longAddr?'L':'S', block, lights?"on":"off", f1?"on":"off", f2?"on":"off", f3?"on":"off", f4?"on":"off" );
+
+    if( !analog ) {
+      byte f0  = wLoc.isfn( node ) ? 0x10:0x00;
+
+      byte f1  = wFunCmd.isf1 ( node ) ? 0x01:0x00;
+      byte f2  = wFunCmd.isf2 ( node ) ? 0x02:0x00;
+      byte f3  = wFunCmd.isf3 ( node ) ? 0x04:0x00;
+      byte f4  = wFunCmd.isf4 ( node ) ? 0x08:0x00;
+      byte f5  = wFunCmd.isf5 ( node ) ? 0x01:0x00;
+      byte f6  = wFunCmd.isf6 ( node ) ? 0x02:0x00;
+      byte f7  = wFunCmd.isf7 ( node ) ? 0x04:0x00;
+      byte f8  = wFunCmd.isf8 ( node ) ? 0x08:0x00;
+      byte f9  = wFunCmd.isf9 ( node ) ? 0x01:0x00;
+      byte f10 = wFunCmd.isf10( node ) ? 0x02:0x00;
+      byte f11 = wFunCmd.isf11( node ) ? 0x04:0x00;
+      byte f12 = wFunCmd.isf12( node ) ? 0x08:0x00;
+
+      datagram[0] = (longAddr ? 5:4) | VER3_FLAG | data->header;
       datagram[1] = 0x28 | (block / 128) ;
       datagram[2] = block % 128;
-      datagram[3] = f0 | f1 | f2 | f3 | f4;
-      datagram[4] = addr; /* base address */
-      datagram[5] = (byte)__generateChecksum( datagram );
+      if( fnchanged < 5 || fngroup == 1 ) {
+        datagram[3] = f0 | f1 | f2 | f3 | f4;
+      }
+      else if( fnchanged < 9 || fngroup == 2 ) {
+        datagram[3] = 0x30 | f5 | f6 | f7 | f8;
+      }
+      else if( fnchanged < 13 || fngroup == 3 ) {
+        datagram[3] = 0x20 | f9 | f10 | f11 | f12;
+      }
+      datagram[4] = addr % 128; /* base address */
+      if( longAddr ) {
+        datagram[5] = addr / 128; /* base address */
+        datagram[6] = (byte)__generateChecksum( datagram );
+      }
+      else
+        datagram[5] = (byte)__generateChecksum( datagram );
       size = 6;
     }
     else {
@@ -442,109 +528,151 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
     int  addr    = wSwitch.getaddr1( node );
     int  port    = wSwitch.getport1( node );
     int  delay   = wSwitch.getdelay( node );
+    int  param   = wSwitch.getparam1( node );
+    int  value   = wSwitch.getvalue1( node );
     int  nr      = 0;
+
+    if( delay == 0 )
+      delay = data->swtime;
+
+    delay = delay / 16; /* units of 1/60 sec. */
+    if( !wSwitch.isactdelay( node ) )
+      delay = 0; /* use default of 200 ms */
 
     if( port < 1 || addr < 1 ) {
       TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "address out of range [%d-%d]", addr, port);
-      addr = 1;
-      port = 1;
+      size = 0;
     }
-    addr--;
-    port--;
-    nr = addr * 4 + port;
+    else {
+      addr--;
+      port--;
+      nr = addr * 4 + port;
 
-    /* OM32 output */
-    if( StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_OM32 ) ) {
-      byte command = 0;
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "om32 %s [%d-%d] %s",
-          wSwitch.getcmd( node ), addr+1, port+1, wSwitch.issinglegate( node )?" (single gate)":"" );
+      /* OM32 output */
+      if( StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_OM32 ) || StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_OC32 ) ) {
+        byte command = 0;
+        if( wSwitch.issinglegate( node ) ) {
+          if( StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_OC32 ) ) {
+            command = 1;
+            delay = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 1:0;
+          }
+          else {
+            command = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 9:8;
+            delay = 0;
+          }
+        }
+        else {
+          command = 9; /* ON */
+          if( StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) )
+            port++;
+        }
 
-      if( wSwitch.issinglegate( node ) ) {
-        command = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 9:8;
-        delay = 0;
+        if( !wSwitch.isaccessory(node) && wSwitch.getporttype(node) == wProgram.porttype_servo ) {
+          command = 0x26;
+          delay   = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? value:param;
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "om32 switch servo [%d-%d] position=%d", addr+1, port+1, datagram[3]);
+        }
+        else if( !wSwitch.isaccessory(node) && wSwitch.getporttype(node) == wProgram.porttype_motor ) {
+          command = 0x27;
+          delay   = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? value:param;
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "om32 switch motor [%d-%d] PWM=%d", addr+1, port+1, datagram[3]);
+        }
+        else if( !wSwitch.isaccessory(node) && wSwitch.getporttype(node) == wProgram.porttype_light ) {
+          command = 0x01;
+          delay   = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? value:param;
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "om32 switch lights [%d-%d] aspect=%d", addr+1, port+1, datagram[3]);
+        }
+        else {
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "om32/oc32 switch %s [%d-%d] %s",
+              wSwitch.getcmd( node ), addr+1, port+1, wSwitch.issinglegate( node )?" (single gate)":"" );
+        }
+
+        datagram[0] = 4 | VER3_FLAG | data->header;
+        datagram[1] = 0x18 | ((addr & 0x1C) >> 2 );
+        datagram[2] = ((addr & 0x03) << 5) | (port & 0x1F);
+        datagram[3] = command; /* ON command */
+        datagram[4] = delay;
+        datagram[5] = (byte)__generateChecksum( datagram );
+        size = 6;
       }
-      else {
-        command = 9; /* ON */
-        if( StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) )
-          port++;
+
+      /* digital output */
+      else if( StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_DO ) ) {
+        byte command = 0;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "DO %s [%d-%d]",
+            wSwitch.getcmd( node ), addr+1, port+1 );
+
+        if( wSwitch.issinglegate( node ) ) {
+          command = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 10:0;
+
+          datagram[0] = 2 | VER3_FLAG | data->header;
+          datagram[1] = 0x08 | command;
+          datagram[2] = addr & 0x7F;
+          datagram[3] = (byte)__generateChecksum( datagram );
+          size = 4;
+        }
+        else {
+          command = 9; /* ON */
+          if( StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) )
+            addr++;
+
+          datagram[0] = 3 | VER3_FLAG | data->header;
+          datagram[1] = 0x08 | command;
+          datagram[2] = addr & 0x7F;
+          datagram[3] = delay;
+          datagram[4] = (byte)__generateChecksum( datagram );
+          size = 5;
+        }
+
       }
 
-      datagram[0] = 4 | VER3_FLAG | data->header;
-      datagram[1] = 0x18 | ((addr & 0x1C) >> 2 );
-      datagram[2] = ((addr & 0x03) << 5) | (port & 0x1F);
-      datagram[3] = command; /* ON command */
-      datagram[4] = delay;
-      datagram[5] = (byte)__generateChecksum( datagram );
-      size = 6;
-    }
+      /* virtual output */
+      else if( StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_VO ) ) {
+        byte command = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 1:0;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "VO %s [%d-%d]",
+            wSwitch.getcmd( node ), addr+1, port+1 );
 
-    /* digital output */
-    else if( StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_DO ) ) {
-      byte command = 0;
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "DO %s [%d-%d]",
-          wSwitch.getcmd( node ), addr+1, port+1 );
-
-      if( wSwitch.issinglegate( node ) ) {
-        command = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 10:0;
-
+        if( !wSwitch.issinglegate( node ) ) {
+          command = 1;
+          addr++;
+        }
         datagram[0] = 2 | VER3_FLAG | data->header;
-        datagram[1] = 0x08 | command;
+        datagram[1] = 0x0C | (command << 1) | ((addr & 0xFF) >> 7);
         datagram[2] = addr & 0x7F;
         datagram[3] = (byte)__generateChecksum( datagram );
         size = 4;
       }
+
+      /* MDD output (default) */
       else {
-        command = 9; /* ON */
-        if( StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) )
-          addr++;
+        byte turnout = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 0x01:0x00;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "MDD %s [%d-%d]",
+            wSwitch.getcmd( node ), addr+1, port+1 );
 
         datagram[0] = 3 | VER3_FLAG | data->header;
-        datagram[1] = 0x08 | command;
-        datagram[2] = addr & 0x7F;
+        datagram[1] = 0x10 | (turnout << 2) | (nr / 128) ;
+        datagram[2] = nr % 128;
         datagram[3] = delay;
         datagram[4] = (byte)__generateChecksum( datagram );
         size = 5;
       }
-
-    }
-
-    /* virtual output */
-    else if( StrOp.equals( wSwitch.getprot( node ), wSwitch.prot_VO ) ) {
-      byte command = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 1:0;
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "VO %s [%d-%d]",
-          wSwitch.getcmd( node ), addr+1, port+1 );
-
-      if( !wSwitch.issinglegate( node ) ) {
-        command = 1;
-        addr++;
-      }
-      datagram[0] = 2 | VER3_FLAG | data->header;
-      datagram[1] = 0x0C | (command << 1) | ((addr & 0xFF) >> 7);
-      datagram[2] = addr & 0x7F;
-      datagram[3] = (byte)__generateChecksum( datagram );
-      size = 4;
-    }
-
-    /* MDD output (default) */
-    else {
-      byte turnout = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 0x01:0x00;
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "MDD %s [%d-%d]",
-          wSwitch.getcmd( node ), addr+1, port+1 );
-
-      datagram[0] = 3 | VER3_FLAG | data->header;
-      datagram[1] = 0x10 | (turnout << 2) | (nr / 128) ;
-      datagram[2] = nr % 128;
-      datagram[3] = delay;
-      datagram[4] = (byte)__generateChecksum( datagram );
-      size = 5;
     }
   }
 
   /* Signal command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSignal.name() ) ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
-        "Signal commands are no longer supported at this level." );
-    size = 0;
+    int addr   = wSignal.getaddr( node ) - 1;
+    int port   = wSignal.getport1( node ) - 1;
+    int aspect = wSignal.getaspect(node);
+
+    datagram[0] = 4 | VER3_FLAG | data->header;
+    datagram[1] = 0x18 | (addr >> 2);
+    datagram[2] = (port & 0x1F) | ((addr&0x03) << 5);
+    datagram[3] = 0x01;
+    datagram[4] = aspect;
+    datagram[5] = (byte)__generateChecksum( datagram );
+    size = 6;
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "oc32 signal cmd=%s [%d-%d]", wSignal.getcmd( node ), addr+1, port+1 );
   }
 
 
@@ -552,42 +680,62 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
   else if( StrOp.equals( NodeOp.getName( node ), wOutput.name() ) ) {
     int   addr = wOutput.getaddr( node );
     int   port = wOutput.getport( node );
+    int   gain = wOutput.getparam( node );
+    Boolean on = StrOp.equals( wOutput.on, wOutput.getcmd( node ) );
 
-    if( StrOp.equals( wOutput.getprot( node ), wOutput.prot_OM32 ) ) {
-      /* OM32 output */
-      byte param = StrOp.equals( wOutput.on, wOutput.getcmd( node ) ) ? 10:0;
-      datagram[0] = 4 | VER3_FLAG | data->header;
-      datagram[1] = 0x18 | (addr >> 2);
-      datagram[2] = port & 0x1F | ((addr&0x03) << 5);
-      datagram[3] = 5; /* linear */
-      datagram[4] = param;
-      datagram[5] = (byte)__generateChecksum( datagram );
-      size = 6;
+    if( port < 1 || addr < 1 ) {
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "address out of range [%d-%d]", addr, port);
+      size = 0;
     }
-    else if( StrOp.equals( wOutput.getprot( node ), wOutput.prot_DO ) ) {
-      /* digital output */
-      byte command = StrOp.equals( wOutput.on, wOutput.getcmd( node ) ) ? 10:0;
-      datagram[0] = 2 | VER3_FLAG | data->header;
-      datagram[1] = 0x08 | command;
-      datagram[2] = addr & 0x7F;
-      datagram[3] = (byte)__generateChecksum( datagram );
-      size = 4;
-    }
-    else if( StrOp.equals( wOutput.getprot( node ), wOutput.prot_VO ) ) {
-      /* virtual output */
-      byte command = StrOp.equals( wOutput.on, wOutput.getcmd( node ) ) ? 1:0;
-      datagram[0] = 2 | VER3_FLAG | data->header;
-      datagram[1] = 0x0C | (command << 1) | ((addr & 0xFF) >> 7);
-      datagram[2] = addr & 0x7F;
-      datagram[3] = (byte)__generateChecksum( datagram );
-      size = 4;
+    else {
+      addr--;
+      port--;
+
+      if( gain == 0 )
+        gain = 10;
+
+      if( StrOp.equals( wOutput.getprot( node ), wOutput.prot_OM32 ) ) {
+        Boolean blink = wOutput.isblink( node );
+        /* OM32 output (0011MMM) (mmuuuuu) (commando) (parameter) */
+        byte param   = on ? gain:0;
+        byte command = blink ? 10:5;
+        datagram[0] = 4 | VER3_FLAG | data->header;
+        datagram[1] = 0x18 | (addr >> 2);
+        datagram[2] = (port & 0x1F) | ((addr&0x03) << 5);
+        datagram[3] = on?command:0x08;
+        datagram[4] = param;
+        datagram[5] = (byte)__generateChecksum( datagram );
+        size = 6;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "om32 %s %s [%d-%d] gain=%d",
+            blink?"blink":"lnear", wOutput.getcmd( node ), addr+1, port+1, gain );
+      }
+      else if( StrOp.equals( wOutput.getprot( node ), wOutput.prot_DO ) ) {
+        /* digital output */
+        byte command = StrOp.equals( wOutput.on, wOutput.getcmd( node ) ) ? 10:0;
+        datagram[0] = 2 | VER3_FLAG | data->header;
+        datagram[1] = 0x08 | command;
+        datagram[2] = addr & 0x7F;
+        datagram[3] = (byte)__generateChecksum( datagram );
+        size = 4;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "digital %s [%d]", wOutput.getcmd( node ), addr+1 );
+      }
+      else if( StrOp.equals( wOutput.getprot( node ), wOutput.prot_VO ) ) {
+        /* virtual output */
+        byte command = StrOp.equals( wOutput.on, wOutput.getcmd( node ) ) ? 1:0;
+        datagram[0] = 2 | VER3_FLAG | data->header;
+        datagram[1] = 0x0C | (command << 1) | ((addr & 0xFF) >> 7);
+        datagram[2] = addr & 0x7F;
+        datagram[3] = (byte)__generateChecksum( datagram );
+        size = 4;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "virtual %s [%d]", wOutput.getcmd( node ), addr+1 );
+      }
     }
   }
 
 
   /* Block command. */
   else if( StrOp.equals( NodeOp.getName( node ), wBlock.name() ) ) {
-    int   addr = wBlock.getaddr( node ); /* block address */
+    int   addr = wBlock.getport( node ); /* trackport */
     Boolean power = wBlock.ispower( node );
 
     datagram[0] = 3 | VER3_FLAG | data->header;
@@ -602,12 +750,11 @@ static int __translate( iODINAMO dinamo, iONode node, byte* datagram, Boolean* r
   /* FeedBack command. */
   else if( StrOp.equals( NodeOp.getName( node ), wFeedback.name() ) ) {
     int   addr = wFeedback.getaddr( node ); /* feedback address */
-
-    datagram[0] = 2 | VER3_FLAG | data->header;
-    datagram[1] = 0x60 | (addr / 128) ;
-    datagram[2] = addr % 128;
-    datagram[3] = (byte)__generateChecksum( datagram );
-    size = 4;
+    Boolean state = wFeedback.isstate( node );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "simulate fb addr=%d state=%s", addr, state?"true":"false" );
+    if( data->listenerFun != NULL && data->listenerObj != NULL )
+      data->listenerFun( data->listenerObj, (iONode)NodeOp.base.clone(node), TRCLEVEL_INFO );
+    size = 0;
   }
 
   return size;
@@ -640,7 +787,11 @@ static void __fbEvent( iODINAMO dinamo, byte* datagram ) {
 
 
 /** ------------------------------------------------------------
- * generate a rocrail event node and call the event listener
+ * generate a rocrail event node and call the event listener 4A B0 80 86
+ * < Alarm event (01100CB) (bbbbbbb)
+ * Dit is een EVENT gegenereerd door Dinamo
+ * C=1: blok Bbbbbbbb heeft kortsluiting
+ * C=0: kortsluiting van blok Bbbbbbbb is opgeheven
  */
 static void __alEvent( iODINAMO dinamo, byte* datagram ) {
   iODINAMOData data = Data(dinamo);
@@ -651,11 +802,25 @@ static void __alEvent( iODINAMO dinamo, byte* datagram ) {
 
   TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Alarm Event" );
 
-  if( shortcircuit )
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "block %d has short-circuit", block );
   {
-    /* inform listener: */
-    /* TODO: */
+    char* sAddr = StrOp.fmt("%d", block );
+    const char* blockID = (const char*)MapOp.get( data->blockMap, sAddr );
+    StrOp.free(sAddr);
+
+    /* Inform listener. */
+    TraceOp.trc( name, (shortcircuit ? TRCLEVEL_EXCEPTION:TRCLEVEL_INFO), __LINE__, 9999,
+        "block [%s][%d] has %sshort-circuit", blockID!=NULL?blockID:"?", block, shortcircuit ? "":"no longer " );
+
+    iONode node = NodeOp.inst( wBlock.name(), NULL, ELEMENT_NODE );
+    if( blockID != NULL ) {
+      wBlock.setid( node, blockID );
+      wBlock.setport( node, block );
+      if( data->iid != NULL )
+        wBlock.setiid( node, data->iid );
+      wBlock.setstate( node, shortcircuit ? wBlock.shortcut:wBlock.shortcutcleared );
+      if( data->listenerFun != NULL && data->listenerObj != NULL )
+        data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+    }
   }
 }
 
@@ -695,7 +860,7 @@ static Boolean __checkResponse( iODINAMO dinamo, byte* rbuffer ) {
     if( cnt > 0 ) {
       byte commandoR = rbuffer[1];
 
-      if( commandoR & SYS_CMD == SYS_CMD && cnt > 1 ) {
+      if( (commandoR & SYS_CMD) == SYS_CMD && cnt > 1 ) {
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "System response 0x%02X", rbuffer[2] );
 
         if( (rbuffer[2] & 0x60) == 0 ) {
@@ -779,7 +944,7 @@ static Boolean __checkResponse( iODINAMO dinamo, byte* rbuffer ) {
       }
     }
     else {
-      TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "null datagram received" );
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "null datagram received" );
     }
   }
   return True;
@@ -821,7 +986,7 @@ static void __checkFlags( iODINAMO dinamo, byte* rbuffer ) {
       data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
     }
 
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "state changed" );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "state changed: fault=%d hold=%d", data->fault, data->hold );
     if( data->fault ) {
       /* inform listener: */
       iONode node = NodeOp.inst( wResponse.name(), NULL, ELEMENT_NODE );
@@ -858,6 +1023,14 @@ static void __flush( iODINAMO dinamo ) {
 }
 
 
+static Boolean __isNullDatagram(byte* b) {
+  if( (b[0] & 0x07) == 0 ) {
+    return True;
+  }
+  return False;
+}
+
+
 /** ------------------------------------------------------------
  * datagram pump thread
  */
@@ -866,7 +1039,7 @@ static void __transactor( void* threadinst ) {
   iODINAMO   dinamo = (iODINAMO)ThreadOp.getParm(th);
   iODINAMOData data = Data(dinamo);
   Boolean        ok = True;
-  Boolean    gotrsp = False;
+  Boolean    gotrsp = True;
 
   byte lastdatagram[32];
   int lastdatagramsize = 0;
@@ -876,6 +1049,7 @@ static void __transactor( void* threadinst ) {
   int wsize = 0; /* request size  */
   int dsize = 0; /* data size     */
   int timer = 0;
+  int psleep = data->psleep;
 
   ThreadOp.setDescription( th, "Transactor for Dinamo 3.x" );
   TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Transactor started: the datagram pump." );
@@ -891,7 +1065,14 @@ static void __transactor( void* threadinst ) {
 
     /* get next node */
     if( gotrsp && lastdatagramsize == 0 ) {
-      post = ThreadOp.getPost( th );
+      if( !data->hold )
+        post = ThreadOp.getPost( th );
+
+      if( post == NULL && data->stress ) {
+        post = (obj)NodeOp.inst( wSysCmd.name(), NULL, ELEMENT_NODE );
+        wSysCmd.setcmd( (iONode)post, wSysCmd.version );
+      }
+
       if( post != NULL ) {
         iONode node = (iONode)post;
         Boolean responseExpected = False;
@@ -915,25 +1096,35 @@ static void __transactor( void* threadinst ) {
 
         /* Cleanup: endstation for all nodes. */
         node->base.del( node );
+        psleep = 10;
+      }
+      else {
+        psleep = data->psleep;
       }
     }
 
     if( !data->dummyio ) {
       if( !gotrsp && lastdatagramsize > 0 && (SystemOp.getTick() - timer) > 20 ) {
-        TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "resend last datagram size=%d timer=%d", lastdatagramsize, timer );
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "resend last datagram size=%d timer=%d", lastdatagramsize, timer );
         TraceOp.dump( "lastdatagram", TRCLEVEL_BYTE, (char*)lastdatagram, lastdatagramsize );
         SerialOp.write( data->serial, (char*)lastdatagram, lastdatagramsize );
         timer = SystemOp.getTick();
         gotrsp = False;
       }
-      else {
+
+      if(gotrsp || (SystemOp.getTick() - timer) > 25 ) {
         int  lsize = 0;
         byte lbuffer[32]; /* make a local send buffer to preserve the datagram for checking */
         /* Send NULL datagram to signal Rocrail is still a live: */
         lsize = __translateNode2Datagram( dinamo, NULL, lbuffer, NULL );
-        TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "send null datagram size=%d", lsize );
-        TraceOp.dump( "nullreq", TRCLEVEL_BYTE, (char*)lbuffer, lsize );
+        if( (SystemOp.getTick() - timer) > 25 )
+          TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "timeout on response: send null datagram size=%d", lsize );
+        else
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "send null datagram size=%d", lsize );
+        TraceOp.dump( "nullreq", TRCLEVEL_DEBUG, (char*)lbuffer, lsize );
         SerialOp.write( data->serial, (char*)lbuffer, lsize );
+        lastdatagramsize = 0;
+        timer = SystemOp.getTick();
         gotrsp = False;
       }
     }
@@ -941,7 +1132,8 @@ static void __transactor( void* threadinst ) {
     /* check if there is a response waiting: */
     dsize = 0;
     ok = False;
-    if( !data->dummyio ) {
+    if( !data->dummyio && SerialOp.available(data->serial) > 0 ) {
+      MemOp.set( rbuffer, 0, 32 );
       do {
         /* check if it is the start of the datagram */
         ok = SerialOp.read( data->serial, (char*)rbuffer, 1 );
@@ -955,8 +1147,10 @@ static void __transactor( void* threadinst ) {
           if( !data->dummyio ) {
             ok = SerialOp.read( data->serial, (char*)rbuffer+1, dsize+1 );
             if( ok ) {
-              TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "%d bytes read in buffer:", dsize + 2 );
-              TraceOp.dump( "cmdrsp", TRCLEVEL_BYTE, (char*)rbuffer, dsize + 2 );
+              if( !__isNullDatagram(rbuffer) ) {
+                TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "%d bytes read in buffer:", dsize + 2 );
+                TraceOp.dump( "cmdrsp", TRCLEVEL_BYTE, (char*)rbuffer, dsize + 2 );
+              }
             }
             ismore = SerialOp.available(data->serial);
             if( ismore > 0 )
@@ -968,7 +1162,8 @@ static void __transactor( void* threadinst ) {
         }
       }
       else {
-        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "no startbyte = 0x%02X  rbuffer[0] & 0x80 = 0x%02X (ok=%d)", rbuffer[0], (rbuffer[0] & 0x80), ok );
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+            "no startbyte = 0x%02X  rbuffer[0] & 0x80 = 0x%02X (ok=%d gotrsp=%d)", rbuffer[0], (rbuffer[0] & 0x80), ok, gotrsp );
         ok = False;
       }
     }
@@ -1018,7 +1213,7 @@ static void __transactor( void* threadinst ) {
 
 
     /* Give up timeslize: */
-    ThreadOp.sleep( data->dummyio?1000:10 );
+    ThreadOp.sleep( data->dummyio?1000:psleep );
   } while( data->run );
 
 
@@ -1042,7 +1237,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 /** ------------------------------------------------------------
  * shutdown
  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iODINAMOData data = Data(inst);
   data->header |= FAULT_FLAG;
   /* TODO: shutdown? */
@@ -1114,26 +1309,44 @@ static struct ODINAMO* _inst( const iONode ini ,const iOTrace trc ) {
   /* Initialize data->xxx members... */
   data->ini = ini;
   data->iid = StrOp.dup( wDigInt.getiid( ini ) );
-  data->swtime = (wDigInt.getswtime( ini ) * 60) / 1000; /* units of 1/60 sec. */
+  data->swtime = wDigInt.getswtime( ini );
   data->dummyio = wDigInt.isdummyio( ini );
+  data->stress = wDigInt.isstress(ini);
+  data->blockMap = MapOp.inst();
+  data->psleep = wDigInt.getpsleep(ini);
+  if( data->psleep > 100 ) {
+    data->psleep = 50;
+    wDigInt.setpsleep(ini, 50);
+  }
+
+  if( wDigInt.getbps( ini ) != 19200 && wDigInt.getbps( ini ) != 38400 ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "baudrate correction from %d to %d", wDigInt.getbps( ini ), 19200 );
+    wDigInt.setbps( ini, 19200 );
+  }
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dinamo %d.%d.%d", vmajor, vminor, patch );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  IID      [%s]", data->iid );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  device   [%s]", wDigInt.getdevice( ini ) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  timeout  [%d]", wDigInt.gettimeout( ini ) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  psleep   [%d]", data->psleep );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  swtime   [%d]", data->swtime );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  baudrate [%d]", wDigInt.getbps( ini ) );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Init serial %s", wDigInt.getdevice( ini ) );
 
   if( !data->dummyio ) {
     data->serial = SerialOp.inst( wDigInt.getdevice( ini ) );
 
-    SerialOp.setFlow( data->serial, -1 );
-    SerialOp.setLine( data->serial, 19200, 8, 1, odd, wDigInt.isrtsdisabled( ini ) );
-    SerialOp.setTimeout( data->serial, wDigInt.gettimeout( ini ), 200 );
+    SerialOp.setFlow( data->serial, 0 );
+    SerialOp.setLine( data->serial, wDigInt.getbps( ini ), 8, 1, odd, wDigInt.isrtsdisabled( ini ) );
+    SerialOp.setTimeout( data->serial, wDigInt.gettimeout( ini ), wDigInt.gettimeout( ini ) );
   }
 
 
   if( data->dummyio || SerialOp.open( data->serial ) ) {
     SystemOp.inst();
+    SerialOp.flush(data->serial);
     data->run = True;
     data->transactor = ThreadOp.inst( "transactor", &__transactor, __DINAMO );
     ThreadOp.start( data->transactor );

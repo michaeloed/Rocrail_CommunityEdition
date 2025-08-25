@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -94,6 +97,7 @@ public:
     void CreateControls();
     wxString getHostname();
     int getPort();
+    wxString getControlCode();
 
 ////@begin ConnectionDialog event handler declarations
 
@@ -108,6 +112,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end ConnectionDialog event handler declarations
 
@@ -131,6 +138,8 @@ public:
     wxComboBox* m_Host;
     wxStaticText* m_LabelPort;
     wxTextCtrl* m_Port;
+    wxStaticText* m_labControlCode;
+    wxTextCtrl* m_ControlCode;
     wxButton* m_OK;
     wxButton* m_Cancel;
     iONode m_Props;

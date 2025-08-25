@@ -1,7 +1,10 @@
  /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -173,7 +176,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iORFID12Data data = Data(inst);
   data->run = False;
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
@@ -232,33 +235,36 @@ static void __evaluateRFID(iORFID12 inst, char* rfid, int idx) {
   /* STX data[10] CRC[2] cr lf ETX */
   iORFID12Data data = Data(inst);
   iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-  long id = 0;
   int addr = 1;
   int i = 0;
+  char ident[64];
 
   rfid[11] = '\0';
   byte* b = StrOp.strToByte(rfid + 1);
 
-  for( i = 0; i < 5; i++ ) {
-    long tmp = b[i];
-    tmp = tmp << ((4-i)*8);
-    id = id + tmp;
-  }
+  StrOp.fmtb(ident, "%d.%d.%d.%d.%d", b[0], b[1], b[2], b[3], b[4]);
+
   freeMem(b);
 
   if( rfid[0] >= 'A' ) {
     addr = (rfid[0] - 'A') + 1;
   }
+  StrOp.copy(data->ident[addr-1], ident);
 
   data->readerTick[addr-1] = SystemOp.getTick();
   addr = addr + data->fboffset;
 
-  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "evaluateRFID[%c][%s]: addr=%d id=%ld", rfid[0], rfid+1, addr, id );
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "evaluateRFID[%c][%s]: addr=%d id=%s", rfid[0], rfid+1, addr, ident );
 
   wFeedback.setstate( evt, True );
   wFeedback.setaddr( evt, addr );
-  wFeedback.setbus( evt, wFeedback.fbtype_rfid );
-  wFeedback.setidentifier( evt, id );
+  wFeedback.setfbtype( evt, wFeedback.fbtype_rfid );
+
+  if( data->protver == 1 )
+    wFeedback.setid( evt, ident );
+  else
+    wFeedback.setidentifier( evt, ident );
+
   if( data->iid != NULL )
     wFeedback.setiid( evt, data->iid );
 
@@ -275,12 +281,14 @@ static void __RFIDTicker( void* threadinst ) {
   while( data->run ) {
     int i = 0;
     for( i = 0; i < 8; i++ ) {
-      if( data->readerTick[i] > 0 && (SystemOp.getTick() - data->readerTick[i]) > 250 ) {
+      if( data->readerTick[i] > 0 && (SystemOp.getTick() - data->readerTick[i]) > 50 ) {
         iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
         wFeedback.setstate( evt, False );
         wFeedback.setaddr( evt, i + 1 + data->fboffset );
-        wFeedback.setbus( evt, wFeedback.fbtype_rfid );
+        wFeedback.setfbtype( evt, wFeedback.fbtype_rfid );
         wFeedback.setidentifier( evt, 0 );
+        if( data->protver == 1 )
+          wFeedback.setid( evt, data->ident[i] );
         if( data->iid != NULL )
           wFeedback.setiid( evt, data->iid );
 
@@ -288,10 +296,10 @@ static void __RFIDTicker( void* threadinst ) {
         
         data->readerTick[i] = 0;
       }
-      ThreadOp.sleep( 100 );
+      ThreadOp.sleep( 10 );
     }
     
-    ThreadOp.sleep( 100 );
+    ThreadOp.sleep( 10 );
   };
 
   TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "RFID ticker ended." );
@@ -323,7 +331,7 @@ static void __RFIDReader( void* threadinst ) {
 
   while( data->run ) {
     int bAvail = SerialOp.available(data->serial);
-    if (bAvail < 0) {
+    if (bAvail < 0 || SerialOp.getRc(data->serial) != 0 ) {
       TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "device error; exit reader." );
       break;
     }
@@ -333,8 +341,8 @@ static void __RFIDReader( void* threadinst ) {
       SerialOp.read( data->serial, &c, 1 );
       TraceOp.dump( NULL, TRCLEVEL_BYTE, &c, 1 );
 
-      if( !packetStart && (c == 0x02 || c >= 'A' && c <= 'H' ) ) {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "packet start detected: [0x%02X]", c );
+      if( !packetStart && (c == 0x02 || (c >= 'A' && c <= 'H') ) ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "packet start detected: [0x%02X]", c & 0xFF );
         /* STX */
         packetStart = True;
         idx = 0;
@@ -343,7 +351,7 @@ static void __RFIDReader( void* threadinst ) {
       }
       else if(packetStart) {
         if( c == 0x03 || c == '>' ) {
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "packet end detected: [0x%02X] idx=%d", c, idx );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "packet end detected: [0x%02X] idx=%d", c & 0xFF, idx );
           /* ETX */
           packetStart = False;
           rfid[idx] = c;
@@ -357,6 +365,9 @@ static void __RFIDReader( void* threadinst ) {
           idx++;
           TraceOp.dump( NULL, TRCLEVEL_BYTE, rfid, idx );
         }
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "unknown sequence: [0x%02X]", c & 0xFF );
       }
 
       bAvail = SerialOp.available(data->serial);
@@ -391,6 +402,7 @@ static struct ORFID12* _inst( const iONode ini ,const iOTrace trc ) {
 
   data->bps      = wDigInt.getbps( ini );
   data->fboffset = wDigInt.getfboffset( ini );
+  data->protver  = wDigInt.getprotver( ini );
   
   MemOp.set( data->readerTick, 0, sizeof(data->readerTick) );
 
@@ -398,15 +410,18 @@ static struct ORFID12* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "RFID-12 %d.%d.%d", vmajor, vminor, patch );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid      = %s", data->iid );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device   = %s", data->device );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fboffset = %d", data->fboffset );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid       = %s", data->iid );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device    = %s", data->device );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bps       = 9600 (fixed)" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "handshake = RTS/CTS (fixed)" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fboffset  = %d", data->fboffset );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "protocol  = %d", data->protver );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
 
   data->serial = SerialOp.inst( data->device );
-  SerialOp.setFlow( data->serial, none );
-  SerialOp.setLine( data->serial, data->bps, 8, 1, none, wDigInt.isrtsdisabled( ini ) );
+  SerialOp.setFlow( data->serial, cts );
+  SerialOp.setLine( data->serial, 9600, 8, 1, none, wDigInt.isrtsdisabled( ini ) );
   data->serialOK = SerialOp.open( data->serial );
 
   if( data->serialOK ) {

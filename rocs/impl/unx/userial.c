@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -47,6 +50,9 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <time.h>
+#if defined __APPLE__
+#include <IOKit/serial/ioss.h>
+#endif
 #else
 #include <termio.h>
 #include <termios.h>
@@ -63,9 +69,14 @@
 Boolean rocs_serial_close( iOSerial inst ) {
 #ifdef __ROCS_SERIAL__
   iOSerialData o = Data(inst);
-  int rc = close( o->sh );
-  TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "rocs_serial_close rc=%d", errno );
-  return rc ? False:True;
+  int rc = 0;
+  if( o->sh > 0 ) {
+    rc = close( o->sh );
+    o->sh = 0;
+    if( rc == -1 )
+      TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "error on close" );
+  }
+  return rc == 0 ? True:False;
 #else
 
   return False;
@@ -73,39 +84,79 @@ Boolean rocs_serial_close( iOSerial inst ) {
 }
 
 /* Conversions */
-static speed_t __symbolicSpeed( int bps ) {
+static speed_t __symbolicSpeed( int bps, int* actbps ) {
   /* AIX does not support speeds above 38k. */
 
 
+#ifdef B1000000
+  if( bps >= 1000000 ) {
+    *actbps = 1000000;
+    return B1000000;
+  }
+#endif
+
+
+#ifdef B500000
+  if( bps >= 500000 ) {
+    *actbps = 500000;
+    return B500000;
+  }
+#endif
+
+
 #ifdef B230400
-  if( bps >= 230400 )
+  if( bps >= 230400 ) {
+    *actbps = 230400;
     return B230400;
+  }
 #endif
 
 
 #ifdef B115200
-  if( bps >= 115200 )
+  if( bps >= 115200 ) {
+    *actbps = 115200;
     return B115200;
+  }
 #endif
 
 #ifdef B57600
-
-  if( bps >=  57600 )
+  if( bps >= 57600 ) {
+    *actbps = 57600;
     return B57600;
+  }
 #endif
 
-  if( bps >=  38400 )
+  if( bps >= 38400 ) {
+    *actbps = 38400;
     return B38400;
-  if( bps >=  19200 )
+  }
+
+  if( bps >= 19200 ) {
+    *actbps = 19200;
     return B19200;
-  if( bps >=   9600 )
+  }
+
+  if( bps >= 9600 ) {
+    *actbps = 9600;
     return B9600;
-  if( bps >=   4800 )
+  }
+
+  if( bps >= 4800 ) {
+    *actbps = 4800;
     return B4800;
-  if( bps >=   2400 )
+  }
+
+  if( bps >= 2400 ) {
+    *actbps = 2400;
     return B2400;
-  if( bps >=   1200 )
+  }
+
+  if( bps >= 1200 ) {
+    *actbps = 1200;
     return B1200;
+  }
+
+  *actbps = 600;
   return B600;
 }
 static int __symbolicBits( int bits ) {
@@ -128,15 +179,16 @@ Boolean rocs_serial_open( iOSerial inst ) {
   iOSerialData o = Data(inst);
   char* device = o->device;
   int r,w;
+  int symbps, actbps;
 
   /* open read/write, no controlling terminal */
-  if( StrOp.equals( "com1", o->device ) )
+  if( StrOp.equalsi( "com1", o->device ) )
     device = "/dev/ttyS0";
-  else if( StrOp.equals( "com2", o->device ) )
+  else if( StrOp.equalsi( "com2", o->device ) )
     device = "/dev/ttyS1";
-  else if( StrOp.equals( "com3", o->device ) )
+  else if( StrOp.equalsi( "com3", o->device ) )
     device = "/dev/ttyS2";
-  else if( StrOp.equals( "com4", o->device ) )
+  else if( StrOp.equalsi( "com4", o->device ) )
     device = "/dev/ttyS3";
 
   /*
@@ -178,7 +230,7 @@ Boolean rocs_serial_open( iOSerial inst ) {
   r = access( device, R_OK );
   w = access( device, W_OK );
 
-  TraceOp.terrno( name, TRCLEVEL_INFO, __LINE__, 9999, errno, "rocs_serial_open:open rc=%d read=%d write=%d", errno, r, w );
+  TraceOp.terrno( name, TRCLEVEL_INFO, __LINE__, 9999, errno, "open rc=%d read=%d write=%d", errno, r, w );
 
   if( o->sh > 0 ) {
     struct termios tio;
@@ -210,7 +262,7 @@ Boolean rocs_serial_open( iOSerial inst ) {
 #ifdef CRTSCTS
 
     if( o->line.flow == cts )
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocs_serial_open: set CRTSCTS" );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set CRTSCTS" );
     tio.c_cflag |= o->line.flow == cts ? CRTSCTS:0;
 #endif
     /* ignore modem, enable receiver */
@@ -242,12 +294,21 @@ Boolean rocs_serial_open( iOSerial inst ) {
     tio.c_cc[VTIME] = (o->timeout.read / 100) ? (o->timeout.read / 100):0;
 
     /* insert speed */
-    cfsetospeed( &tio, __symbolicSpeed(o->line.bps) );
-    cfsetispeed( &tio, __symbolicSpeed(o->line.bps) );
-
+    symbps = __symbolicSpeed(o->line.bps, &actbps);
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set bps to %d (requested=%d)", actbps, o->line.bps );
+    cfsetospeed( &tio, symbps );
+    cfsetispeed( &tio, symbps );
     errno = 0;
-    /* set attribute now */
     tcsetattr( o->sh, TCSANOW, &tio );
+
+#if defined __APPLE__
+    if( actbps !=  o->line.bps ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "trying IOSSIOSPEED for set bps to %d", o->line.bps );
+      if( ioctl(o->sh, IOSSIOSPEED, &o->line.bps) == -1 )
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "unable to set bps to %d", o->line.bps );
+    }
+#endif
+
 
     //    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocs_serial_open:tcsetattr rc=%d", errno );
   }
@@ -407,7 +468,7 @@ Boolean rocs_serial_isCTS( iOSerial inst ) {
     __printmsr(msr);
   }
   if( rc < 0 ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,"TIOCMGET returns rc=%d errno=%d\n", rc, errno );
+    TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "TIOCMGET returns rc=%d", rc );
     if( errno == ENXIO )
       return -1;
   }
@@ -434,7 +495,7 @@ Boolean rocs_serial_isDSR( iOSerial inst ) {
     __printmsr(msr);
   }
   if( rc < 0 )
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,"TIOCMGET returns rc=%d errno=%d\n", rc, errno );
+    TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "TIOCMGET returns rc=%d", rc );
   if (msr & TIOCM_DSR)
     return True;
   else
@@ -447,6 +508,9 @@ Boolean rocs_serial_isDSR( iOSerial inst ) {
 
 Boolean rocs_serial_isRI( iOSerial inst ) {
 #ifdef __ROCS_SERIAL__
+#if defined __APPLE__ || defined __OpenBSD__
+    return True;
+#else
   iOSerialData o = Data(inst);
   int msr = 0;
   int result, arg;
@@ -456,6 +520,7 @@ Boolean rocs_serial_isRI( iOSerial inst ) {
   result = ioctl(o->sh, TIOCMGET, &arg);
   if ((result>=0)&&((!(arg&TIOCM_RI))||(msr&0x04)))
     return True;
+#endif
 #endif
 
   return False;
@@ -468,7 +533,7 @@ Boolean rocs_serial_write( iOSerial inst, char* buffer, int size ) {
   if (o->blocking)
     tcdrain(o->sh);
   if( size != written ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "rocs_serial_write size=%d written=%d errno=%d", size, written, errno );
+    TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "write error size=%d written=%d", size, written );
   }
   return written != size ? False:True;
 #else
@@ -482,12 +547,14 @@ int rocs_serial_avail( iOSerial inst ) {
   iOSerialData o = Data(inst);
   int rc = 0;
   int nbytes = 0;
+  o->rc = 0;
 #ifdef FIONREAD
 
   rc = ioctl( o->sh, FIONREAD, &nbytes );
   if( rc<0 ) {
     TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "ioctl FIONREAD error" );
-    /*if(errno == ENXIO || errno == EIO)*/
+    if(errno == ENXIO || errno == EIO)
+      o->rc = errno;
     if(errno == ENXIO)
       return -1;
   }
@@ -495,7 +562,7 @@ int rocs_serial_avail( iOSerial inst ) {
 
   rc = ioctl( o->sh, TIOCINQ, &nbytes );
   if( rc<0 ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "ioctl TIOCINQ error" );
+    TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "ioctl TIOCINQ error" );
   }
 #endif
 
@@ -513,7 +580,7 @@ int rocs_serial_getWaiting( iOSerial inst ) {
    * It may not even support TIOCOUTQ... */
   rc = ioctl(o->sh,TIOCOUTQ, &nbytes);
   if( rc<0 ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "ioctl TIOCOUTQ error" );
+    TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "ioctl TIOCOUTQ error" );
   }
   return nbytes;
 #endif
@@ -700,7 +767,7 @@ void rocs_serial_setSerialMode( iOSerial inst, serial_mode mode ) {
   }
   /* set attribute now */
   if (!o->directIO && tcsetattr( o->sh, TCSAFLUSH, &tio ) != 0)
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "tcsetattr failed!" );
+    TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, errno, "tcsetattr failed!" );
   //        tcgetattr( o->sh, &tio );
   //    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Current output baud rate is %d\n", (int) cfgetospeed(&tio) );
 #endif

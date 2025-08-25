@@ -1,3 +1,9 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef __ROCS_DIRENT_H
 #define __ROCS_DIRENT_H
 

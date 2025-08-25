@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -21,6 +24,11 @@
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
+#ifdef _MSC_VER
+#include <io.h>
+#else
+#include <unistd.h>
+#endif // _WIN32
 
 #ifdef _WIN32
 #include <winsock.h>
@@ -67,11 +75,14 @@ Boolean rocs_socket_setSndTimeout( iOSocket inst, int timeout );
 Boolean rocs_socket_setRcvTimeout( iOSocket inst, int timeout );
 const char* rocs_socket_getPeername(iOSocket inst);
 Boolean rocs_socket_setKeepalive(iOSocket,Boolean);
+Boolean rocs_socket_setBroadcast(iOSocket,Boolean);
 Boolean rocs_socket_setNodelay(iOSocket,Boolean);
 Boolean rocs_socket_peek( iOSocket inst, char* buf, int size );
 char* rocs_socket_mac( const char* device );
 Boolean rocs_socket_LoadCerts( iOSocket inst, const char *cFile, const char *kFile );
 const char* rocs_socket_gethostaddr( void );
+const char* rocs_socket_getsockname(iOSocket inst);
+Boolean rocs_socket_istimedout( iOSocketData o );
 
 #ifdef __OPENSSL__
 Boolean rocs_socket_CreateCTX( iOSocket inst );
@@ -259,7 +270,7 @@ static int _getRc( iOSocket inst ) {
 
 static Boolean _isTimedOut( iOSocket inst ) {
   iOSocketData data = Data(inst);
-  return data->rc == ETIMEDOUT ? True:False;
+  return rocs_socket_istimedout(data);
 }
 
 static long _getReceived( iOSocket inst ) {
@@ -309,6 +320,10 @@ static const char* _gethostname( void ) {
 
 static const char* _gethostaddr( void ) {
   return rocs_socket_gethostaddr();
+}
+
+static const char* _getsockname( iOSocket inst ) {
+  return rocs_socket_getsockname(inst);
 }
 
 static char* _getMAC( const char* device ) {

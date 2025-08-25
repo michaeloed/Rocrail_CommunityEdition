@@ -1,10 +1,24 @@
-/**
-* Name:    wxAnalogClock.h
-* Purpose:     Analog clock
-* Author:      emarti, Murat Özdemir  e-mail: dtemarti<add>gmail<dot>com
-* Created:     15.04.2006
-* Copyright:   (c) emarti
-* Licence:     wxWindows license
+/*
+ Rocrail - Model Railroad Software
+
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 2
+ of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #ifndef __Clock_H__
@@ -21,33 +35,42 @@
 
 class Clock : public wxPanel{
 	public:
-    Clock(wxWindow *parent, wxWindowID id, int x, int y, int handwidth, int devider=1, int clocktype=0);
+    Clock(wxWindow *parent, wxWindowID id, int x, int y, int handwidth, int devider=1, int clocktype=0, bool showsecondhand=true);
 
     void OnPaint(wxPaintEvent& event);
     void Timer(wxTimerEvent& event);
     void SetDevider(int devider);
     void SetTime(long rocrailtime);
+    long GetTime();
+    int GetHour();
     void OnPopup(wxMouseEvent& event);
     void OnAdjustTime(wxCommandEvent& event);
     void OnFreezeTime(wxCommandEvent& event);
     void OnResumeTime(wxCommandEvent& event);
+    void OnHelp(wxCommandEvent& event);
     void SyncClock( iONode node );
     void stopTimer();
+    void calculate();
+    void drawClock();
+    void drawNewClock();
+    void drawSecondHand(wxGraphicsContext* gc, double c, bool erase=false);
 
 	private:
-		wxBitmap* m_Plate;
     wxBitmap* m_Logo;
+    wxWindow* m_Parent;
 		wxTimer *WxTimer;
-		double x,y,z,xpre;
+		double x,y,z;
 		bool start;
-		int hw, clockpicwidth;
     wxDateTime* datetime;
     time_t ltime;
     int devider;
+    int m_Temp;
     bool deviderchanged;
     bool run;
+    bool showsecondhand;
     int type;
     int hours, minutes;
+    bool second;
 
 		DECLARE_EVENT_TABLE()
 };
@@ -56,6 +79,7 @@ enum {
   ME_AdjustTime = 201,
   ME_FreezeTime,
   ME_ResumeTime,
+  ME_ClockHelp,
 };
 
 #endif

@@ -1,4 +1,10 @@
 /*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+
+
 [00:000] - Open COM1 port (D:\Programme\Railroad & Co.70\RailTCS32.exe)
 Kommentar by rpa - System wurde gestartet mit zwei nachfolgenden Loks
 Kommentar by rpa - Lok mit Adresse 21 auf Block 4 mit Adresse 60 Port 4 und Zugerkennung Adresse 61 Port 4

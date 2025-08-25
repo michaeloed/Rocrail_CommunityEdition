@@ -1,5 +1,22 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef BASEPANEL_H_
 #define BASEPANEL_H_
+
+// ----------------------------------------------------------------------------
+// headers
+// ----------------------------------------------------------------------------
+// For compilers that support precompilation, includes "wx/wx.h".
+#include "wx/wxprec.h"
+
+#ifndef WX_PRECOMP
+#include "wx/wx.h"
+#include "wx/event.h"
+#endif
 
 
 #include "rocs/public/node.h"
@@ -24,6 +41,8 @@ public:
   virtual bool SetBackgroundColor(int red, int green, int blue, bool savecolor) = 0;
   virtual void OnPanelProps(wxCommandEvent& event) = 0;
   virtual BasePanel* updateZLevel(iONode zlevel) = 0;
+  virtual void showTooltip(bool show) = 0;
+  virtual void* GetItem(const char* key) = 0;
 
 };
 

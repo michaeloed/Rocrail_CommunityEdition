@@ -1,7 +1,10 @@
 # ------------------------------------------------------------
 # Rocrail - Model Railroad Software
 #
-# Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+# Copyright (C) 2002-2012 Rob Versluis, Rocrail.net
+#
+# Without an official permission commercial use is not permitted.
+# Forking this project is not permitted.  
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -51,12 +54,19 @@ endif
 PLATFORM=LINUX
 ARCH=
 ifeq ($(PLATFORM),WIN32)
-	LIBS=-liphlpapi -lmpr -lwsock32 -ladvapi32
+	LIBS=-liphlpapi -lmpr -lws2_32 -ladvapi32
 	DIRPREFIX=win
-	CC_EXTRA_FLAGS=
-	LNK_FLAGS=--def lcdriver.def
+	CC_EXTRA_FLAGS=-mthreads
+	LNK_FLAGS=--def lcdriver.def -mthreads -static
 	LNK=$(TOOLPREFIX)dllwrap
 	SHAREDSUFFIX=.dll
+else ifeq ($(PLATFORM),WIN64)
+	DIRPREFIX=win
+	LIBS=-liphlpapi -lmpr -lmswsock -lws2_32 -ladvapi32
+	LNK=$(TOOLPREFIX)dllwrap
+	LNK_FLAGS=--def lcdriver.def
+	SHAREDSUFFIX=.dll
+	CC_EXTRA_FLAGS=
 else ifeq ($(PLATFORM),MACOSX)
 	LIBS=-lpthread -ldl
 	DIRPREFIX=unx
@@ -138,5 +148,8 @@ clean:
 install:
   ifeq ($(PLATFORM),LINUX)
 	-cp -p $(OUTDIR)$(FS)lcdriver.so $(DESTDIR)
+  endif
+  ifeq ($(PLATFORM),MACOSX)
+	-cp -p $(OUTDIR)$(FS)lcdriver.dylib $(DESTDIR)
   endif
 

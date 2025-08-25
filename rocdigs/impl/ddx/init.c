@@ -1,7 +1,8 @@
 /*
  Rocrail - Model Railroad Software
  
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
  Some parts are copied from the DDL project of Torsten Vogt: http://www.vogt-it.com/OpenSource/DDL
  
  This program is free software; you can redistribute it and/or
@@ -33,6 +34,7 @@
 #include "rocs/public/thread.h"
 #include "rocs/public/mutex.h"
 
+void rocrail_ddxStateChanged(obj inst);
 
 /* functions to open, initialize and close comport */
 

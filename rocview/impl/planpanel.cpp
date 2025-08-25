@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -38,10 +41,15 @@
     #include "wx/wx.h"
 #endif
 
+#include <wx/colordlg.h>
+#include <wx/clipbrd.h>
+#include <wx/dataobj.h>
+
 
 #include "rocs/public/node.h"
 #include "rocs/public/thread.h"
 #include "rocs/public/str.h"
+#include "rocs/public/strtok.h"
 #include "rocs/public/mem.h"
 #include "rocs/public/system.h"
 #include "rocview/public/planpanel.h"
@@ -50,9 +58,11 @@
 #include "rocview/dialogs/planpaneldlg.h"
 #include "rocview/dialogs/selectdialog.h"
 #include "rocview/dialogs/modulepropsdlg.h"
+#include "rocview/dialogs/trackpickerdlg.h"
 
 #include "rocview/wrapper/public/Gui.h"
 #include "rocview/wrapper/public/PlanPanel.h"
+#include "rocview/wrapper/public/Tab.h"
 
 #include "rocrail/wrapper/public/SysCmd.h"
 #include "rocrail/wrapper/public/ModelCmd.h"
@@ -91,6 +101,19 @@
 #include "rocrail/wrapper/public/ScheduleList.h"
 #include "rocrail/wrapper/public/Action.h"
 #include "rocrail/wrapper/public/ActionList.h"
+#include "rocrail/wrapper/public/Tour.h"
+#include "rocrail/wrapper/public/TourList.h"
+#include "rocrail/wrapper/public/Link.h"
+#include "rocrail/wrapper/public/LinkList.h"
+#include "rocrail/wrapper/public/Dec.h"
+#include "rocrail/wrapper/public/DecList.h"
+#include "rocrail/wrapper/public/Variable.h"
+#include "rocrail/wrapper/public/VariableList.h"
+#include "rocrail/wrapper/public/Weather.h"
+#include "rocrail/wrapper/public/WeatherList.h"
+
+#include <wx/dcbuffer.h>
+
 
 BEGIN_EVENT_TABLE(PlanPanel, wxScrolledWindow)
 
@@ -122,14 +145,21 @@ BEGIN_EVENT_TABLE(PlanPanel, wxScrolledWindow)
   EVT_MENU( ME_AddTrackDirAll   , PlanPanel::addTrackDirAll )
   EVT_MENU( ME_AddTrackBuffer   , PlanPanel::addTrackBuffer )
   EVT_MENU( ME_AddTrackConnector, PlanPanel::addTrackConnector )
+  EVT_MENU( ME_AddTrackConnectorCurveRight, PlanPanel::addTrackConnectorCurveRight )
+  EVT_MENU( ME_AddTrackConnectorCurveLeft, PlanPanel::addTrackConnectorCurveLeft )
 
   EVT_MENU( ME_AddSwitchLeft     , PlanPanel::addSwitchLeft)
   EVT_MENU( ME_AddSwitchRight    , PlanPanel::addSwitchRight)
   EVT_MENU( ME_AddSwitchCrossing , PlanPanel::addSwitchCrossing)
   EVT_MENU( ME_AddSwitchDCrossing, PlanPanel::addSwitchDCrossing)
+  EVT_MENU( ME_AddSwitchCenterCrossing , PlanPanel::addSwitchCenterCrossing)
+  EVT_MENU( ME_AddSwitchRectCrossing , PlanPanel::addSwitchRectCrossing)
+  EVT_MENU( ME_AddSwitchLeftCrossing , PlanPanel::addSwitchLeftCrossing)
+  EVT_MENU( ME_AddSwitchLeftDCrossing, PlanPanel::addSwitchLeftDCrossing)
   EVT_MENU( ME_AddSwitchThreeway , PlanPanel::addSwitchThreeway)
   EVT_MENU( ME_AddSwitchDecoupler, PlanPanel::addSwitchDecoupler)
   EVT_MENU( ME_AddSwitchAccessory,PlanPanel::addSwitchAccessory)
+  EVT_MENU( ME_AddSwitchTwoway , PlanPanel::addSwitchTwoway)
 
   EVT_MENU( ME_AddSignal , PlanPanel::addSignal)
   EVT_MENU( ME_AddOutput , PlanPanel::addOutput)
@@ -153,15 +183,130 @@ BEGIN_EVENT_TABLE(PlanPanel, wxScrolledWindow)
   EVT_MENU( ME_AddRoadFBack    , PlanPanel::addFBack )
 
   EVT_MENU( ME_PlanProps , PlanPanel::OnPanelProps )
+  EVT_MENU( ME_PanelHelp , PlanPanel::OnPanelHelp )
+  EVT_MENU( ME_PlanColor , PlanPanel::OnBackColor )
   EVT_MENU( ME_ModProps , PlanPanel::OnModProps )
   EVT_MENU( ME_AddPlan   , PlanPanel::OnAddPanel )
   EVT_MENU( ME_PanelSelect    , PlanPanel::OnSelect )
+  EVT_MENU( ME_Paste    , PlanPanel::OnPaste )
   EVT_MENU( ME_RemovePlan, PlanPanel::OnRemovePanel )
+
+  EVT_TIMER (ME_TimerAlt, PlanPanel::OnTimer)
 
 END_EVENT_TABLE()
 
+
+bool PlanPanelDrop::OnDropText(wxCoord x, wxCoord y, const wxString& data) {
+  bool ok = false;
+  char* dataStr = StrOp.dup((const char*)data.mb_str(wxConvUTF8));
+  TraceOp.trc( "panel", TRCLEVEL_INFO, __LINE__, 9999, "D&D x=%d y=%d data [%s] len=[%d]", x, y, dataStr, data.Len() );
+  iOStrTok tok = StrTokOp.inst(dataStr, ':');
+  const char* dropcmd = StrTokOp.nextToken(tok);
+
+  if( StrOp.equals( "addsymbol", dropcmd ) ) {
+    if( StrTokOp.hasMoreTokens(tok) ) {
+      const char* symname = StrTokOp.nextToken(tok);
+      const char* symtype = "";
+      const char* symdir  = "";
+      const char* symsub  = "";
+      const char* symsub2 = "";
+      if( StrTokOp.hasMoreTokens(tok) )
+        symtype = StrTokOp.nextToken(tok);
+      if( StrTokOp.hasMoreTokens(tok) )
+        symdir = StrTokOp.nextToken(tok);
+      if( StrTokOp.hasMoreTokens(tok) )
+        symsub = StrTokOp.nextToken(tok);
+      if( StrTokOp.hasMoreTokens(tok) )
+        symsub2 = StrTokOp.nextToken(tok);
+      TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "D&D: symbol=%s type=%s", symname, symtype );
+      m_PlanPanel->m_X = (int)(x / (m_PlanPanel->m_ItemSize*m_PlanPanel->m_Scale));
+      m_PlanPanel->m_Y = (int)(y / (m_PlanPanel->m_ItemSize*m_PlanPanel->m_Scale));
+      iONode node = NodeOp.inst( symname, NULL, ELEMENT_NODE );
+      if( StrOp.len(symtype) > 0 ) {
+        if( StrOp.equals(symtype, "traverser"))
+          wTurntable.settraverser(node, True);
+        else if( StrOp.equals(symtype, "smallsymbol"))
+          wBlock.setsmallsymbol(node, True);
+        else
+          wItem.settype( node, symtype );
+      }
+      if( StrOp.len(symdir) > 0 ) {
+        if( StrOp.equals(symdir, wSwitch.right) || StrOp.equals(symdir, wSwitch.left) )
+          wSwitch.setrectcrossing( node, False );
+        if( StrOp.equals(symdir, "rect") )
+          wSwitch.setrectcrossing( node, True );
+        if( StrOp.equals(symdir, wSwitch.right))
+          wItem.setdir( node, True );
+        if( StrOp.equals(symdir, wSignal.main ) || StrOp.equals(symdir, wSignal.distant ) || StrOp.equals(symdir, wSignal.shunting ) || StrOp.equals(symdir, wSignal.blockstate ) )
+          wSignal.setsignal( node, symdir );
+        if( StrOp.equals(symdir, "curve"))
+          wFeedback.setcurve( node, True );
+        if( atoi(symdir) > 0 ) {
+          if( StrOp.equals(symname, wOutput.name()))
+            wOutput.setsvgtype(node, atoi(symdir) );
+          else if( StrOp.equals(symname, wTrack.name()))
+            wTrack.settknr(node, atoi(symdir) );
+          else
+            wSwitch.setaccnr(node, atoi(symdir) );
+        }
+      }
+      if( StrOp.len(symsub) > 0 ) {
+        if( StrOp.equals(symsub, "dwarf"))
+          wSignal.setdwarf( node, True );
+      }
+      if( StrOp.len(symsub2) > 0 ) {
+        if( StrOp.equals(symsub2, "road"))
+          wItem.setroad( node, True );
+        if( !StrOp.equals(symsub2, "road") && StrOp.equals(symdir, wSignal.main ) )
+          wSignal.setaspects(node, atoi(symsub2));
+      }
+      m_PlanPanel->addItemAttr( node );
+      ok = true;
+    }
+  }
+  else if( StrOp.equals( "bus", dropcmd ) ) {
+    if( StrTokOp.hasMoreTokens(tok) ) {
+      const char* busnr  = StrTokOp.nextToken(tok);
+      if( StrTokOp.hasMoreTokens(tok) ) {
+        const char* addr = StrTokOp.nextToken(tok);
+        const char* type = "";
+        const char* iid = "";
+        if( StrTokOp.hasMoreTokens(tok) ) {
+          type = StrTokOp.nextToken(tok);
+          if( StrTokOp.hasMoreTokens(tok) )
+            iid = StrTokOp.nextToken(tok);
+        }
+        TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "D&D: bus=%s, addr=%s, type=%s, iid=%s", busnr, addr, type, iid );
+        m_PlanPanel->m_X = (int)(x / (m_PlanPanel->m_ItemSize*m_PlanPanel->m_Scale));
+        m_PlanPanel->m_Y = (int)(y / (m_PlanPanel->m_ItemSize*m_PlanPanel->m_Scale));
+        if( StrOp.len(type) == 0) {
+          // sensor
+          iONode node = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+          wFeedback.setiid(node, iid);
+          wFeedback.setbus(node, atoi(busnr));
+          wFeedback.setaddr(node, atoi(addr));
+          m_PlanPanel->addItemAttr( node );
+        }
+        else {
+          // switch
+          iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+          wSwitch.setiid(node, iid);
+          wSwitch.setbus(node, atoi(busnr));
+          wSwitch.setaddr1(node, atoi(addr));
+          m_PlanPanel->addItemAttr( node );
+        }
+        ok = true;
+      }
+    }
+  }
+
+  tok->base.del(tok);
+  StrOp.free(dataStr);
+  return ok;
+}
+
 // ----------------------------------------------------------------------------
-// LcDlg
+//
 // ----------------------------------------------------------------------------
 
 PlanPanel::PlanPanel(wxWindow *parent, int itemsize, double scale, double bktext, int z, iONode zlevel, bool showBorder )
@@ -176,12 +321,21 @@ PlanPanel::PlanPanel(wxWindow *parent, int itemsize, double scale, double bktext
   m_ModViewLabel = NULL;
   m_Parent = parent;
   m_LockedRoutes = MapOp.inst();
+  m_dragX = 0;
+  m_dragY = 0;
+  m_selX = 0;
+  m_selY = 0;
+  m_Selecting = false;
+  m_bModView = false;
+  m_OK2Clear = false;
+  m_bAlt = false;
 
   m_Z = z;
   m_Ori = wItem.west;
   m_Initialized = false;
   m_ChildTable = new wxHashTable( wxKEY_STRING );
   SetBackgroundColour( *wxWHITE );
+  SetBackgroundStyle(wxBG_STYLE_CUSTOM);
 
   m_MultiAdd = true;
 
@@ -190,50 +344,103 @@ PlanPanel::PlanPanel(wxWindow *parent, int itemsize, double scale, double bktext
   SetVirtualSize( (int)(m_ItemSize*m_Scale * wPlanPanel.getcx(ini)), (int)(m_ItemSize*m_Scale * wPlanPanel.getcy(ini)) );
   SetScrollRate( (int)(m_ItemSize*m_Scale), (int)(m_ItemSize*m_Scale) );
 
-  SetToolTip( wxString(wZLevel.getmodid(m_zLevel),wxConvUTF8) + _T(" ") + wxString(wZLevel.gettitle(m_zLevel),wxConvUTF8) );
+  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "starting timer..." );
+  m_Timer = new wxTimer(this, ME_TimerAlt);
+  if( !m_Timer->Start(1000, false) ) {
+    TraceOp.trc( "plan", TRCLEVEL_WARNING, __LINE__, 9999, "could not start the timer.." );
+  }
+
+  SetDropTarget(new PlanPanelDrop(this));
+
 }
+
+ PlanPanel::~PlanPanel() {
+   m_Timer->Stop();
+ }
 
 const char* PlanPanel::getZLevelTitle() {
   return wZLevel.gettitle( m_zLevel );
 }
 
+void PlanPanel::showTooltip(bool show) {
+  // iterate the items in this panel
+  m_ChildTable->BeginFind();
+  Symbol* item = NULL;
+  wxHashTable::Node* node = m_ChildTable->Next();
+  while( node != NULL ) {
+    item = (Symbol*)node->GetData();
+    if( !item->isDragged() )
+      item->showTooltip(show);
+    node = m_ChildTable->Next();
+  }
+}
+
+
 void PlanPanel::OnPaint(wxPaintEvent& event)
 {
+  //wxPaintDC dc(this);
+  wxAutoBufferedPaintDC dc(this);
+  DoPrepareDC(dc);
+  dc.SetBackground(GetBackgroundColour());
+  dc.Clear();
+
   TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "OnPaint() z=%d", m_Z );
 
-  wxPaintDC dc(this);
-  if( !wZLevel.isactive(m_zLevel) && !m_bModView)
+  if( !wZLevel.isactive(m_zLevel) && !m_bModView) {
+    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "Level %d is not active (modview=%d)", wZLevel.getz(m_zLevel), m_bModView );
     return;
+  }
 
-
-  dc.SetPen( *wxLIGHT_GREY_PEN );
-
-  int x, y;
-  GetViewStart( &x, &y );
-  TraceOp.trc( "planpanel", TRCLEVEL_DEBUG, __LINE__, 9999, "x_off=%d, y_off=%d", x, y );
-
-  int cx, cy;
-  GetClientSize( &cx, &cy );
-
-  double itemsize = (double)(m_ItemSize * m_Scale);
-  double dx = x;
-  dx = dx / itemsize;
-  x = (int)dx;
-  double dy = y;
-  dy = dy / itemsize;
-  y = (int)dy;
-
-  int xcnt = (int)(cx / itemsize);
-  int ycnt = (int)(cy / itemsize);
-  int i = 0;
+  TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "Level %d is active (z=%d)", wZLevel.getz(m_zLevel), m_Z );
 
   if( wxGetApp().getFrame()->isRaster() ) {
-    for( i = 0; i <= ycnt; i++ ) {
-      dc.DrawLine( x, (int)(i * itemsize), cx, int(i * itemsize) );
+    int x, y;
+    GetViewStart( &x, &y );
+    TraceOp.trc( "planpanel", TRCLEVEL_DEBUG, __LINE__, 9999, "viewstart x_off=%d, y_off=%d", x, y );
+
+    double cx, cy;
+    //GetClientSize( &cx, &cy );
+    iONode ini = wGui.getplanpanel(wxGetApp().getIni());
+    cx = (double)(wPlanPanel.getcx(ini)+1) * m_ItemSize * m_Scale;
+    cy = (double)(wPlanPanel.getcy(ini)+1) * m_ItemSize * m_Scale;
+
+    double itemsize = m_ItemSize;
+    itemsize *= m_Scale;
+    double dx = x;
+    dx = dx / itemsize;
+    x = (int)dx;
+    double dy = y;
+    dy = dy / itemsize;
+    y = (int)dy;
+
+    int xcnt = (int)(cx / itemsize);
+    int ycnt = (int)(cy / itemsize);
+    int i = 0;
+
+    dc.SetPen( *wxLIGHT_GREY_PEN );
+
+
+    for( i = 0; i <= ycnt+1; i++ ) {
+      dy = i * m_ItemSize;
+      dy *= m_Scale;
+      dc.DrawLine( x, (int)dy, cx, (int)dy );
     }
-    for( i = 0; i <= xcnt; i++ ) {
-      dc.DrawLine( (int)(i * itemsize), y, (int)(i * itemsize), cy );
+    for( i = 0; i <= xcnt+1; i++ ) {
+      dx = i * m_ItemSize;
+      dx *= m_Scale;
+      dc.DrawLine( (int)dx, y, (int)dx, cy );
     }
+  }
+
+  // iterate the items in this panel
+  m_ChildTable->BeginFind();
+  Symbol* item = NULL;
+  wxHashTable::Node* node = m_ChildTable->Next();
+  while( node != NULL ) {
+    item = (Symbol*)node->GetData();
+    if( !item->isDragged() )
+      item->setPosition();
+    node = m_ChildTable->Next();
   }
 }
 
@@ -249,19 +456,23 @@ void PlanPanel::OnPanelProps(wxCommandEvent& event) {
   else if( m_zLevel != NULL ) {
     PlanPanelProps* dlg = new PlanPanelProps( this, m_zLevel );
     if( wxID_OK == dlg->ShowModal() ) {
-      SetToolTip( wxString(wZLevel.getmodid(m_zLevel),wxConvUTF8) + _T(" ") + wxString(wZLevel.gettitle(m_zLevel),wxConvUTF8) );
     }
     dlg->Destroy();
   }
 }
 
 
+void PlanPanel::OnPanelHelp(wxCommandEvent& event) {
+  wxGetApp().openLink( "track-diagram" );
+}
+
+
 void PlanPanel::OnModProps(wxCommandEvent& event) {
   // Get the copied node:
-  iONode ini = (iONode)event.GetClientData();
+  iONode ini    = (iONode)event.GetClientData();
   iONode zlevel = (ini!=NULL ? NodeOp.findNode(ini, wZLevel.name() ) : NULL);
 
-  if( StrOp.equals( wModule.cmd_state, wModule.getcmd(ini) ) ) {
+  if( ini != NULL && StrOp.equals( wModule.cmd_state, wModule.getcmd(ini) ) ) {
     if( StrOp.equals( wModule.state_shortcut, wModule.getstate(ini) ) && m_ShowSc ) {
       SetBackgroundColor( m_ScRed, m_ScGreen, m_ScBlue, false);
     }
@@ -269,6 +480,7 @@ void PlanPanel::OnModProps(wxCommandEvent& event) {
       /* normal state */
       SetBackgroundColor( m_Red, m_Green, m_Blue, false);
     }
+    reScale(m_Scale);
   }
   else if( ini != NULL && zlevel != NULL ) {
     wZLevel.setmodviewcx( m_zLevel, wZLevel.getmodviewcx(zlevel) );
@@ -312,7 +524,8 @@ void PlanPanel::moveSelection(iONode sel) {
   // iterate the items in this panel
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* node = (wxNode*)m_ChildTable->Next();
+  bool modified = false;
+  wxHashTable::Node* node = m_ChildTable->Next();
   // model event node
   iONode move = NodeOp.inst( wItem.name(), NULL, ELEMENT_NODE );
   while( node != NULL ) {
@@ -344,9 +557,13 @@ void PlanPanel::moveSelection(iONode sel) {
       wItem.sety( moveditem, wItem.gety( props ) );
       wItem.setz( moveditem, wItem.getz( props ) );
       NodeOp.addChild( cmd, moveditem );
+      modified = true;
     }
-    node = (wxNode*)m_ChildTable->Next();
+    node = m_ChildTable->Next();
   }
+
+  if( modified )
+    wxGetApp().setLocalModelModified(true);
 
   // TODO: if the move is to another level, remove from this child table and put it in the other
 
@@ -381,8 +598,9 @@ void PlanPanel::copySelection(iONode sel) {
   // iterate the items in this panel
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* node = (wxNode*)m_ChildTable->Next();
+  wxHashTable::Node* node = m_ChildTable->Next();
 
+  bool modified = false;
   while( node != NULL ) {
     item = (Symbol*)node->GetData();
     iONode props = item->getProperties();
@@ -397,16 +615,20 @@ void PlanPanel::copySelection(iONode sel) {
       wItem.setx( copy, wItem.getx(props) + destx - x );
       wItem.sety( copy, wItem.gety(props) + desty - y );
       wItem.setz( copy, destz );
-      NodeOp.setBool( copy, "copy", True );
+      wItem.setcopy( copy, True );
 
       TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "copy [%s] from(%d,%d,%d) to (%d,%d,%d)",
           wItem.getid(copy),
           wItem.getx(props), wItem.gety(props), wItem.getz(props),
           wItem.getx(copy), wItem.gety(copy), wItem.getz(copy) );
       addItemAttr( copy );
+      modified = true;
     }
-    node = (wxNode*)m_ChildTable->Next();
+    node = m_ChildTable->Next();
   }
+
+  if( modified )
+    wxGetApp().setLocalModelModified(true);
 
 }
 
@@ -427,8 +649,9 @@ void PlanPanel::deleteSelection(iONode sel) {
   // iterate the items in this panel
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* node = (wxNode*)m_ChildTable->Next();
+  wxHashTable::Node* node = m_ChildTable->Next();
 
+  bool modified = false;
   while( node != NULL ) {
     item = (Symbol*)node->GetData();
     iONode props = item->getProperties();
@@ -436,17 +659,121 @@ void PlanPanel::deleteSelection(iONode sel) {
         wItem.gety(props) >= y && wItem.gety(props) < y+cy )
     {
       NodeOp.addChild( cmd, (iONode)NodeOp.base.clone( props ) );
-
+      modified = true;
       if( wxGetApp().isOffline() )
         removeItemFromList( props );
     }
-    node = (wxNode*)m_ChildTable->Next();
+    node = m_ChildTable->Next();
   }
+
+  if( modified )
+    wxGetApp().setLocalModelModified(true);
 
   /* notify RocRail */
   if( NodeOp.getChildCnt(cmd) > 0 ) {
     wxGetApp().sendToRocrail( cmd );
     wxGetApp().pushUndoItem( (iONode)NodeOp.base.clone( cmd ) );
+  }
+
+  cmd->base.del(cmd);
+
+}
+
+
+void PlanPanel::routeidSelection(iONode sel) {
+  int x  = NodeOp.getInt(sel, "x", 0);
+  int y  = NodeOp.getInt(sel, "y", 0);
+  int cx = NodeOp.getInt(sel, "cx", 0);
+  int cy = NodeOp.getInt(sel, "cy", 0);
+  Boolean merge = NodeOp.getBool(sel, "mergerouteids", False);
+
+  /* prepare notify RocRail */
+  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "routeIDs selection" );
+  iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
+  wModelCmd.setcmd( cmd, wModelCmd.modify );
+  NodeOp.setStr( cmd, "id", "routeids" );
+
+  // iterate the items in this panel
+  m_ChildTable->BeginFind();
+  Symbol* item = NULL;
+  wxHashTable::Node* node = m_ChildTable->Next();
+  bool modified = false;
+
+  while( node != NULL ) {
+    item = (Symbol*)node->GetData();
+    iONode props = item->getProperties();
+    if( wItem.getx(props) >= x && wItem.getx(props) < x+cx &&
+        wItem.gety(props) >= y && wItem.gety(props) < y+cy )
+    {
+      const char* oldroutes = wItem.getrouteids(props );
+      const char* newroutes = NodeOp.getStr(sel, "routeids", "" );
+      if( merge && oldroutes != NULL && StrOp.len(oldroutes) > 0 ) {
+        char* s = (char*)allocMem(StrOp.len(oldroutes) + StrOp.len(newroutes) + 10);
+        StrOp.fmtb(s, "%s,%s", oldroutes, newroutes );
+        wItem.setrouteids(props, s );
+        freeMem(s);
+      }
+      else
+        wItem.setrouteids(props, newroutes );
+
+      NodeOp.addChild( cmd, (iONode)NodeOp.base.clone( props ) );
+      modified = true;
+    }
+    node = m_ChildTable->Next();
+  }
+
+  if( modified )
+    wxGetApp().setLocalModelModified(true);
+
+  /* notify RocRail */
+  if( NodeOp.getChildCnt(cmd) > 0 ) {
+    if( !wxGetApp().isOffline() )
+      wxGetApp().sendToRocrail( cmd );
+  }
+
+  cmd->base.del(cmd);
+
+}
+
+
+void PlanPanel::blockidSelection(iONode sel) {
+  int x  = NodeOp.getInt(sel, "x", 0);
+  int y  = NodeOp.getInt(sel, "y", 0);
+  int cx = NodeOp.getInt(sel, "cx", 0);
+  int cy = NodeOp.getInt(sel, "cy", 0);
+
+  /* prepare notify RocRail */
+  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "blockID selection" );
+  iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
+  wModelCmd.setcmd( cmd, wModelCmd.modify );
+  NodeOp.setStr( cmd, "id", "blockid" );
+
+  // iterate the items in this panel
+  m_ChildTable->BeginFind();
+  Symbol* item = NULL;
+  wxHashTable::Node* node = m_ChildTable->Next();
+  bool modified = false;
+
+  while( node != NULL ) {
+    item = (Symbol*)node->GetData();
+    iONode props = item->getProperties();
+    if( wItem.getx(props) >= x && wItem.getx(props) < x+cx &&
+        wItem.gety(props) >= y && wItem.gety(props) < y+cy )
+    {
+      wItem.setblockid(props, NodeOp.getStr(sel, "blockid", "" ) );
+      NodeOp.addChild( cmd, (iONode)NodeOp.base.clone( props ) );
+      modified = true;
+    }
+    node = m_ChildTable->Next();
+  }
+
+  if( modified )
+    wxGetApp().setLocalModelModified(true);
+
+  /* notify RocRail */
+  if( NodeOp.getChildCnt(cmd) > 0 ) {
+    if( !wxGetApp().isOffline() )
+      wxGetApp().sendToRocrail( cmd );
   }
 
   cmd->base.del(cmd);
@@ -483,12 +810,60 @@ void PlanPanel::processSelection(iONode sel) {
         // delete
         deleteSelection(sel);
         break;
+      case 3:
+        // route ids
+        routeidSelection(sel);
+        break;
+      case 4:
+        // block id
+        blockidSelection(sel);
+        break;
     }
   }
 
   NodeOp.base.del(sel);
 
   m_ProcessingSelect = false;
+}
+
+
+iONode PlanPanel::GetClipboardNode(bool clear) {
+  iONode node = NULL;
+  wxClipboard* cb = wxTheClipboard;
+  if( cb != NULL ) {
+    if( cb->Open() ) {
+      if( cb->IsSupported( wxDF_TEXT )) {
+        wxTextDataObject data;
+        cb->GetData( data );
+        char* xmlStr = StrOp.dup(data.GetText().mb_str(wxConvUTF8) );
+        if( xmlStr != NULL && StrOp.len(xmlStr) > 0 ) {
+          TraceOp.trc( "planpanel", TRCLEVEL_INFO, __LINE__, 9999, "paste:\n%s", xmlStr );
+          iODoc doc = DocOp.parse( xmlStr );
+          if( doc != NULL ) {
+            node = DocOp.getRootNode( doc );
+            DocOp.base.del( doc );
+          }
+          StrOp.free(xmlStr);
+        }
+      }
+      if( clear )
+        cb->Clear();
+      cb->Close();
+    }
+  }
+  return node;
+}
+
+
+void PlanPanel::OnPaste(wxCommandEvent& event) {
+  iONode node = GetClipboardNode();
+  if( node != NULL ) {
+    wItem.setcopy( node, False );
+    wItem.setid(node, "");
+    addItemAttr( node );
+  }
+  else
+    TraceOp.trc( "planpanel", TRCLEVEL_INFO, __LINE__, 9999, "unsupported clipboard content" );
 }
 
 
@@ -517,30 +892,66 @@ void PlanPanel::OnSelect(wxCommandEvent& event) {
 }
 
 void PlanPanel::OnMotion(wxMouseEvent& event) {
-  if( !wxGetApp().getFrame()->isEditModPlan() )
-    return;
-
+  int l_mouseX = m_mouseX;
+  int l_mouseY = m_mouseY;
   m_mouseX = event.GetX();
   m_mouseY = event.GetY();
+
+  int l_X = (int)(m_mouseX / (m_ItemSize*m_Scale));
+  int l_Y = (int)(m_mouseY / (m_ItemSize*m_Scale));
+
+  int x = 0, y = 0;
+  GetViewStart( &x, &y );
+
+  if( wxGetApp().getFrame()->isEditMode() || wxGetApp().getFrame()->isEditModPlan() ) {
+    char* text = StrOp.fmt( "(%d,%d)", l_X+x, l_Y+y );
+    wxGetApp().getFrame()->setInfoText( text );
+    StrOp.free( text );
+  }
+
+  bool dragging = event.Dragging();
+
+  if( event.CmdDown() && dragging && wxGetApp().getFrame()->isEditMode() && !wxGetApp().getFrame()->isEditModPlan() ) {
+    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999,
+        "select rect start=%d,%d size=%d,%d", m_selX, m_selY, m_mouseX-m_selX, m_mouseY-m_selY );
+    if( m_Selecting ) {
+      l_mouseX += (x * m_ItemSize*m_Scale);
+      l_mouseY += (y * m_ItemSize*m_Scale);
+      if( m_selX < l_mouseX && m_selY < l_mouseY ) {
+        // The rectangle area is without offset.
+        RefreshRect(wxRect(m_selX-(x * m_ItemSize*m_Scale), m_selY-(y * m_ItemSize*m_Scale), l_mouseX-m_selX, l_mouseY-m_selY));
+      }
+      else {
+        Refresh();
+      }
+    }
+    Update();
+    wxClientDC dc(this);
+    DoPrepareDC(dc);
+    dc.SetPen( *wxRED_PEN );
+    dc.SetBrush(*wxTRANSPARENT_BRUSH);
+    l_mouseX = m_mouseX + (x * m_ItemSize*m_Scale);
+    l_mouseY = m_mouseY + (y * m_ItemSize*m_Scale);
+    dc.DrawRectangle(m_selX, m_selY, l_mouseX-m_selX, l_mouseY-m_selY);
+    m_Selecting = true;
+  }
+
+
+  if( !wxGetApp().getFrame()->isEditModPlan() )
+    return;
 
   m_X = (int)(m_mouseX / (m_ItemSize*m_Scale));
   m_Y = (int)(m_mouseY / (m_ItemSize*m_Scale));
 
-  int x, y;
-  GetViewStart( &x, &y );
-
-  char* text = StrOp.fmt( "(%d,%d)", m_X+x, m_Y+y );
-  wxGetApp().getFrame()->setInfoText( text );
-  StrOp.free( text );
-
   wxGetMousePosition( &x, &y );
   TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "drag move x=%d(%d), y=%d(%d)", x, m_dragX, y, m_dragY );
 
-  bool dragging = event.Dragging();
 
 
   if( m_bModView && dragging && event.m_leftDown && !m_isDragged ) {
     m_isDragged = true;
+    m_dragX = x;
+    m_dragY = y;
     CaptureMouse();
   }
 
@@ -568,6 +979,19 @@ void PlanPanel::OnRemovePanel(wxCommandEvent& event) {
   int action = wxMessageDialog( this, wxGetApp().getMsg("removewarning"), _T("Rocrail"), wxYES_NO | wxICON_EXCLAMATION ).ShowModal();
   if( action == wxID_NO )
     return;
+
+  action = wxMessageDialog( this, wxGetApp().getMsg("removealltracks"), _T("Rocrail"), wxYES_NO | wxICON_EXCLAMATION ).ShowModal();
+  if( action == wxID_YES ) {
+    // iterate the items in this panel
+    m_ChildTable->BeginFind();
+    Symbol* item = NULL;
+    wxHashTable::Node* node = m_ChildTable->Next();
+    while( node != NULL ) {
+      item = (Symbol*)node->GetData();
+      item->OnDelete(event);
+      node = m_ChildTable->Next();
+    }
+  }
 
   iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
   wModelCmd.setcmd( cmd, wModelCmd.remove );
@@ -603,6 +1027,8 @@ void PlanPanel::setPosition() {
 
 
 void PlanPanel::OnLeftUp(wxMouseEvent& event) {
+  int l_mouseX = m_mouseX;
+  int l_mouseY = m_mouseY;
   m_mouseX = event.GetX();
   m_mouseY = event.GetY();
 
@@ -622,43 +1048,88 @@ void PlanPanel::OnLeftUp(wxMouseEvent& event) {
     int x = p.x - x_off;
     int y = p.y - y_off;
 
-    int pre_move_x = wZLevel.getmodviewx( m_zLevel );
-    int pre_move_y = wZLevel.getmodviewy( m_zLevel );
-    wZLevel.setmodviewx( m_zLevel, p.x + x_off );
-    wZLevel.setmodviewy( m_zLevel, p.y + y_off );
+    // Check for invalid values:
+    if( (p.x + x_off) >= 0 && (p.y + y_off) >= 0 && (p.x + x_off) <= 256 && (p.y + y_off) <= 256 ) {
 
-    setPosition();
+      int pre_move_x = wZLevel.getmodviewx( m_zLevel );
+      int pre_move_y = wZLevel.getmodviewy( m_zLevel );
+      wZLevel.setmodviewx( m_zLevel, p.x + x_off );
+      wZLevel.setmodviewy( m_zLevel, p.y + y_off );
 
-    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "drag end x=%d(%d), y=%d(%d)", p.x, m_dragX, p.y, m_dragY );
+      setPosition();
 
-    /* Notify RocRail. */
-    TraceOp.trc( "panel", TRCLEVEL_INFO, __LINE__, 9999,
-        "Change position to %d,%d", p.x + x_off, p.y + y_off );
-    iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
-    wModelCmd.setcmd( cmd, wModelCmd.modify );
-    NodeOp.setStr( cmd, "id", "movemod" );
+      TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "drag end x=%d(%d), y=%d(%d)", p.x, m_dragX, p.y, m_dragY );
 
-    iONode module = NodeOp.inst( wModule.name(), cmd, ELEMENT_NODE );
-    wModule.setid( module, wZLevel.getmodid(m_zLevel) );
-    wModule.setcmd( module, wModule.cmd_move );
+      /* Notify RocRail. */
+      TraceOp.trc( "panel", TRCLEVEL_INFO, __LINE__, 9999,
+          "Change position to %d,%d", p.x + x_off, p.y + y_off );
+      iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
+      wModelCmd.setcmd( cmd, wModelCmd.modify );
+      NodeOp.setStr( cmd, "id", "movemod" );
 
-    NodeOp.setInt( module, "pre_move_x", pre_move_x );
-    NodeOp.setInt( module, "pre_move_y", pre_move_y );
-    wModule.setx( module, p.x + x_off );
-    wModule.sety( module, p.y + y_off );
+      iONode module = NodeOp.inst( wModule.name(), cmd, ELEMENT_NODE );
+      wModule.setid( module, wZLevel.getmodid(m_zLevel) );
+      wModule.setcmd( module, wModule.cmd_move );
 
-    NodeOp.addChild( cmd, module );
-    wxGetApp().sendToRocrail( cmd );
-    wxGetApp().pushUndoItem( (iONode)NodeOp.base.clone( cmd ) );
-    cmd->base.del(cmd);
+      NodeOp.setInt( module, "pre_move_x", pre_move_x );
+      NodeOp.setInt( module, "pre_move_y", pre_move_y );
+      wModule.setx( module, p.x + x_off );
+      wModule.sety( module, p.y + y_off );
+
+      NodeOp.addChild( cmd, module );
+      wxGetApp().sendToRocrail( cmd );
+      wxGetApp().pushUndoItem( (iONode)NodeOp.base.clone( cmd ) );
+      cmd->base.del(cmd);
+    }
+    else {
+      // Restore position:
+      setPosition();
+    }
+
   }
   else {
     m_X = (int)(m_mouseX / (m_ItemSize*m_Scale));
     m_Y = (int)(m_mouseY / (m_ItemSize*m_Scale));
 
-    if( m_lastAddedItem != NULL && wxGetApp().getFrame()->isEditMode() ) {
+    if( !m_Selecting && m_lastAddedItem != NULL && wxGetApp().getFrame()->isEditMode() ) {
       wItem.setori(m_lastAddedItem, m_Ori);
       addItemAttr(m_lastAddedItem);
+    }
+
+    if( m_Selecting && wxGetApp().getFrame()->isEditMode() && !wxGetApp().getFrame()->isEditModPlan() ) {
+      int x_off, y_off;
+      ReleaseMouse();
+      GetViewStart( &x_off, &y_off );
+      l_mouseX += x_off * (m_ItemSize*m_Scale);
+      l_mouseY += y_off * (m_ItemSize*m_Scale);
+      int sx = (m_selX < l_mouseX) ? m_selX:l_mouseX;
+      int sy = (m_selY < l_mouseY) ? m_selY:l_mouseY;
+      int cx = (m_selX < l_mouseX) ? l_mouseX-m_selX:m_selX-l_mouseX;
+      int cy = (m_selY < l_mouseY) ? l_mouseY-m_selY:m_selY-l_mouseY;
+      if( m_selX < l_mouseX && m_selY < l_mouseY ) {
+        // The rectangle area is without offset.
+        RefreshRect(wxRect(m_selX-(x_off * m_ItemSize*m_Scale), m_selY-(y_off * m_ItemSize*m_Scale), l_mouseX-m_selX, l_mouseY-m_selY));
+      }
+      else {
+        Refresh();
+      }
+      m_Selecting = false;
+
+      iONode sel = NodeOp.inst( "selection", NULL, ELEMENT_NODE );
+      int div = m_ItemSize*m_Scale;
+      NodeOp.setInt( sel, "x", sx/div + (sx%div > div/2 ? 1:0));
+      NodeOp.setInt( sel, "y", sy/div + (sy%div > div/2 ? 1:0));
+      NodeOp.setInt( sel, "z", m_Z );
+      NodeOp.setInt( sel, "cx", cx/div + (cx%div > div/2 ? 1:0) );
+      NodeOp.setInt( sel, "cy", cy/div + (cy%div > div/2 ? 1:0) );
+      NodeOp.setStr( sel, "title", wZLevel.gettitle( m_zLevel ) );
+
+      SelectDialog* dlg = new SelectDialog( this, sel );
+      if( wxID_OK == dlg->ShowModal() ) {
+        processSelection(dlg->getSelection());
+      }
+      dlg->Destroy();
+      NodeOp.base.del(sel);
     }
   }
 
@@ -703,6 +1174,13 @@ void PlanPanel::OnPopup(wxMouseEvent& event) {
     m_X = (int)(m_mouseX / (m_ItemSize*m_Scale));
     m_Y = (int)(m_mouseY / (m_ItemSize*m_Scale));
 
+    if( event.CmdDown() ) {
+      TrackPickerDlg* dlg = new TrackPickerDlg( this );
+      dlg->Show(TRUE);
+      //dlg->Move( m_mouseX, m_mouseY );
+      return;
+    }
+
     if( wxGetApp().getFrame()->isEditMode() ) {
       wxMenu* menuTrack = new wxMenu();
       menuTrack->Append( ME_AddTrackStraight , wxGetApp().getMenu("straight") );
@@ -711,13 +1189,30 @@ void PlanPanel::OnPopup(wxMouseEvent& event) {
       menuTrack->Append( ME_AddTrackDirAll   , wxGetApp().getMenu("dirall") );
       menuTrack->Append( ME_AddTrackBuffer   , wxGetApp().getMenu("buffer") );
       menuTrack->Append( ME_AddTrackConnector, wxGetApp().getMenu("zconnector") );
+      menuTrack->Append( ME_AddTrackConnectorCurveRight, wxGetApp().getMenu("concurveright") );
+      menuTrack->Append( ME_AddTrackConnectorCurveLeft, wxGetApp().getMenu("concurveleft") );
 
       wxMenu* menuTurnout = new wxMenu();
-      menuTurnout->Append( ME_AddSwitchRight    , wxGetApp().getMenu("rightturnout") );
-      menuTurnout->Append( ME_AddSwitchLeft     , wxGetApp().getMenu("leftturnout") );
-      menuTurnout->Append( ME_AddSwitchCrossing , wxGetApp().getMenu("crossing") );
-      menuTurnout->Append( ME_AddSwitchDCrossing, wxGetApp().getMenu("dcrossing") );
+
+      wxMenu* menuSwitch = new wxMenu();
+      menuSwitch->Append( ME_AddSwitchLeft     , wxGetApp().getMenu("left") );
+      menuSwitch->Append( ME_AddSwitchRight    , wxGetApp().getMenu("right") );
+      menuTurnout->Append( -1, wxGetApp().getMenu("turnout"), menuSwitch  );
+
+      wxMenu* menuCrossing = new wxMenu();
+      menuCrossing->Append( ME_AddSwitchRectCrossing , wxGetApp().getMenu("rectangular") );
+      menuCrossing->Append( ME_AddSwitchCenterCrossing , wxGetApp().getMenu("center") );
+      menuCrossing->Append( ME_AddSwitchLeftCrossing , wxGetApp().getMenu("left") );
+      menuCrossing->Append( ME_AddSwitchCrossing , wxGetApp().getMenu("right") );
+      menuTurnout->Append( -1, wxGetApp().getMenu("crossing"), menuCrossing  );
+
+      wxMenu* menuDCrossing = new wxMenu();
+      menuDCrossing->Append( ME_AddSwitchLeftDCrossing , wxGetApp().getMenu("left") );
+      menuDCrossing->Append( ME_AddSwitchDCrossing , wxGetApp().getMenu("right") );
+      menuTurnout->Append( -1, wxGetApp().getMenu("dcrossing"), menuDCrossing  );
+
       menuTurnout->Append( ME_AddSwitchThreeway , wxGetApp().getMenu("threeway") );
+      menuTurnout->Append( ME_AddSwitchTwoway   , wxGetApp().getMenu("twoway") );
       menuTurnout->Append( ME_AddSwitchDecoupler, wxGetApp().getMenu("decoupler") );
       menuTurnout->Append( ME_AddSwitchAccessory, wxGetApp().getMenu("accessory") );
 
@@ -734,20 +1229,26 @@ void PlanPanel::OnPopup(wxMouseEvent& event) {
       menu.Append( ME_AddSelTab, wxGetApp().getMenu("seltab") );
       menu.Append( ME_AddText  , wxGetApp().getMenu("text") );
 
+      menu.AppendSeparator();
       wxMenu* menuRoad = new wxMenu();
       menuRoad->Append( ME_AddRoadStraight , wxGetApp().getMenu("straight") );
       menuRoad->Append( ME_AddRoadCurve    , wxGetApp().getMenu("curve") );
       menuRoad->Append( ME_AddRoadDir      , wxGetApp().getMenu("dir") );
       menuRoad->Append( ME_AddRoadBlock    , wxGetApp().getMenu("block") );
       menuRoad->Append( ME_AddRoadFBack    , wxGetApp().getMenu("sensor") );
-      wxMenu* menuTurnoff = new wxMenu();
-      menuTurnoff->Append( ME_AddRoadRight    , wxGetApp().getMenu("right") );
-      menuTurnoff->Append( ME_AddRoadLeft     , wxGetApp().getMenu("left") );
-      menuTurnoff->Append( ME_AddRoadCrossing , wxGetApp().getMenu("crossing") );
-      menuRoad->Append( -1, wxGetApp().getMenu("turnoff"), menuTurnoff );
+      wxMenu* menuRoadTurnoout = new wxMenu();
+      menuRoadTurnoout->Append( ME_AddRoadRight    , wxGetApp().getMenu("right") );
+      menuRoadTurnoout->Append( ME_AddRoadLeft     , wxGetApp().getMenu("left") );
+      menuRoadTurnoout->Append( ME_AddRoadCrossing , wxGetApp().getMenu("crossing") );
+      menuRoad->Append( -1, wxGetApp().getMenu("turnout"), menuRoadTurnoout );
       menu.Append( -1, wxGetApp().getMenu("road"), menuRoad );
 
       menu.AppendSeparator();
+      iONode node = GetClipboardNode();
+      if( node != NULL ) {
+        menu.Append( ME_Paste, wxGetApp().getMenu("paste") );
+        NodeOp.base.del(node); // free unused node
+      }
       menu.Append( ME_PanelSelect, wxGetApp().getMenu("select") );
       menu.AppendSeparator();
       menu.Append( ME_RemovePlan, wxGetApp().getMenu("removepanel") );
@@ -755,7 +1256,7 @@ void PlanPanel::OnPopup(wxMouseEvent& event) {
       PopupMenu(&menu, event.GetX(), event.GetY() );
     }
     else {
-      wxMenu menu( wxGetApp().getMenu("panel") );
+      wxMenu menu( wxGetApp().getMenu("panel") + wxT(" \"") + wxString( wZLevel.gettitle(m_zLevel),wxConvUTF8) + wxT("\"") );
       if( this->m_bModView ) {
         wxMenu* menuOrientation = new wxMenu();
         menuOrientation->Append( ME_ModuleRotate, wxGetApp().getMenu("rotate") );
@@ -771,10 +1272,71 @@ void PlanPanel::OnPopup(wxMouseEvent& event) {
         menu.Append( ME_ModProps, wxGetApp().getMenu("modproperties") );
         menu.AppendSeparator();
       }
+      menu.Append( ME_PlanColor, wxGetApp().getMenu("panelcolor") );
       menu.Append( ME_PlanProps, wxGetApp().getMenu("properties") );
+      menu.Append( ME_PanelHelp, wxGetApp().getMenu("help") );
       PopupMenu(&menu, event.GetX(), event.GetY() );
     }
 }
+
+void PlanPanel::OnTimer(wxTimerEvent& event) {
+  m_bAlt = !m_bAlt;
+  m_ChildTable->BeginFind();
+  Symbol* item = NULL;
+  wxHashTable::Node* node = m_ChildTable->Next();
+  while( node != NULL ) {
+    item = (Symbol*)node->GetData();
+    if( ( item->isSignal() || item->isSwitch() ) && !item->isDragged() && item->hasAlt())
+      item->Refresh();
+    node = m_ChildTable->Next();
+  }
+}
+
+
+
+
+void PlanPanel::OnBackColor( wxCommandEvent& event ) {
+  iONode ini = wxGetApp().getIni();
+
+  iONode tab = wGui.gettab(ini);
+  bool tabBackground = false;
+  while( tab != NULL ) {
+    if( m_Z == wTab.getnr(tab) ) {
+      tabBackground = true;
+      wxColourData ColourData;
+      ColourData.SetColour(wxColour(wTab.getred(tab),wTab.getgreen(tab),wTab.getblue(tab)));
+      wxColourDialog* dlg = new wxColourDialog(this, &ColourData);
+      if( wxID_OK == dlg->ShowModal() ) {
+        wxColour &color = dlg->GetColourData().GetColour();
+        wTab.setred( tab, (int)color.Red() );
+        wTab.setgreen( tab, (int)color.Green() );
+        wTab.setblue( tab, (int)color.Blue() );
+        SetBackgroundColor((byte)wTab.getred(tab), (byte)wTab.getgreen(tab), (byte)wTab.getblue(tab), true);
+      }
+      dlg->Destroy();
+      break;
+    }
+    tab = wGui.nexttab(ini, tab);
+  }
+
+  if( !tabBackground ) {
+    wxColourDialog* dlg = new wxColourDialog(this);
+    if( wxID_OK == dlg->ShowModal() ) {
+      wxColour &color = dlg->GetColourData().GetColour();
+      iONode tab = NodeOp.inst( wTab.name(), ini, ELEMENT_NODE);
+      NodeOp.addChild( ini, tab);
+      wTab.setnr(tab, m_Z);
+      wTab.setred( tab, (int)color.Red() );
+      wTab.setgreen( tab, (int)color.Green() );
+      wTab.setblue( tab, (int)color.Blue() );
+      SetBackgroundColor((byte)wTab.getred(tab), (byte)wTab.getgreen(tab), (byte)wTab.getblue(tab), true);
+    }
+    dlg->Destroy();
+  }
+
+  reScale( m_Scale );
+}
+
 
 void PlanPanel::removeItemFromList( iONode item ) {
   iONode model = wxGetApp().getModel();
@@ -893,11 +1455,26 @@ iONode PlanPanel::addItemInList( iONode item ) {
   else if( StrOp.equals( wSchedule.name(), name ) ) {
     dbkey = wScheduleList.name();
   }
+  else if( StrOp.equals( wTour.name(), name ) ) {
+    dbkey = wTourList.name();
+  }
   else if( StrOp.equals( wLocation.name(), name ) ) {
     dbkey = wLocationList.name();
   }
   else if( StrOp.equals( wAction.name(), name ) ) {
     dbkey = wActionList.name();
+  }
+  else if( StrOp.equals( wLink.name(), name ) ) {
+    dbkey = wLinkList.name();
+  }
+  else if( StrOp.equals( wDec.name(), name ) ) {
+    dbkey = wDecList.name();
+  }
+  else if( StrOp.equals( wVariable.name(), name ) ) {
+    dbkey = wVariableList.name();
+  }
+  else if( StrOp.equals( wWeather.name(), name ) ) {
+    dbkey = wWeatherList.name();
   }
 
   const char* id = wItem.getid(item);
@@ -923,8 +1500,7 @@ iONode PlanPanel::addItemInList( iONode item ) {
 
   }
   else {
-    TraceOp.trc( "planpanel", TRCLEVEL_WARNING, __LINE__, 9999, "Unknown item %s with dbkey %s",
-                 name, dbkey );
+    TraceOp.trc( "planpanel", TRCLEVEL_WARNING, __LINE__, 9999, "Unknown item %s with dbkey ????", name );
   }
 
   return item;
@@ -935,19 +1511,12 @@ void PlanPanel::addItemAttr( iONode node ) {
 
   iONode l_clone = (iONode)NodeOp.base.clone(node);
 
-  if( StrOp.equals( wText.name(), NodeOp.getName( node ) ) &&
-      (wText.gettext(node) == NULL || StrOp.len( wText.gettext(node) ) == 0) ) {
-
-    wxTextEntryDialog* dlg = new wxTextEntryDialog(m_Parent, wxGetApp().getMenu("entertext") );
-    if( wxID_OK == dlg->ShowModal() ) {
-      wText.settext( node, dlg->GetValue().mb_str(wxConvUTF8) );
-    }
-    dlg->Destroy();
-  }
-  else if( !StrOp.equals( wTrack.name(), NodeOp.getName( node ) ) &&
+  if( !StrOp.equals( wTrack.name(), NodeOp.getName( node ) ) &&
       ( wItem.getid(node) == NULL || StrOp.len( wItem.getid(node) ) == 0 ) ) {
 
-    wxTextEntryDialog* dlg = new wxTextEntryDialog(m_Parent, wxGetApp().getMenu("enterid") );
+    wxTextEntryDialog* dlg = new wxTextEntryDialog(m_Parent,
+        wxGetApp().getMenu("enterid") + wxT(" (") + wxString(NodeOp.getName(node),wxConvUTF8) + (wItem.gettype(node)!=NULL?wxT(":"):wxT(":")) +
+        wxString(wItem.gettype(node)!=NULL?wItem.gettype(node):"",wxConvUTF8) + wxT(")") );
 
     Symbol* item = NULL;
     do {
@@ -955,13 +1524,29 @@ void PlanPanel::addItemAttr( iONode node ) {
         wItem.setid( node, dlg->GetValue().mb_str(wxConvUTF8) );
         char key[256];
         itemKey( node, key, NULL );
-        item = (Symbol*)m_ChildTable->Get( wxString(key,wxConvUTF8) );
+
+        int pagecnt = wxGetApp().getFrame()->getNotebook()->GetPageCount();
+        for( int i = 0; i < pagecnt; i++ ) {
+          PlanPanel* p = (PlanPanel*)wxGetApp().getFrame()->getNotebook()->GetPage(i);
+          item = (Symbol*)p->m_ChildTable->Get( wxString(key,wxConvUTF8) );
+          if( item != NULL )
+            break;
+        }
       }
       else {
         // TODO: cleanup node!
         return;
       }
     } while( item != NULL );
+    dlg->Destroy();
+  }
+
+  if( StrOp.equals( wText.name(), NodeOp.getName( node ) ) && (wText.gettext(node) == NULL || StrOp.len( wText.gettext(node) ) == 0) ) {
+
+    wxTextEntryDialog* dlg = new wxTextEntryDialog(m_Parent, wxGetApp().getMenu("entertext"), wxString(wText.getid( node ),wxConvUTF8) );
+    if( wxID_OK == dlg->ShowModal() ) {
+      wText.settext( node, dlg->GetValue().mb_str(wxConvUTF8) );
+    }
     dlg->Destroy();
   }
 
@@ -975,19 +1560,17 @@ void PlanPanel::addItemAttr( iONode node ) {
   int x, y;
   GetViewStart( &x, &y );
 
-  if( !NodeOp.getBool( node, "copy", False ) ) {
+  if( wItem.iscopy( node ) ) {
+    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "copied item added, z=%d", wItem.getz(node) );
+    wItem.setcopy( node, False ); // reset copy flag
+  }
+  else {
     wItem.setx( node, m_X+x );
     wItem.sety( node, m_Y+y );
     wItem.setz( node, m_Z );
   }
-  else {
-    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "copied item added, z=%d", wItem.getz(node) );
-  }
 
-  if( wxGetApp().isOffline() ) {
-    addItemInList( node );
-  }
-
+  addItemInList( node ); // Allways add new Items locally to prevent two nodes after getting a server modify event!
 
   wxCommandEvent evt( wxEVT_COMMAND_MENU_SELECTED, ADDITEM_EVENT );
   evt.SetClientData( node );
@@ -1045,6 +1628,18 @@ void PlanPanel::addTrackConnector(wxCommandEvent& event) {
   addItemAttr( node );
 }
 
+void PlanPanel::addTrackConnectorCurveRight(wxCommandEvent& event) {
+  iONode node = NodeOp.inst( wTrack.name(), NULL, ELEMENT_NODE );
+  wTrack.settype( node, wTrack.concurveright );
+  addItemAttr( node );
+}
+
+void PlanPanel::addTrackConnectorCurveLeft(wxCommandEvent& event) {
+  iONode node = NodeOp.inst( wTrack.name(), NULL, ELEMENT_NODE );
+  wTrack.settype( node, wTrack.concurveleft );
+  addItemAttr( node );
+}
+
 void PlanPanel::addTrackDir(wxCommandEvent& event) {
   iONode node = NodeOp.inst( wTrack.name(), NULL, ELEMENT_NODE );
   wTrack.settype( node, wTrack.dir );
@@ -1078,6 +1673,8 @@ void PlanPanel::addSwitchRight(wxCommandEvent& event) {
 void PlanPanel::addSwitchCrossing(wxCommandEvent& event) {
   iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
   wSwitch.settype( node, wSwitch.crossing );
+  wSwitch.setdir( node, True );
+  wSwitch.setrectcrossing( node, False );
   if( event.GetId() == ME_AddRoadCrossing )
     wItem.setroad(node, True);
   addItemAttr( node );
@@ -1086,12 +1683,46 @@ void PlanPanel::addSwitchCrossing(wxCommandEvent& event) {
 void PlanPanel::addSwitchDCrossing(wxCommandEvent& event) {
   iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
   wSwitch.settype( node, wSwitch.dcrossing );
+  wSwitch.setdir( node, True );
+  addItemAttr( node );
+}
+
+void PlanPanel::addSwitchRectCrossing(wxCommandEvent& event) {
+  iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+  wSwitch.settype( node, wSwitch.crossing );
+  wSwitch.setrectcrossing( node, True );
+  addItemAttr( node );
+}
+
+void PlanPanel::addSwitchCenterCrossing(wxCommandEvent& event) {
+  iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+  wSwitch.settype( node, wSwitch.ccrossing );
+  wSwitch.setrectcrossing( node, False );
+  addItemAttr( node );
+}
+
+void PlanPanel::addSwitchLeftCrossing(wxCommandEvent& event) {
+  iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+  wSwitch.settype( node, wSwitch.crossing );
+  wSwitch.setrectcrossing( node, False );
+  addItemAttr( node );
+}
+
+void PlanPanel::addSwitchLeftDCrossing(wxCommandEvent& event) {
+  iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+  wSwitch.settype( node, wSwitch.dcrossing );
   addItemAttr( node );
 }
 
 void PlanPanel::addSwitchThreeway(wxCommandEvent& event) {
   iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
   wSwitch.settype( node, wSwitch.threeway );
+  addItemAttr( node );
+}
+
+void PlanPanel::addSwitchTwoway(wxCommandEvent& event) {
+  iONode node = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+  wSwitch.settype( node, wSwitch.twoway );
   addItemAttr( node );
 }
 
@@ -1161,6 +1792,25 @@ void PlanPanel::addItemCmd(wxCommandEvent& event) {
   addItem( child );
 }
 
+
+void PlanPanel::ChangeItemKey( const char* key, const char* prev_key ) {
+
+  Symbol* item = (Symbol*)m_ChildTable->Get( wxString(prev_key,wxConvUTF8) ); 
+  if (item) {
+    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "generate new key, prev: %s , new: %s", prev_key, key );
+    m_ChildTable->Put( wxString(key,wxConvUTF8), item);
+    m_ChildTable->Delete(wxString(prev_key,wxConvUTF8));
+  }
+}
+
+
+void* PlanPanel::GetItem( const char* key ) {
+  Symbol* item = (Symbol*)m_ChildTable->Get( wxString(key,wxConvUTF8) );
+  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "GetItem [%s] %lx", key, item );
+  return item;
+}
+
+
 void PlanPanel::putChild(void* item) {
   TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "put moved Item at level %d", m_Z );
 
@@ -1178,7 +1828,7 @@ void PlanPanel::updateItemCmd(wxCommandEvent& event) {
   // Get the copied node from the event object:
   iONode node = (iONode)event.GetClientData();
 
-  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "update ITEM" );
+  TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "update ITEM %s_%s", NodeOp.getName(node), wItem.getid(node) );
 
   char key[256];
   char prevkey[256];
@@ -1196,7 +1846,7 @@ void PlanPanel::updateItemCmd(wxCommandEvent& event) {
   }
   else if( item != NULL ) {
     item->modelEvent( node );
-    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "Item with id=%s is informed", key );
+    TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "Item with id=%s is informed", key );
 
     if( wItem.getz(item->getProperties()) != this->m_Z ) {
       m_ChildTable->Delete(wxString(prevkey,wxConvUTF8));
@@ -1231,10 +1881,11 @@ void PlanPanel::updateItemCmd(wxCommandEvent& event) {
 void PlanPanel::updateTTItemCmd(wxCommandEvent& event) {
   // Get the copied node from the event object:
   iONode node = (iONode)event.GetClientData();
+  iONode ini  = wGui.getplanpanel(wxGetApp().getIni());
 
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* tablenode = (wxNode*)m_ChildTable->Next();
+  wxHashTable::Node* tablenode = m_ChildTable->Next();
   while( tablenode != NULL ) {
     item = (Symbol*)tablenode->GetData();
     const char* nodeName = NodeOp.getName( item->getProperties() );
@@ -1242,12 +1893,17 @@ void PlanPanel::updateTTItemCmd(wxCommandEvent& event) {
     if( StrOp.equals( nodeName, wTurntable.name() ) ) {
       item->modelEvent( node );
     }
-    else if( StrOp.equals( nodeName, wTrack.name() ) || StrOp.equals( nodeName, wSignal.name() ) ||
-             StrOp.equals( nodeName, wFeedback.name() ) || StrOp.equals( nodeName, wSwitch.name() ) ) {
-      TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "feedback event id=[%s]", wFeedback.getid(node) );
-      item->blockEvent( wFeedback.getid(node));
+    else if(wPlanPanel.isprocessblockevents(ini)) {
+      if( StrOp.equals( nodeName, wTrack.name() ) || StrOp.equals( nodeName, wSignal.name() ) ||
+          StrOp.equals( nodeName, wFeedback.name() ) || StrOp.equals( nodeName, wSwitch.name() ) ||
+          StrOp.equals( nodeName, wOutput.name() ))
+      {
+        TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999,
+            "feedback [%s] block event for id=[%s]", wFeedback.getid(node), item->getId() );
+        item->blockEvent( wItem.getid(node));
+      }
     }
-    tablenode = (wxNode*)m_ChildTable->Next();
+    tablenode = m_ChildTable->Next();
   }
 
   // Cleanup copy:
@@ -1279,18 +1935,18 @@ void PlanPanel::update4Route(wxCommandEvent& event) {
 
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* tablenode = (wxNode*)m_ChildTable->Next();
+  wxHashTable::Node* tablenode = m_ChildTable->Next();
   while( tablenode != NULL ) {
     item = (Symbol*)tablenode->GetData();
     item->routeEvent( routeId, locked );
-    tablenode = (wxNode*)m_ChildTable->Next();
+    tablenode = m_ChildTable->Next();
   }
 
   // Cleanup copy:
   NodeOp.base.del( node );
 }
 
-void PlanPanel::addItem( iONode child, bool add2list ) {
+void PlanPanel::addItem( iONode child, bool add2list, bool focus ) {
   const char* id = wItem.getid( child );
   int z = wItem.getz( child );
   if( id == NULL )
@@ -1305,7 +1961,8 @@ void PlanPanel::addItem( iONode child, bool add2list ) {
 
       if(wItem.isshow( child )) {
         Symbol* item = new Symbol( (PlanPanel*)this, child, m_ItemSize, m_Z, m_Scale, m_Bktext );
-        item->SetFocus();
+        if( focus )
+          item->SetFocus();
         m_ChildTable->Put( wxString(key,wxConvUTF8), item );
         item->SetBackgroundColour( GetBackgroundColour() );
       }
@@ -1322,7 +1979,7 @@ void PlanPanel::addItem( iONode child, bool add2list ) {
 }
 
 void PlanPanel::addItem( const char* nodename, const char* id, wxWindow* item ) {
-  if( id != NULL ) {
+  if( id != NULL && StrOp.len(id) > 0 ) {
     char key[256];
     itemKey( nodename, id, key );
 
@@ -1342,12 +1999,14 @@ void PlanPanel::addMultipleItem(wxCommandEvent& event) {
   }
 
   int cnt = NodeOp.getChildCnt( node );
+  char* text = StrOp.fmt( "adding %d from %s...", cnt, NodeOp.getName(node) );
+  wxGetApp().getFrame()->setInfoText( text );
+  StrOp.free( text );
   for( int i = 0; i < cnt; i++ ) {
     iONode child = NodeOp.getChild( node, i );
-    addItem( child, false );
-    //wxGetApp().Yield();
+    addItem( child, false, false );
   }
-  char* text = StrOp.fmt( "%d items", m_ChildTable->GetCount() );
+  text = StrOp.fmt( "%d items added", m_ChildTable->GetCount() );
   wxGetApp().getFrame()->setInfoText( text );
   StrOp.free( text );
 
@@ -1355,9 +2014,14 @@ void PlanPanel::addMultipleItem(wxCommandEvent& event) {
 }
 
 void PlanPanel::modelEvent( iONode node ) {
+
+  if( node == NULL ) {
+    m_Timer->Stop();
+    return;
+  }
+
   const char* name = NodeOp.getName( node );
   const char* id   = wItem.getid( node );
-  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "PlanPanel::modelEvent() name=%s", name );
 
   if( StrOp.equals( wModelCmd.name(), name ) ){
     const char* cmd = wModelCmd.getcmd( node );
@@ -1428,10 +2092,14 @@ void PlanPanel::modelEvent( iONode node ) {
       for( int i = 0; i < cnt; i++ ) {
         iONode child = NodeOp.getChild( node, i );
         id = wItem.getid( child );
-        TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "Item with id=%s will be informed", id );
+        TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "Item with id=%s will be informed", id );
         // check for loc or street nodes:
         // TODO: check for existence -> modify or add...
         wxCommandEvent event( wxEVT_COMMAND_MENU_SELECTED, UPDATEITEM_EVENT );
+
+        if(StrOp.equals(wBlock.name(), NodeOp.getName(node)))
+          wBlock.setdesc(node, "planpanel model modify");
+
         event.SetClientData( node->base.clone( child ) );
         wxPostEvent( this, event );
       }
@@ -1439,31 +2107,46 @@ void PlanPanel::modelEvent( iONode node ) {
   }
   else if( id != NULL ) {
     char key[256];
-    itemKey( node, key, NULL );
+    char prev_key[256];
+    itemKey( node, key, prev_key );
     TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "itemKey=\"%s\"", key );
     Symbol* item = (Symbol*)m_ChildTable->Get( wxString(key,wxConvUTF8) );
+		if(( item == NULL ) && ( !StrOp.equals(key, prev_key) )) {
+    	TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "Item with id=%s at level %d not found!", key, wZLevel.getz(m_zLevel) );
+    	item = (Symbol*)m_ChildTable->Get( wxString(prev_key,wxConvUTF8) );
+			if (item)
+				ChangeItemKey(key, prev_key);
+    	item = (Symbol*)m_ChildTable->Get( wxString(key,wxConvUTF8) );
+		}
     if( item != NULL ) {
-      TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "update item=[%s]", key );
+      TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "update item=[%s]", key );
       wxCommandEvent event( wxEVT_COMMAND_MENU_SELECTED, UPDATEITEM_EVENT );
       // Make a copy of the node for using it out of this scope:
       event.SetClientData( node->base.clone( node ) );
       wxPostEvent( this, event );
     }
-    if( StrOp.equals( wFeedback.name(), name ) ) {
+    if( StrOp.equals( wFeedback.name(), name ) || StrOp.equals( wOutput.name(), name ) ) {
       // could be invisible feedback for a turntable...
-      TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "feedback event item=[%s]", key );
-      wxCommandEvent event( wxEVT_COMMAND_MENU_SELECTED, UPDATETT_EVENT );
-      // Make a copy of the node for using it out of this scope:
-      event.SetClientData( node->base.clone( node ) );
-      wxPostEvent( this, event );
+      TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "feedback event item=[%s]", key );
+      iONode ini = wGui.getplanpanel(wxGetApp().getIni());
+      if( wPlanPanel.isprocessblockevents(ini) ) {
+        wxCommandEvent event( wxEVT_COMMAND_MENU_SELECTED, UPDATETT_EVENT );
+        // Make a copy of the node for using it out of this scope:
+        event.SetClientData( node->base.clone( node ) );
+        wxPostEvent( this, event );
+      }
     }
     else if( StrOp.equals( wRoute.name(), name ) ) {
       // could be invisible feedback for a turntable...
-      TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "route event item=[%s]", key );
-      wxCommandEvent event( wxEVT_COMMAND_MENU_SELECTED, UPDATE4ROUTE_EVENT );
-      // Make a copy of the node for using it out of this scope:
-      event.SetClientData( node->base.clone( node ) );
-      wxPostEvent( this, event );
+      TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "route event item=[%s]", key );
+
+      iONode ini = wGui.getplanpanel(wxGetApp().getIni());
+      if( wPlanPanel.isprocessrouteevents(ini) ) {
+        wxCommandEvent event( wxEVT_COMMAND_MENU_SELECTED, UPDATE4ROUTE_EVENT );
+        // Make a copy of the node for using it out of this scope:
+        event.SetClientData( node->base.clone( node ) );
+        wxPostEvent( this, event );
+      }
     }
   }
   else {
@@ -1472,32 +2155,61 @@ void PlanPanel::modelEvent( iONode node ) {
 }
 
 
+
 bool PlanPanel::isBlockOccupied( const char* id ) {
-  char key[256];
-  itemKey( wBlock.name(), id, key );
-  Symbol* item = (Symbol*)m_ChildTable->Get( wxString(key,wxConvUTF8) );
-  if( item != NULL ) {
-    const char* locid = wBlock.getlocid( item->getProperties() );
-    if( locid != NULL && StrOp.len( locid ) > 0 )
-      return true;
+  iONode model = wxGetApp().getModel();
+  iONode list = wPlan.getbklist( model );
+  if( list != NULL ) {
+    int cnt = NodeOp.getChildCnt( list );
+    for( int i = 0; i < cnt; i++ ) {
+      iONode node = NodeOp.getChild( list, i );
+      if( id != NULL && StrOp.equals( id, wItem.getid(node) ) ) {
+        const char* locid = wBlock.getlocid( node );
+        if( locid != NULL && StrOp.len( locid ) > 0 )
+          return true;
+        else
+          return false;
+      }
+    }
   }
 
-  itemKey( wFeedback.name(), id, key );
-  item = (Symbol*)m_ChildTable->Get( wxString(key,wxConvUTF8) );
-  if( item != NULL ) {
-    if( StrOp.equals(wFeedback.name(), NodeOp.getName(item->getProperties())) && wFeedback.isstate(item->getProperties()) )
-      return true;
+  list = wPlan.getfblist( model );
+  if( list != NULL ) {
+    int cnt = NodeOp.getChildCnt( list );
+    for( int i = 0; i < cnt; i++ ) {
+      iONode node = NodeOp.getChild( list, i );
+      if( id != NULL && StrOp.equals( id, wItem.getid(node) ) ) {
+        return wFeedback.isstate(node);
+      }
+    }
+  }
+
+  list = wPlan.getcolist( model );
+  if( list != NULL ) {
+    int cnt = NodeOp.getChildCnt( list );
+    for( int i = 0; i < cnt; i++ ) {
+      iONode node = NodeOp.getChild( list, i );
+      if( id != NULL && StrOp.equals( id, wItem.getid(node) ) ) {
+        return StrOp.equals( wOutput.on, wOutput.getstate(node) );
+      }
+    }
   }
 
   return false;
 }
 
+
 bool PlanPanel::isBlockReserved( const char* id ) {
-  char key[256];
-  itemKey( wBlock.name(), id, key );
-  Symbol* item = (Symbol*)m_ChildTable->Get( wxString(key,wxConvUTF8) );
-  if( item != NULL ) {
-    return wBlock.isreserved( item->getProperties() )?true:false;
+  iONode model = wxGetApp().getModel();
+  iONode list = wPlan.getbklist( model );
+  if( list != NULL ) {
+    int cnt = NodeOp.getChildCnt( list );
+    for( int i = 0; i < cnt; i++ ) {
+      iONode node = NodeOp.getChild( list, i );
+      if( id != NULL && StrOp.equals( id, wItem.getid(node) ) ) {
+        return wBlock.isreserved( node );
+      }
+    }
   }
   return false;
 }
@@ -1512,7 +2224,6 @@ void PlanPanel::addItems( iONode node ) {
     event.SetClientData( node );
     // send in a thread-safe way
     wxPostEvent( this, event );
-    ThreadOp.sleep( 10 );
   }
   else {
     if( StrOp.equals( NodeOp.getName( node ), wModelCmd.name() ) ) {
@@ -1529,7 +2240,6 @@ void PlanPanel::addItems( iONode node ) {
       event.SetClientData( child );
       // send in a thread-safe way
       wxPostEvent( this, event );
-      ThreadOp.sleep( 0 );
     }
   }
 }
@@ -1610,12 +2320,12 @@ void PlanPanel::clean() {
   Show(false);
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* node = (wxNode*)m_ChildTable->Next();
+  wxHashTable::Node* node = m_ChildTable->Next();
   while( node != NULL ) {
     item = (Symbol*)node->GetData();
     item->disable();
     RemoveChild(item);
-    node = (wxNode*)m_ChildTable->Next();
+    node = m_ChildTable->Next();
   }
   m_ChildTable->Clear();
   Refresh();
@@ -1626,13 +2336,17 @@ void PlanPanel::blockEvent( const char* id ) {
   if( m_ProcessingSelect )
     return;
 
+  iONode ini = wGui.getplanpanel(wxGetApp().getIni());
+  if( !wPlanPanel.isprocessrouteevents(ini) )
+    return;
+
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* node = (wxNode*)m_ChildTable->Next();
+  wxHashTable::Node* node = m_ChildTable->Next();
   while( node != NULL ) {
     item = (Symbol*)node->GetData();
     item->blockEvent( id );
-    node = (wxNode*)m_ChildTable->Next();
+    node = m_ChildTable->Next();
   }
 }
 
@@ -1655,7 +2369,7 @@ void PlanPanel::reScale( double scale ) {
 
   m_ChildTable->BeginFind();
   Symbol* item = NULL;
-  wxNode* node = (wxNode*)m_ChildTable->Next();
+  wxHashTable::Node* node = m_ChildTable->Next();
   while( node != NULL ) {
     item = (Symbol*)node->GetData();
     item->SetBackgroundColour( GetBackgroundColour() );
@@ -1669,16 +2383,16 @@ void PlanPanel::reScale( double scale ) {
         cy = wItem.gety(iProps);
     }
 
-    node = (wxNode*)m_ChildTable->Next();
+    node = m_ChildTable->Next();
   }
 
   if( needSize ) {
-    TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "needSize cx=%d, cy=%d", cx, cy );
+    TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "needSize cx=%d, cy=%d", cx, cy );
     cx++; cy++;
   }
 
 
-  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "size2fit cx=%d, cy=%d", cx, cy );
+  TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "size2fit cx=%d, cy=%d", cx, cy );
 
   if( m_bModView ) {
   /*
@@ -1741,16 +2455,31 @@ void PlanPanel::refresh(bool eraseBackground ) {
 }
 
 void PlanPanel::OnLeftDown(wxMouseEvent& event) {
-  int x;
-  int y;
+  int x = 0;
+  int y = 0;
+  int xoff = 0;
+  int yoff = 0;
+  int sx = 0;
+  int sy = 0;
 
   Raise();
 
   wxGetMousePosition( &x, &y );
+  GetScreenPosition(&sx, &sy);
+  GetViewStart( &xoff, &yoff );
 
   m_dragX = x;
   m_dragY = y;
-  TraceOp.trc( "plan", TRCLEVEL_INFO, __LINE__, 9999, "drag start x=%d, y=%d", x, y );
+  if(event.CmdDown() && wxGetApp().getFrame()->isEditMode() ) {
+    //m_selX = event.GetX();
+    //m_selY = event.GetY();
+    m_selX = (x - sx) + (xoff*m_ItemSize*m_Scale);
+    m_selY = (y - sy) + (yoff*m_ItemSize*m_Scale);
+    m_Selecting = true;
+    TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "select start %d,%d (%d,%d)", m_selX, m_selY );
+    CaptureMouse();
+  }
+  TraceOp.trc( "plan", TRCLEVEL_DEBUG, __LINE__, 9999, "drag start x=%d, y=%d (%d,%d)", x, y, event.GetX(), event.GetY() );
 
 }
 

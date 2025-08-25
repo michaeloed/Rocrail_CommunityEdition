@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -91,7 +94,7 @@ static void __signalHandler( int sig ) {
 
   printf( "__signalHandler: shutdown...\n" );
   if( sig != SIGSEGV ) {
-    AppOp.shutdown();
+    AppOp.shutdown(0, sigName);
   }
   else {
     /* try todo a power off... */
@@ -113,6 +116,9 @@ static char** m_argv;
 int main( int argc, char* argv[] ) {
   /* Resets memory statistics. */
   MemOp.resetDump();
+
+  /* disable stdout buffering to be able to tail the nohup out*/
+  setbuf( stdout, NULL );
 
   /* make copy of arguments for later use: */
   m_argc = argc;
@@ -145,7 +151,7 @@ int main( int argc, char* argv[] ) {
   {
     struct rlimit rl;
     getrlimit( RLIMIT_CORE, &rl );
-    rl.rlim_cur = 1024 * 1024 * 100;
+    rl.rlim_cur = 1024 * 1024 * 1024;
     setrlimit( RLIMIT_CORE, &rl );
     printf( "   --                     \n" );
     printf( "  / /  (_)__  __ ____  __ \n" );
@@ -247,7 +253,7 @@ void WINAPI RocrailServiceCtrlHandler( DWORD Opcode ) {
     case SERVICE_CONTROL_STOP: 
     RocrailServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
     SetServiceStatus( RocrailServiceStatusHandle, &RocrailServiceStatus ); 
-    AppOp.shutdown();
+    AppOp.shutdown(0, "SERVICE_CONTROL_STOP");
     return; 
     
     case SERVICE_CONTROL_PAUSE: 

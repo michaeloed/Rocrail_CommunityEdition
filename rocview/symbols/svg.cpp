@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -134,7 +137,7 @@ bool svgReader::parsePoly( const char* d, int xpoints[], int ypoints[], int* cnt
 }
 
 
-void svgReader::addPoly2List( iOList polyList, int cnt, int xpoints[], int ypoints[], const char* stroke, const char* fill, bool arc ) {
+void svgReader::addPoly2List( iOList polyList, int cnt, int xpoints[], int ypoints[], const char* stroke, const char* fill, bool arc, const char* stroke_width ) {
   svgPoly* svgpoly = new svgPoly();
   svgpoly->poly = new wxPoint[cnt];
   svgpoly->cnt = cnt;
@@ -155,11 +158,16 @@ void svgReader::addPoly2List( iOList polyList, int cnt, int xpoints[], int ypoin
   else
     svgpoly->fill = StrOp.dup("none");
 
+  if( stroke_width != NULL )
+    svgpoly->stroke_width = StrOp.dup(stroke_width);
+  else
+    svgpoly->stroke_width = StrOp.dup("1");
+
   ListOp.add( polyList, (obj)svgpoly );
 }
 
 
-void svgReader::addCircle2List( iOList circleList, int cx, int cy, int r, const char* stroke, const char* fill ) {
+void svgReader::addCircle2List( iOList circleList, int cx, int cy, int r, const char* stroke, const char* fill, const char* stroke_width ) {
   svgCircle* svgcircle = new svgCircle();
   svgcircle->cx = cx;
   svgcircle->cy = cy;
@@ -169,6 +177,11 @@ void svgReader::addCircle2List( iOList circleList, int cx, int cy, int r, const 
     svgcircle->stroke = StrOp.dup(stroke);
   else
     svgcircle->stroke = StrOp.dup("black");
+
+  if( stroke_width != NULL )
+    svgcircle->stroke_width = StrOp.dup(stroke_width);
+  else
+    svgcircle->stroke_width = StrOp.dup("1");
 
   if( fill != NULL )
     svgcircle->fill = StrOp.dup(fill);
@@ -182,9 +195,13 @@ void svgReader::addCircle2List( iOList circleList, int cx, int cy, int r, const 
 svgSymbol* svgReader::parseSvgSymbol( const char* svgStr ) {
   iOList polyList = NULL;
   iOList circleList = NULL;
+  iOList polyListAlt = NULL;
+  iOList circleListAlt = NULL;
   svgSymbol* sym = new svgSymbol();
   sym->circleList = NULL;
   sym->polyList = NULL;
+  sym->circleListAlt = NULL;
+  sym->polyListAlt = NULL;
 
   /*char* vga = "<svg width=\"32\" height=\"32\"><g><path style=\"fill:none;\" d=\"M 10,10 L 20,20L34,54 z\"/></g></svg>";*/
   /* <circle cx="600" cy="200" r="100" fill="red" stroke="blue"/> */
@@ -197,6 +214,8 @@ svgSymbol* svgReader::parseSvgSymbol( const char* svgStr ) {
   else {
     polyList = ListOp.inst();
     circleList = ListOp.inst();
+    polyListAlt = NULL;
+    circleListAlt = NULL;
 
     iONode svg = DocOp.getRootNode( doc );
     // clean up
@@ -211,6 +230,7 @@ svgSymbol* svgReader::parseSvgSymbol( const char* svgStr ) {
       while( path != NULL ) {
         const char* fill = NodeOp.getStr( path, "fill", NULL );
         const char* stroke = NodeOp.getStr( path, "stroke", NULL );
+        const char* stroke_width = NodeOp.getStr( path, "stroke-width", NULL );
         const char* d = NodeOp.getStr( path, "d", NULL );
         if( d != NULL ) {
           int xpoints[__MAXPOINTS];
@@ -219,7 +239,7 @@ svgSymbol* svgReader::parseSvgSymbol( const char* svgStr ) {
           TraceOp.trc( "svg", TRCLEVEL_PARSE, __LINE__, 9999, "d=[%s]", d );
           bool arc = parsePoly(d, xpoints, ypoints, &cnt);
           TraceOp.trc( "svg", TRCLEVEL_PARSE, __LINE__, 9999, "%d wxPoints", cnt );
-          addPoly2List( polyList, cnt, xpoints, ypoints, stroke, fill, arc );
+          addPoly2List( polyList, cnt, xpoints, ypoints, stroke, fill, arc, stroke_width );
         }
         path = NodeOp.findNextNode( g, path );
       };
@@ -228,18 +248,55 @@ svgSymbol* svgReader::parseSvgSymbol( const char* svgStr ) {
       while( circle != NULL ) {
         const char* fill = NodeOp.getStr( circle, "fill", NULL );
         const char* stroke = NodeOp.getStr( circle, "stroke", NULL );
+        const char* stroke_width = NodeOp.getStr( circle, "stroke-width", NULL );
         addCircle2List( circleList, NodeOp.getInt( circle, "cx", 0 ), NodeOp.getInt( circle, "cy", 0 ),
-                        NodeOp.getInt( circle, "r", 0 ), stroke, fill );
+                        NodeOp.getInt( circle, "r", 0 ), stroke, fill, stroke_width );
 
         circle = NodeOp.findNextNode( g, circle );
       };
 
+      // Alternate graphic for blinking
+      g = NodeOp.findNextNode( svg, g );
+      if( g != NULL ) {
+        polyListAlt = ListOp.inst();
+        circleListAlt = ListOp.inst();
+        iONode path = NodeOp.findNode( g, "path" );
+        while( path != NULL ) {
+          const char* fill = NodeOp.getStr( path, "fill", NULL );
+          const char* stroke = NodeOp.getStr( path, "stroke", NULL );
+          const char* stroke_width = NodeOp.getStr( path, "stroke-width", NULL );
+          const char* d = NodeOp.getStr( path, "d", NULL );
+          if( d != NULL ) {
+            int xpoints[__MAXPOINTS];
+            int ypoints[__MAXPOINTS];
+            int cnt;
+            TraceOp.trc( "svg", TRCLEVEL_PARSE, __LINE__, 9999, "d=[%s]", d );
+            bool arc = parsePoly(d, xpoints, ypoints, &cnt);
+            TraceOp.trc( "svg", TRCLEVEL_PARSE, __LINE__, 9999, "%d wxPoints", cnt );
+            addPoly2List( polyListAlt, cnt, xpoints, ypoints, stroke, fill, arc, stroke_width );
+          }
+          path = NodeOp.findNextNode( g, path );
+        };
+
+        iONode circle = NodeOp.findNode( g, "circle" );
+        while( circle != NULL ) {
+          const char* fill = NodeOp.getStr( circle, "fill", NULL );
+          const char* stroke = NodeOp.getStr( circle, "stroke", NULL );
+          const char* stroke_width = NodeOp.getStr( circle, "stroke-width", NULL );
+          addCircle2List( circleListAlt, NodeOp.getInt( circle, "cx", 0 ), NodeOp.getInt( circle, "cy", 0 ),
+                          NodeOp.getInt( circle, "r", 0 ), stroke, fill, stroke_width );
+
+          circle = NodeOp.findNextNode( g, circle );
+        };
+      }
 
     }
     NodeOp.base.del(svg);
   }
-  sym->polyList = polyList;
-  sym->circleList = circleList;
+  sym->polyList      = polyList;
+  sym->circleList    = circleList;
+  sym->polyListAlt   = polyListAlt;
+  sym->circleListAlt = circleListAlt;
   return sym;
 }
 
@@ -286,19 +343,25 @@ iOMap svgReader::readSvgSymbols( const char* path, iOMap map, const char* themes
       obj o = MapOp.get( symbolMap, key );
       if( o == NULL ) {
         char* pathfileName = StrOp.fmt( "%s%c%s", newpath, SystemOp.getFileSeparator(), fileName );
-        long size = FileOp.fileSize( pathfileName );
-        char* svgStr = (char*)allocMem( size+1 );
         iOFile f = FileOp.inst( pathfileName, OPEN_READONLY );
-        TraceOp.trc( "svg", TRCLEVEL_PARSE, __LINE__, 9999, "reading %s", pathfileName );
-        FileOp.read( f, svgStr, size );
-        FileOp.base.del( f );
-        svgSymbol* sym = parseSvgSymbol( svgStr );
-        if(sym != NULL) {
-          TraceOp.trc( "svg", TRCLEVEL_DEBUG, __LINE__, 9999, "add [%s] to symbolMap", key );
-          MapOp.put( symbolMap, key, (obj)sym );
+        if( f != NULL ) {
+          long size = FileOp.fileSize( pathfileName );
+          char* svgStr = (char*)allocMem( size+1 );
+          TraceOp.trc( "svg", TRCLEVEL_PARSE, __LINE__, 9999, "reading %s", pathfileName );
+          FileOp.read( f, svgStr, size );
+          FileOp.base.del( f );
+          svgSymbol* sym = parseSvgSymbol( svgStr );
+          if(sym != NULL) {
+            TraceOp.trc( "svg", TRCLEVEL_DEBUG, __LINE__, 9999, "add [%s] to symbolMap", key );
+            MapOp.put( symbolMap, key, (obj)sym );
+          }
+          else {
+            TraceOp.trc( "svg", TRCLEVEL_WARNING, __LINE__, 9999, "invalid svg symbol [%s]", pathfileName );
+          }
+          freeMem(svgStr);
         }
         else {
-          TraceOp.trc( "svg", TRCLEVEL_WARNING, __LINE__, 9999, "invalid svg symbol [%s]", pathfileName );
+          TraceOp.trc( "svg", TRCLEVEL_WARNING, __LINE__, 9999, "could not open svg symbol [%s]", pathfileName );
         }
         StrOp.free(pathfileName);
       }

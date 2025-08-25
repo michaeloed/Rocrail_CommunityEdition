@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2010 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -38,11 +41,13 @@ class DCC232Dlg : public dcc232gen
   void evaluate();
   void onOK( wxCommandEvent& event );
   void onCancel( wxCommandEvent& event );
+  void onHelp( wxCommandEvent& event );
   iONode m_Props;
+  const char* m_Devices;
 
 public:
 	/** Constructor */
-	DCC232Dlg( wxWindow* parent, iONode props );
+	DCC232Dlg( wxWindow* parent, iONode props, const char* devices=NULL );
 };
 
 #endif // __dcc232dlg__

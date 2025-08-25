@@ -1,7 +1,7 @@
  /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -82,7 +82,61 @@ const char* rnActionTypeString(unsigned char* rn) {
   }
 }
 
+const char* rnClassString(int classid, char* mnemonic) {
+  char* classname = NULL;
+  int idx = 0;
 
+  mnemonic[idx] = '\0';
+  if( classid & RN_CLASS_IO ) {
+    if( classname != NULL ) classname = StrOp.cat( classname, ",");
+    classname = StrOp.cat( classname, "Accessory");
+    mnemonic[idx] = 'A';
+    idx++;
+    mnemonic[idx] = '\0';
+  }
+  if( classid & RN_CLASS_DCC ) {
+    if( classname != NULL ) classname = StrOp.cat( classname, ",");
+    classname = StrOp.cat( classname, "DCC");
+    mnemonic[idx] = 'D';
+    idx++;
+    mnemonic[idx] = '\0';
+  }
+  if( classid & RN_CLASS_RFID ) {
+    if( classname != NULL ) classname = StrOp.cat( classname, ",");
+    classname = StrOp.cat( classname, "RFID");
+    mnemonic[idx] = 'I';
+    idx++;
+    mnemonic[idx] = '\0';
+  }
+
+  return classname;
+}
+
+const char* rnGetRC(int rc) {
+  switch( rc ) {
+  case RN_ERROR_RC_IO:
+    return "GPIO";
+  case RN_ERROR_RC_I2C:
+    return "I2C";
+  case RN_ERROR_RC_RFID:
+    return "RFID";
+  }
+  return "unknown";
+}
+
+const char* rnGetRS(int rs) {
+  switch( rs ) {
+  case RN_ERROR_RS_SETUP:
+    return "setup";
+  case RN_ERROR_RS_WRITE:
+    return "write";
+  case RN_ERROR_RS_READ:
+    return "read";
+  case RN_ERROR_RS_ACK:
+    return "acknowledge";
+  }
+  return "unknown";
+}
 
 
 

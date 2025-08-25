@@ -1,7 +1,10 @@
 <!--
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+  
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -52,7 +55,8 @@
       <var name="run" vt="Boolean"/>
       <var name="serialOK" vt="Boolean"/>
       <var name="initOK" vt="Boolean"/>
-    </data>
+      <var name="ini" vt="iONode"/>
+      </data>
   </object>
 
 
@@ -87,7 +91,6 @@
       <var name="state" vt="p50state"/>
       <var name="iid" vt="const char*"/>
       <var name="readfb" vt="Boolean"/>
-      <var name="tok" vt="Boolean"/>
       <var name="run" vt="Boolean"/>
       <var name="serialOK" vt="Boolean"/>
       <var name="initOK" vt="Boolean"/>
@@ -96,35 +99,59 @@
       <var name="halt" vt="Boolean"/>
       <var name="cv_nr" vt="int"/>
       <var name="cv_val" vt="int"/>
-    </data>
+      <var name="useextfunc" vt="Boolean"/>
+      <var name="swversion" vt="unsigned long"/>
+      <var name="bidi" vt="Boolean"/>
+      <var name="ini" vt="iONode"/>
+      <var name="force" vt="Boolean"/>
+      <var name="echoswcmds" vt="Boolean"/>
+      </data>
   </object>
 
 
-  <object name="SRCP" interface="$../rocint/rocint.xml:DigInt" use="node,trace,socket,thread" include="$rocint/public/digint" remark="SRCP object">
-    <typedef def="enum {SRCP_07=1, SRCP_08} __srcpversion"/>
+  <object name="SRCP" interface="$../rocint/rocint.xml:DigInt" use="node,trace,socket,thread,map,serial,mutex" include="$rocint/public/digint" remark="SRCP object">
+    <typedef def="enum {SRCP_STATE_OK=1, SRCP_STATE_ERROR} srcpstate"/>
+    <typedef def="Boolean(*sublib_init)(obj)"/>
+      <typedef def="int(*sublib_connect)(obj,Boolean)"/>
+    <typedef def="void(*sublib_disconnect)(obj,Boolean)"/>
+    <typedef def="int(*sublib_read)(obj,char*,Boolean)"/>
+    <typedef def="int(*sublib_write)(obj,const char*,char*,Boolean)"/>
+    <typedef def="Boolean(*sublib_available)(obj)"/>
     <fun name="inst" vt="this">
       <param name="ini" vt="const iONode" remark="Ini node"/>
       <param name="trc" vt="const iOTrace" remark="Trace instance"/>
     </fun>
     <data>
       <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
       <var name="srcpini" vt="iONode"/>
       <var name="trace" vt="iOTrace"/>
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
       <var name="cmdSocket" vt="iOSocket"/>
-      <var name="fbackSocket" vt="iOSocket"/>
       <var name="infoSocket" vt="iOSocket"/>
-      <var name="fbackReader" vt="iOThread"/>
       <var name="infoReader" vt="iOThread"/>
-      <var name="ddlHost" vt="const char*"/>
-      <var name="cmdPort" vt="int"/>
-      <var name="infoPort" vt="int"/>
-      <var name="fbackPort" vt="int"/>
-      <var name="iid" vt="const char*"/>
-      <var name="srcpversion" vt="__srcpversion"/>
-      <var name="srcpx" vt="obj"/>
+      <var name="host" vt="const char*"/>
+      <var name="port" vt="int"/>
       <var name="run" vt="Boolean"/>
+      <var name="evalfirst" vt="Boolean"/>
+      <var name="handshakeerror" vt="Boolean"/>
+      <var name="state" vt="srcpstate"/>
+      <var name="knownObjects" vt="iOMap" />
+      <var name="subInit" vt="sublib_init"/>
+      <var name="subConnect" vt="sublib_connect"/>
+      <var name="subDisconnect" vt="sublib_disconnect"/>
+      <var name="subRead" vt="sublib_read"/>
+      <var name="subWrite" vt="sublib_write"/>
+      <var name="subAvailable" vt="sublib_available"/>
+      <var name="subReader" vt="iOThread"/>
+      <var name="subWriter" vt="iOThread"/>
+      <var name="subReadQueue" vt="iOQueue"/>
+      <var name="subWriteQueue" vt="iOQueue"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="serialMux" vt="iOMutex"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="enablecom" vt="Boolean"/>
     </data>
   </object>
 
@@ -189,7 +216,7 @@
   </object>
 
 
-  <object name="DINAMO" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread" include="$rocint/public/digint" remark="DINAMO object">
+  <object name="DINAMO" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread,map" include="$rocint/public/digint" remark="DINAMO object">
     <fun name="inst" vt="this">
       <param name="ini" vt="const iONode" remark="Ini node"/>
       <param name="trc" vt="const iOTrace" remark="Trace instance"/>
@@ -208,9 +235,12 @@
       <var name="header" vt="Boolean"/>
       <var name="fault" vt="Boolean"/>
       <var name="hold" vt="Boolean"/>
+      <var name="psleep" vt="int"/>
       <var name="swtime" vt="int"/>
       <var name="dummyio" vt="Boolean"/>
-    </data>
+      <var name="blockMap" vt="iOMap"/>
+      <var name="stress" vt="Boolean"/>
+      </data>
   </object>
 
 
@@ -263,15 +293,32 @@
     </fun>
     <data>
       <var name="ini" vt="iONode"/>
+      <var name="protver" vt="int"/>
       <var name="iid" vt="const char*"/>
       <var name="serial" vt="iOSerial"/>
       <var name="ctsretry" vt="int"/>
       <var name="mux" vt="iOMutex"/>
       <var name="dummyio" vt="Boolean"/>
       <var name="fbmod" vt="int"/>
+      <var name="fboffset" vt="int"/>
+      <var name="swtime" vt="int"/>
+      <var name="timeout" vt="int"/>
       <var name="readfb" vt="Boolean"/>
       <var name="transactor" vt="iOThread"/>
+      <var name="packethandler" vt="iOThread"/>
+      <var name="pqueue" vt="iOQueue"/>
+      <var name="pmux" vt="iOMutex"/>
+      <var name="tqueue" vt="iOQueue"/>
+      <var name="tmux" vt="iOMutex"/>
       <var name="run" vt="Boolean"/>
+      <var name="power" vt="int"/>
+      <var name="halt" vt="int"/>
+      <var name="ues" vt="int"/>
+      <var name="volt" vt="int"/>
+      <var name="pt" vt="int"/>
+      <var name="comm" vt="int"/>
+      <var name="locolist" vt="iONode"/>
+      <var name="switchlist" vt="iONode"/>
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
     </data>
@@ -339,11 +386,16 @@
       <var name="socket" vt="iOSocket"/>
       <var name="serialmux" vt="iOMutex"/>
       <var name="fboffset" vt="int"/>
+      <var name="v2" vt="Boolean"/>
       <var name="dummyio" vt="Boolean"/>
       <var name="reader" vt="iOThread"/>
       <var name="initializer" vt="iOThread"/>
       <var name="transactor" vt="iOThread"/>
       <var name="timedQueue" vt="iOThread"/>
+      <var name="lastcmd" vt="long"/>
+      <var name="timeOutWD" vt="iOThread"/>
+      <var name="availWD" vt="iOThread"/>
+      <var name="availFlag" vt="Boolean"/>
       <var name="run" vt="Boolean"/>
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
@@ -365,6 +417,13 @@
       <var name="interfaceVersion" vt="int"/>
       <var name="power" vt="Boolean"/>
       <var name="ignoreBusy" vt="Boolean"/>
+      <var name="infoQueue" vt="iOThread"/>
+      <var name="infoaddr" vt="int"/>
+      <var name="connectpending" vt="Boolean"/>
+      <var name="fbmodcnt" vt="int"/>
+      <var name="fbmods[256]" vt="byte"/>
+      <var name="startbyte" vt="byte"/>
+      <var name="enablecom" vt="Boolean"/>
     </data>
   </object>
 
@@ -373,55 +432,30 @@
       <param name="ini" vt="const iONode" remark="Ini node"/>
       <param name="trc" vt="const iOTrace" remark="Trace instance"/>
     </fun>
+    <struct name="QCmd" typedef="*iQCmd" remark="Queue command.">
+      <var name="node" vt="iONode"/>
+      <var name="time" vt="unsigned long"/>
+      <var name="delay" vt="unsigned long"/>
+    </struct>
     <data>
       <var name="ini" vt="iONode"/>
       <var name="iid" vt="const char*"/>
       <var name="mux" vt="iOMutex"/>
       <var name="fbmod" vt="int"/>
+      <var name="fboffset" vt="int"/>
       <var name="fbnum" vt="int"/>
       <var name="power" vt="Boolean"/>
+      <var name="enablecom" vt="Boolean"/>
       <var name="readfb" vt="Boolean"/>
       <var name="responseReader" vt="iOThread"/>
       <var name="transactor" vt="iOThread"/>
+      <var name="commander" vt="iOThread"/>
       <var name="run" vt="Boolean"/>
       <var name="fbState[128*8]" vt="Boolean"/>
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
       <var name="cvval[1024]" vt="byte"/>
-    </data>
-  </object>
-
-
-  <object name="SRCP07" interface="$../rocint/rocint.xml:DigInt" use="node,trace,socket,thread" include="$rocint/public/digint" remark="SRCP object">
-    <fun name="inst" vt="this">
-      <param name="ini" vt="const iONode" remark="Ini node"/>
-      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
-      <param name="cmdsocket" vt="const iOSocket" remark="Command socket"/>
-    </fun>
-    <data>
-      <var name="ini" vt="iONode"/>
-      <var name="cmdSocket" vt="iOSocket"/>
-      <var name="iid" vt="const char*"/>
-    </data>
-  </object>
-
-
-  <object name="SRCP08" interface="$../rocint/rocint.xml:DigInt" use="node,trace,socket,thread" include="$rocint/public/digint" remark="SRCP object">
-    <typedef def="enum {SRCP_STATE_OK=1, SRCP_STATE_ERROR} srcpstate"/>
-    <fun name="inst" vt="this">
-      <param name="ini" vt="const iONode" remark="Ini node"/>
-      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
-      <param name="cmdsocket" vt="const iOSocket" remark="Command socket"/>
-    </fun>
-    <data>
-      <var name="ini" vt="iONode"/>
-      <var name="srcpini" vt="iONode"/>
-      <var name="cmdSocket" vt="iOSocket"/>
-      <var name="state" vt="srcpstate"/>
-      <var name="iid" vt="const char*"/>
-      <var name="knownSwitches" vt="Boolean *" />
-      <var name="knownLocos" vt="Boolean *" />
-      <var name="locInited" vt="Boolean *"/>
+      <var name="boosteruid" vt="int"/>
     </data>
   </object>
 
@@ -445,6 +479,7 @@
       <var name="devh" vt="long"/>
       <var name="mux" vt="iOMutex"/>
       <var name="feedbackReader" vt="iOThread"/>
+      <var name="delayedOffHandler" vt="iOThread"/>
       <var name="device" vt="const char*"/>
       <var name="bps" vt="serial_bps"/>
       <var name="bits" vt="serial_databits"/>
@@ -460,6 +495,7 @@
       <var name="fbmiddle" vt="int"/>
       <var name="run" vt="Boolean"/>
       <var name="smooth" vt="Boolean"/>
+      <var name="triggertime" vt="int"/>
       <var name="fbstate" vt="iOFBState"/>
       <var name="serialOK" vt="Boolean"/>
       <var name="initOK" vt="Boolean"/>
@@ -579,6 +615,7 @@
       <var name="loconetReader" vt="iOThread"/>
       <var name="loconetWriter" vt="iOThread"/>
       <var name="swReset" vt="iOThread"/>
+      <var name="SensorQuery" vt="iOThread"/>
       <var name="lastSwCmd" vt="unsigned long"/>
       <var name="device" vt="const char*"/>
       <var name="bps" vt="serial_bps"/>
@@ -641,28 +678,14 @@
       <var name="usedouble" vt="Boolean"/>
       <var name="expectdouble" vt="Boolean"/>
       <var name="packetloss" vt="int"/>
-    </data>
-  </object>
-
-
-  <object name="Inter10" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread" include="$rocint/public/digint">
-    <fun name="inst" vt="this">
-      <param name="ini" vt="const iONode" remark="Ini node"/>
-      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
-    </fun>
-    <data>
-      <var name="ini" vt="iONode"/>
-      <var name="iid" vt="const char*"/>
-      <var name="serial" vt="iOSerial"/>
-      <var name="run" vt="Boolean"/>
-      <var name="serialOK" vt="Boolean"/>
-      <var name="initOK" vt="Boolean"/>
-      <var name="reader" vt="iOThread"/>
-      <var name="device" vt="const char*"/>
-      <var name="bps" vt="serial_bps"/>
-      <var name="listenerObj" vt="obj"/>
-      <var name="listenerFun" vt="digint_listener"/>
-    </data>
+      <var name="swack" vt="Boolean"/>
+      <var name="swretry" vt="int"/>
+      <var name="swsleep" vt="int"/>
+      <var name="lissyReset" vt="iOThread"/>
+      <var name="resetLissy" vt="Boolean"/>
+      <var name="GBM16xn" vt="Boolean"/>
+      <var name="monitor" vt="Boolean"/>
+      </data>
   </object>
 
 
@@ -685,8 +708,10 @@
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
       <var name="fboffset" vt="int"/>
+      <var name="protver" vt="int"/>
       <var name="readerTick[8]" vt="unsigned long"/>
-    </data>
+      <var name="ident[8][64]" vt="char"/>
+      </data>
   </object>
 
 
@@ -709,8 +734,8 @@
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
       <var name="fboffset" vt="int"/>
-      <var name="readerTick[128]" vt="unsigned long"/>
-    </data>
+      <var name="ident[24]" vt="int"/>
+      </data>
   </object>
 
 
@@ -765,7 +790,9 @@
       <var name="dccSwitchAddrToOidMap" vt="iOMap" remark="DCC Switch Addr to OID Mapper"/>
       <var name="dccOidToSwitchAddrMap" vt="iOMap" remark="DCC OID to Switch Addr Mapper"/>
       <var name="dccSwitchStates[2048]" vt="unsigned char" remark="DCC Switch state control"/>
-    </data>
+      <var name="power" vt="Boolean" remark="Power Flag"/>
+      <var name="enablecom" vt="Boolean"/>
+      </data>
   </object>
 
   <object name="OpenDCC" interface="$../rocint/rocint.xml:DigInt" use="node,trace,socket,thread,mutex,map" include="$rocint/public/digint" remark="ECoS object">
@@ -809,6 +836,17 @@
     <typedef def="int(*sublib_read)(obj,byte*)"/>
     <typedef def="Boolean(*sublib_write)(obj,byte*,int)"/>
     <typedef def="Boolean(*sublib_available)(obj)"/>
+    <struct name="rnreq" typedef="*iORNreq">
+      <var name="req" vt="byte*"/>
+      <var name="timer" vt="long"/>
+      <var name="retry" vt="int"/>
+      <var name="ack" vt="Boolean"/>
+    </struct>
+    <struct name="mouse" typedef="*iOMouse">
+      <var name="nodeid" vt="int"/>
+      <var name="baseaddr" vt="int"/>
+      <var name="lcaddr" vt="int"/>
+    </struct>
     <fun name="inst" vt="this">
       <param name="ini" vt="const iONode" remark="Ini node"/>
       <param name="trc" vt="const iOTrace" remark="Trace instance"/>
@@ -834,8 +872,20 @@
       <var name="ctsretry" vt="int"/>
       <var name="reader" vt="iOThread"/>
       <var name="writer" vt="iOThread"/>
+      <var name="watchdog" vt="iOThread"/>
+      <var name="watchNodes" vt="iOThread"/>
       <var name="seven" vt="Boolean"/>
       <var name="crc" vt="Boolean"/>
+      <var name="AckList" vt="iOList"/>
+      <var name="nodemap" vt="iOMap"/>
+      <var name="highestID" vt="int"/>
+      <var name="shutdown" vt="Boolean"/>
+      <var name="dispatchAddr" vt="int"/>
+      <var name="mousemap" vt="iOMap"/>
+      <var name="sack" vt="Boolean"/>
+      <var name="power" vt="Boolean"/>
+      <var name="sensor" vt="Boolean"/>
+      <var name="lcbus" vt="int"/>
     </data>
   </object>
 
@@ -846,17 +896,57 @@
     </fun>
     <data>
       <var name="ini" vt="iONode" remark="DigInt Ini"/>
+      <var name="mcs2ini" vt="iONode" remark="MCS2 Ini"/>
       <var name="trace" vt="iOTrace" remark="Trace pointer"/>
       <var name="listenerObj" vt="obj" remark="Listener pointer"/>
       <var name="listenerFun" vt="digint_listener" remark="Listener Function pointer"/>
       <var name="iid" vt="const char*" remark="Interface ID"/>
+      <var name="gbUID" vt="int" remark="Gleisbox UID"/>
+      <var name="ms2UID" vt="int" remark="MS2-GUI UID"/>
+      <var name="mcs2gfpUID" vt="int" remark="CS2 GFP UID"/>
+      <var name="mcs2guiUID" vt="int" remark="CS2-GUI UID"/>
       <var name="run" vt="Boolean"/>
+      <var name="udp" vt="Boolean"/>
+      <var name="conOK" vt="Boolean"/>
+      <var name="serial" vt="iOSerial"/>
       <var name="readUDP" vt="iOSocket"/>
       <var name="writeUDP" vt="iOSocket"/>
       <var name="reader" vt="iOThread"/>
       <var name="writer" vt="iOThread"/>
       <var name="feedbackReader" vt="iOThread"/>
       <var name="fbmod" vt="int"/>
+      <var name="swtime" vt="int"/>
+      <var name="power" vt="Boolean"/>
+      <var name="sensor" vt="Boolean"/>
+      <var name="discovery" vt="iOThread"/>
+      <var name="initASCII" vt="Boolean"/>
+      <var name="cmdpause" vt="int"/>
+      <var name="sensorbegin" vt="int"/>
+      <var name="sensorend" vt="int"/>
+      <var name="load" vt="int"/>
+      <var name="volt" vt="int"/>
+      <var name="temp" vt="int"/>
+      <var name="overload" vt="Boolean"/>
+      <var name="sod_fbmod" vt="int"/>
+      <var name="sod_sensorbegin" vt="int"/>
+      <var name="sod_sensorend" vt="int"/>
+      <var name="id" vt="char*" remark="Id name"/>
+      <var name="sid" vt="int" remark="address"/>
+      <var name="uid" vt="unsigned int" remark="UID"/>
+      <var name="locolist" vt="iONode"/>
+      <var name="mfxbinder" vt="iOThread"/>
+      <var name="mfxDetectInProgress" vt="Boolean"/>
+      <var name="swtimeset" vt="Boolean"/>
+      <var name="xS2handling" vt="int" remark="address which is processed for bind verification"/>
+      <var name="mgboxsvc" vt="iOThread"/>
+      <var name="lstChn" vt="int" remark="monitor channel"/>
+      <var name="configchnl" vt="byte"/>
+      <var name="lastseqnr" vt="byte"/>
+      <var name="idxcnt" vt="byte"/>
+      <var name="loadStepRate" vt="float"/>
+      <var name="voltStepRate" vt="float"/>
+      <var name="tempStepRate" vt="float"/>
+      <var name="indices" vt="byte"/>
     </data>
   </object>
 
@@ -934,6 +1024,7 @@
       <var name="writer" vt="iOThread"/>
       <var name="slots[128]" vt="struct slot"/>
       <var name="power" vt="Boolean"/>
+      <var name="commOK" vt="Boolean"/>
     </data>
   </object>
 
@@ -970,6 +1061,7 @@
       <var name="mux" vt="iOMutex"/>
       <var name="slotmux" vt="iOMutex"/>
       <var name="run" vt="Boolean"/>
+      <var name="comOK" vt="Boolean"/>
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
       <var name="reader" vt="iOThread"/>
@@ -1029,22 +1121,37 @@
       <var name="lights" vt="Boolean"/>
       <var name="f1_8" vt="byte"/>
       <var name="f9_16" vt="byte"/>
+      <var name="sx1aux1" vt="int"/>
+      <var name="sx1aux2" vt="int"/>
+      <var name="lastcmd" vt="long"/>
+    </struct>
+    <struct name="point" typedef="*iOPoint">
+      <var name="id" vt="char*"/>
+      <var name="bus" vt="int"/>
+      <var name="addr" vt="int"/>
+      <var name="port" vt="int"/>
+      <var name="type" vt="int"/>
+      <var name="lastcmd" vt="long"/>
     </struct>
     <data>
       <var name="ini" vt="iONode"/>
       <var name="iid" vt="const char*"/>
       <var name="mux" vt="iOMutex"/>
       <var name="lcmux" vt="iOMutex"/>
+      <var name="pointmux" vt="iOMutex"/>
       <var name="serial" vt="iOSerial"/>
       <var name="run" vt="Boolean"/>
       <var name="serialOK" vt="Boolean"/>
       <var name="initOK" vt="Boolean"/>
+      <var name="swInited" vt="Boolean"/>
+      <var name="fbInited" vt="Boolean"/>
       <var name="transactor" vt="iOThread"/>
       <var name="poller" vt="iOThread"/>
       <var name="device" vt="const char*"/>
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="digint_listener"/>
       <var name="lcmap" vt="iOMap" remark="key=locoID, value=slot"/>
+      <var name="pointmap" vt="iOMap"/>
       <var name="sx1[2][128]" vt="byte"/>
       <var name="sx2[2][128]" vt="byte"/>
       <var name="sxReader" vt="iOThread"/>
@@ -1124,6 +1231,7 @@
       <var name="lights" vt="Boolean"/>
       <var name="f1_8" vt="byte"/>
       <var name="f9_16" vt="byte"/>
+      <var name="f17_32" vt="byte"/>
       <var name="idle" vt="long"/>
     </struct>
     <data>
@@ -1132,6 +1240,7 @@
       <var name="mux" vt="iOMutex"/>
       <var name="lcmux" vt="iOMutex"/>
       <var name="serial" vt="iOSerial"/>
+      <var name="flow" vt="serial_flow"/>
       <var name="run" vt="Boolean"/>
       <var name="serialOK" vt="Boolean"/>
       <var name="initOK" vt="Boolean"/>
@@ -1153,22 +1262,11 @@
       <var name="ptval" vt="int"/>
       <var name="power" vt="Boolean"/>
       <var name="load" vt="int"/>
-    </data>
-  </object>
-
-
-  <object name="io8255" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread" include="$rocint/public/digint" remark="8255 IO">
-    <fun name="inst" vt="this">
-      <param name="ini" vt="const iONode" remark="Ini node"/>
-      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
-    </fun>
-    <data>
-      <var name="ini" vt="iONode"/>
-      <var name="iid" vt="const char*"/>
-      <var name="device" vt="const char*"/>
-      <var name="run" vt="Boolean"/>
-      <var name="listenerObj" vt="obj"/>
-      <var name="listenerFun" vt="digint_listener"/>
+      <var name="freeslots" vt="int"/>
+      <var name="shutdown" vt="Boolean"/>
+      <var name="allPurged" vt="Boolean"/>
+      <var name="stressRunner" vt="iOThread"/>
+      <var name="didShowInfo" vt="Boolean"/>
     </data>
   </object>
 
@@ -1220,7 +1318,6 @@
       <var name="initOK" vt="Boolean"/>
       <var name="activebus" vt="int"/>
       <var name="sx1[2][128]" vt="byte"/>
-      <var name="swstate[2][256]" vt="byte"/>
       <var name="fbstate[2][256]" vt="byte"/>
       <var name="fbmodcnt[2]" vt="int"/>
       <var name="fbmods[2][256]" vt="byte"/>
@@ -1229,23 +1326,82 @@
   </object>
 
 
-  <object name="BiDiB" interface="$../rocint/rocint.xml:DigInt" use="node,map,trace,serial,thread,mutex" include="$rocint/public/digint" remark="bidib.org">
-    <typedef def="Boolean(*sublib_connect)(obj)"/>
+  <object name="BiDiB" interface="$../rocint/rocint.xml:DigInt" use="node,map,trace,serial,thread,mutex,file,socket" include="$rocint/public/digint" remark="bidib.org">
+    <typedef def="Boolean(*sublib_init)(obj)"/>
+      <typedef def="Boolean(*sublib_connect)(obj)"/>
     <typedef def="void(*sublib_disconnect)(obj)"/>
     <typedef def="int(*sublib_read)(obj,byte*)"/>
-    <typedef def="Boolean(*sublib_write)(obj,byte*,int)"/>
+    <typedef def="Boolean(*sublib_write)(obj,byte*,byte,byte*,int,void*)"/>
     <typedef def="Boolean(*sublib_available)(obj)"/>
     <fun name="inst" vt="this">
       <param name="ini" vt="const iONode" remark="Ini node"/>
       <param name="trc" vt="const iOTrace" remark="Trace instance"/>
     </fun>
+    <struct name="bidibnode" typedef="*iOBiDiBNode">
+      <var name="uid" vt="int"/>
+      <var name="path[4]" vt="byte" remark=""/>
+      <var name="classid" vt="int"/>
+      <var name="vendorid" vt="int"/>
+      <var name="seq" vt="int"/>
+      <var name="load" vt="int"/>
+      <var name="volt" vt="int"/>
+      <var name="temp" vt="int"/>
+      <var name="loadmax" vt="int"/>
+      <var name="voltmin" vt="int"/>
+      <var name="tempmax" vt="int"/>
+      <var name="stat" vt="int"/>
+      <var name="laststat" vt="int"/>
+      <var name="shortcut" vt="Boolean"/>
+      <var name="fwup" vt="Boolean"/>
+      <var name="iocfg" vt="Boolean"/>
+      <var name="conf_void" vt="int"/>
+      <var name="conf_freeze" vt="int"/>
+      <var name="conf_signal" vt="int"/>
+      <var name="occ[128]" vt="byte" remark=""/>
+      <var name="bmload[128]" vt="int" remark=""/>
+      <var name="sensorcnt" vt="int"/>
+      <var name="sod" vt="Boolean"/>
+      <var name="inputcnt" vt="int"/>
+      <var name="sod4key" vt="Boolean"/>
+      <var name="pendingfeature" vt="int"/>
+      <var name="dmxchannel" vt="char*"/>
+      <var name="username[128]" vt="char" remark=""/>
+      <var name="signalquality" vt="int"/>
+      <var name="signalreporter" vt="char*"/>
+      <var name="signalport" vt="int"/>
+    </struct>
+    <struct name="QBiDiBCmd" typedef="*iQBiDiBCmd" remark="Queue command.">
+      <var name="path[4]" vt="byte" remark=""/>
+      <var name="msg[256]" vt="byte"/>
+      <var name="opc" vt="int"/>
+      <var name="len" vt="int"/>
+      <var name="time" vt="unsigned long"/>
+      <var name="delay" vt="unsigned long"/>
+      <var name="bidibnode" vt="iOBiDiBNode"/>"
+    </struct>
+    <struct name="slot" typedef="*iOSlot" remark="Loco slot">
+      <var name="id" vt="char*"/>
+      <var name="addr" vt="int"/>
+      <var name="V" vt="int"/>
+      <var name="Vraw" vt="int"/>
+      <var name="steps" vt="int"/>
+      <var name="dir" vt="Boolean"/>
+      <var name="f[32]" vt="Boolean"/>
+      <var name="kmh" vt="int"/>
+      </struct>
     <data>
       <var name="ini" vt="iONode"/>
       <var name="bidibini" vt="iONode"/>
       <var name="iid" vt="const char*"/>
       <var name="device" vt="const char*"/>
+      <var name="rwUDP" vt="iOSocket"/>
+      <var name="swtime" vt="int"/>
       <var name="run" vt="Boolean"/>
       <var name="power" vt="Boolean"/>
+      <var name="csgo" vt="Boolean"/>
+      <var name="load" vt="int"/>
+      <var name="volt" vt="int"/>
+      <var name="temp" vt="int"/>
       <var name="tabver" vt="int"/>
       <var name="nodemap" vt="iOMap"/>
       <var name="localmap" vt="iOMap"/>
@@ -1262,6 +1418,7 @@
       <var name="writer" vt="iOThread"/>
       <var name="downSeq" vt="byte"/>
       <var name="upSeq" vt="byte"/>
+      <var name="subInit" vt="sublib_init"/>
       <var name="subConnect" vt="sublib_connect"/>
       <var name="subDisconnect" vt="sublib_disconnect"/>
       <var name="subRead" vt="sublib_read"/>
@@ -1271,11 +1428,797 @@
       <var name="subWriter" vt="iOThread"/>
       <var name="subReadQueue" vt="iOQueue"/>
       <var name="subWriteQueue" vt="iOQueue"/>
+      <var name="cv" vt="int"/>
+      <var name="value" vt="int"/>
+      <var name="ptflag" vt="Boolean"/>
+      <var name="nodepath[4]" vt="byte"/>
+      <var name="defaultbooster" vt="iOBiDiBNode"/>
+      <var name="defaultprog" vt="iOBiDiBNode"/>
+      <var name="defaultswitch" vt="iOBiDiBNode"/>
+      <var name="defaultmain" vt="iOBiDiBNode"/>
+      <var name="hexnode" vt="iOBiDiBNode"/>
+      <var name="hexfile" vt="char*"/>
+      <var name="hexline" vt="int"/>
+      <var name="hexstate" vt="int"/>
+      <var name="hexfh" vt="iOFile"/>
+      <var name="fcsync" vt="Boolean"/>
+      <var name="lcmux" vt="iOMutex"/>
+      <var name="lcmap" vt="iOMap"/>
+      <var name="stress" vt="Boolean"/>
+      <var name="stressRunner" vt="iOThread"/>
+      <var name="stressnode" vt="iOBiDiBNode"/>
+      <var name="watchdogRunner" vt="iOThread"/>
+      <var name="watchdogInt" vt="int"/>
+      <var name="dccreset" vt="Boolean"/>
+      <var name="timedQueue" vt="iOThread"/>
     </data>
   </object>
 
 
+  <object name="ZS2" interface="$../rocint/rocint.xml:DigInt" use="node,trace,serial,thread,mutex,map" include="$rocint/public/digint">
+    <typedef def="enum {WRITE_FLAG=0x80, DATA_MASK=0x7F} __slxheader"/>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <struct name="slot" typedef="*iOSlot" remark="Loco slot">
+      <var name="id" vt="char*"/>
+      <var name="nr" vt="int"/>
+      <var name="bus" vt="int"/>
+      <var name="addr" vt="int"/>
+      <var name="speed" vt="int"/>
+      <var name="steps" vt="int"/>
+      <var name="sx2" vt="Boolean"/>
+      <var name="dcc" vt="Boolean"/>
+      <var name="dir" vt="Boolean"/>
+      <var name="lights" vt="Boolean"/>
+      <var name="fcnt" vt="int"/>
+      <var name="fn" vt="Boolean"/>
+      <var name="fx1" vt="int"/>
+      <var name="fx2" vt="int"/>
+      <var name="lastcmd" vt="long"/>
+    </struct>
+    <struct name="point" typedef="*iOPoint">
+      <var name="id" vt="char*"/>
+      <var name="bus" vt="int"/>
+      <var name="addr" vt="int"/>
+      <var name="port" vt="int"/>
+      <var name="type" vt="int"/>
+      <var name="lastcmd" vt="long"/>
+    </struct>
+    <data>
+      <var name="lcmap" vt="iOMap" remark="key=locoID, value=slot"/>
+      <var name="pointmap" vt="iOMap" remark="key=ID, value=point"/>
+      <var name="fbmap" vt="iOMap" remark="key=bus_addr, value=fbbyte"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="lcmux" vt="iOMutex"/>
+      <var name="pointmux" vt="iOMutex"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="device" vt="const char*"/>
+      <var name="bps" vt="serial_bps"/>
+      <var name="timeout" vt="int"/>
+      <var name="swtime" vt="int"/>
+      <var name="iid" vt="const char*"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="initOK" vt="Boolean"/>
+      <var name="activebus" vt="int"/>
+      <var name="sx[3][128]" vt="byte"/>
+      <var name="swstate[3][256]" vt="byte"/>
+      <var name="fbstate[3][256]" vt="byte"/>
+      <var name="fbmodcnt[3]" vt="int"/>
+      <var name="fbmods[3][256]" vt="byte"/>
+      <var name="dummyio" vt="Boolean"/>
+      <var name="sx2slotcnt" vt="int"/>
+    </data>
+  </object>
 
+  <object name="CBUS" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread,map,socket" include="$rocint/public/digint" remark="CBUS">
+    <typedef def="Boolean(*sublib_connect)(obj)"/>
+    <typedef def="void(*sublib_disconnect)(obj)"/>
+    <typedef def="Boolean(*sublib_read)(obj,byte*,int)"/>
+    <typedef def="Boolean(*sublib_write)(obj,byte*,int)"/>
+    <typedef def="Boolean(*sublib_available)(obj)"/>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <struct name="slot" typedef="*iOSlot" remark="Loco slot">
+      <var name="id" vt="char*"/>
+      <var name="session" vt="int"/>
+      <var name="addr" vt="int"/>
+      <var name="speed" vt="int"/>
+      <var name="rawspeed" vt="int"/>
+      <var name="steps" vt="int"/>
+      <var name="dir" vt="Boolean"/>
+      <var name="lights" vt="Boolean"/>
+      <var name="f[32]" vt="Boolean"/>
+      <var name="lastkeep" vt="long"/>
+      <var name="releasereq" vt="Boolean"/>
+    </struct>
+    <struct name="QCmd" typedef="*iQCmd" remark="Queue command.">
+      <var name="out[32]" vt="byte"/>
+      <var name="time" vt="unsigned long"/>
+      <var name="delay" vt="unsigned long"/>
+      <var name="wait4session" vt="int"/>
+      <var name="slot" vt="iOSlot"/>
+    </struct>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="cbusini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="cid" vt="int"/>
+      <var name="sodaddr" vt="int"/>
+      <var name="shortevents" vt="Boolean"/>
+      <var name="fonfof" vt="Boolean"/>
+      <var name="power" vt="Boolean"/>
+      <var name="buson" vt="Boolean"/>
+      <var name="cts" vt="Boolean"/>
+      <var name="dummyio" vt="Boolean"/>
+      <var name="ctsretry" vt="int"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="keep" vt="iOThread"/>
+      <var name="timedqueue" vt="iOThread"/>
+      <var name="swtime" vt="int"/>
+      <var name="purgetime" vt="int"/>
+      <var name="device" vt="const char*"/>
+      <var name="bps" vt="serial_bps"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="socket" vt="iOSocket"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="lcmap" vt="iOMap" remark="key=locoID, value=slot"/>
+      <var name="lcmux" vt="iOMutex"/>
+      <var name="run" vt="Boolean"/>
+      <var name="connOK" vt="Boolean"/>
+      <var name="initOK" vt="Boolean"/>
+      <var name="subConnect" vt="sublib_connect"/>
+      <var name="subDisconnect" vt="sublib_disconnect"/>
+      <var name="subRead" vt="sublib_read"/>
+      <var name="subWrite" vt="sublib_write"/>
+      <var name="subAvailable" vt="sublib_available"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="nnsetup" vt="int" remark="Current node number in setup mode."/>
+      <var name="loader" vt="iOThread"/>
+      <var name="loaderNode" vt="iONode"/>
+      <var name="loaderMux" vt="iOMutex"/>
+      <var name="stress" vt="Boolean"/>
+      <var name="stressRunner" vt="iOThread"/>
+      <var name="slotserver" vt="Boolean"/>
+      <var name="bootmode" vt="Boolean"/>
+      <var name="cvnr" vt="int"/>
+      <var name="cab[256]" vt="int"/>
+      <var name="fcnode" vt="int"/>
+      <var name="fcaddr" vt="int"/>
+      <var name="fcsync" vt="Boolean"/>
+      <var name="fastclock" vt="Boolean"/>
+      <var name="watchdog" vt="iOThread"/>
+      <var name="connectpending" vt="Boolean"/>
+      <var name="lastcmdtick" vt="unsigned long"/>
+      <var name="commandAck" vt="Boolean"/>
+      <var name="wait4Ack" vt="Boolean"/>
+      <var name="lastSendOPC" vt="byte"/>
+      <var name="time" vt="long"/>
+      <var name="heartbeat" vt="iOThread"/>
+      <var name="heartbeaton" vt="Boolean"/>
+      <var name="heartbeatevent" vt="int"/>
+      <var name="enablecom" vt="Boolean"/>
+    </data>
+  </object>
 
+  <object name="PerIR" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="initOK" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="ticker" vt="iOThread"/>
+      <var name="device" vt="const char*"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="fboffset" vt="int"/>
+      <var name="readerTick[256]" vt="unsigned long"/>
+    </data>
+  </object>
+
+  <object name="EditsPro" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread,mutex" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="initOK" vt="Boolean"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="swTimeWatcher" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="poller" vt="iOThread"/>
+      <var name="device" vt="const char*"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="fbmod" vt="int"/>
+      <var name="swtime" vt="int"/>
+      <var name="dummyio" vt="Boolean"/>
+      <var name="readfb" vt="Boolean"/>
+      <var name="fb[65]" vt="unsigned char"/>
+      <var name="lastSwCmd" vt="int"/>
+      <var name="v10" vt="Boolean"/>
+      <var name="addr[81]" vt="unsigned char"/>
+      <var name="speed[2][16]" vt="unsigned char"/>
+      <var name="accgate[4][2]" vt="unsigned char"/>
+    </data>
+  </object>
+
+  <object name="Infracar" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="dummyio" vt="Boolean"/>
+    </data>
+  </object>
+
+  <object name="CTI" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="dummyio" vt="Boolean"/>
+    </data>
+  </object>
+
+  <object name="EasyDCC" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread,event" include="$rocint/public/digint">
+    <typedef def="enum {CV_READ=1, CV_WRITE} sprogcmd"/>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="dummyio" vt="Boolean"/>
+      <var name="power" vt="Boolean"/>
+      <var name="lastcmd" vt="int"/>
+      <var name="lastcv" vt="int"/>
+      <var name="lastvalue" vt="int"/>
+      <var name="readyEvt" vt="iOEvent"/>
+      </data>
+  </object>
+
+  <object name="Z21" interface="$../rocint/rocint.xml:DigInt" use="node,socket,trace,thread,event,map" include="$rocint/public/digint">
+    <typedef def="enum {DECMODE_DEF=0, DECMODE_DCC, DECMODE_MM} decmode"/>
+      <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <struct name="slot" typedef="*iOSlot" remark="Loco slot">
+      <var name="id" vt="char*"/>
+      <var name="addr" vt="int"/>
+      <var name="V" vt="int"/>
+      <var name="Vraw" vt="int"/>
+      <var name="steps" vt="int"/>
+      <var name="dir" vt="Boolean"/>
+      <var name="lights" vt="Boolean"/>
+      <var name="f[32]" vt="Boolean"/>
+    </struct>
+    <struct name="point" typedef="*iOPoint">
+      <var name="id" vt="char*"/>
+      <var name="bus" vt="int"/>
+      <var name="addr" vt="int"/>
+      <var name="gate" vt="int"/>
+      <var name="singlegate" vt="Boolean"/>
+      <var name="timerpending" vt="Boolean"/>
+      </struct>
+    <struct name="QCmd" typedef="*iQCmd" remark="Queue command.">
+      <var name="out[32]" vt="byte"/>
+      <var name="time" vt="unsigned long"/>
+      <var name="delay" vt="unsigned long"/>
+      <var name="singlegate" vt="Boolean"/>
+      <var name="gate" vt="int"/>
+    </struct>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="timedqueue" vt="iOThread"/>
+      <var name="watchdog" vt="iOThread"/>
+      <var name="rwUDP" vt="iOSocket"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="power" vt="Boolean"/>
+      <var name="sensor[256]" vt="byte"/>
+      <var name="load" vt="int"/>
+      <var name="ptload" vt="int"/>
+      <var name="temp" vt="int"/>
+      <var name="volt" vt="int"/>
+      <var name="swtime" vt="int"/>
+      <var name="lastcmd" vt="long"/>
+      <var name="lcmode[256]" vt="byte"/>
+      <var name="swmode[256]" vt="byte"/>
+      <var name="lcmux" vt="iOMutex"/>
+      <var name="lcmap" vt="iOMap"/>
+      <var name="swmux" vt="iOMutex"/>
+      <var name="swmap" vt="iOMap"/>
+      <var name="locolist" vt="iONode"/>
+      <var name="switchlist" vt="iONode"/>
+      <var name="zerobased" vt="Boolean"/>
+    </data>
+  </object>
+
+  <object name="XNMM" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread,event" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="run" vt="Boolean"/>
+      <var name="device" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="commOK" vt="Boolean"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="useHeader" vt="Boolean"/>
+      </data>
+  </object>
+
+  <object name="RocoMP" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread,usb" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="run" vt="Boolean"/>
+      <var name="transactor" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="usb" vt="iOUSB"/>
+      <var name="usbOK" vt="Boolean"/>
+      <var name="timeout" vt="int"/>
+      <var name="sensor[256]" vt="byte"/>
+      <var name="systemstate" vt="int"/>
+      <var name="power" vt="Boolean"/>
+      <var name="current" vt="int"/>
+      <var name="temp" vt="int"/>
+      <var name="state" vt="int"/>
+      </data>
+  </object>
+
+  <object name="ZimoCAN" interface="$../rocint/rocint.xml:DigInt" use="node,serial,socket,trace,thread,map,mutex,list" include="$rocint/public/digint">
+    <typedef def="Boolean(*sublib_connect)(obj)"/>
+    <typedef def="void(*sublib_disconnect)(obj)"/>
+    <typedef def="int(*sublib_read)(obj,byte*)"/>
+    <typedef def="Boolean(*sublib_write)(obj,byte*,int)"/>
+    <typedef def="Boolean(*sublib_available)(obj)"/>
+    <struct name="slot" typedef="*iOSlot" remark="Loco slot">
+      <var name="id" vt="char*"/>
+      <var name="addr" vt="int"/>
+      <var name="nid" vt="int"/>
+      <var name="V" vt="int"/>
+      <var name="Vraw" vt="int"/>
+      <var name="steps" vt="int"/>
+      <var name="prot" vt="int"/>
+      <var name="fncnt" vt="int"/>
+      <var name="shunting" vt="Boolean"/>
+      <var name="manual" vt="Boolean"/>
+      <var name="dir" vt="Boolean"/>
+      <var name="lights" vt="Boolean"/>
+      <var name="f[32]" vt="Boolean"/>
+    </struct>
+    <struct name="point" typedef="*iOPoint">
+      <var name="id" vt="char*"/>
+      <var name="nid" vt="int"/>
+      <var name="addr" vt="int"/>
+      <var name="prot" vt="int"/>
+      </struct>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="run" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="socket" vt="iOSocket"/>
+      <var name="serialmux" vt="iOMutex"/>
+      <var name="subConnect" vt="sublib_connect"/>
+      <var name="subDisconnect" vt="sublib_disconnect"/>
+      <var name="subRead" vt="sublib_read"/>
+      <var name="subWrite" vt="sublib_write"/>
+      <var name="subAvailable" vt="sublib_available"/>
+      <var name="connOK" vt="Boolean"/>
+      <var name="connAck" vt="Boolean"/>
+      <var name="power" vt="Boolean"/>
+      <var name="NID" vt="int"/>
+      <var name="masterNID" vt="int"/>
+      <var name="lcmux" vt="iOMutex"/>
+      <var name="lcmap" vt="iOMap"/>
+      <var name="swmux" vt="iOMutex"/>
+      <var name="swmap" vt="iOMap"/>
+      </data>
+  </object>
+
+  <object name="uConS88" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,socket" include="$rocint/public/digint" remark="µCon S88 Master">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="device" vt="const char*"/>
+      <var name="run" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="socket" vt="iOSocket"/>
+      <var name="connOK" vt="Boolean"/>
+      <var name="connAck" vt="Boolean"/>
+      <var name="power" vt="Boolean"/>
+      <var name="fbB1" vt="int"/>
+      <var name="fbB2" vt="int"/>
+      <var name="fbB3" vt="int"/>
+    </data>
+  </object>
+
+  <object name="GOT" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,serial,socket,map" include="$rocint/public/digint" remark="GamesOnTrack">
+    <struct name="sender" typedef="*iOSender" remark="SID">
+      <var name="sid" vt="int"/>
+      <var name="x" vt="int"/>
+      <var name="y" vt="int"/>
+      <var name="z" vt="int"/>
+    </struct>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="host" vt="const char*"/>
+      <var name="port" vt="int"/>
+      <var name="socket" vt="iOSocket"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="connOK" vt="Boolean"/>
+      <var name="sidMap" vt="iOMap"/>
+      </data>
+  </object>
+
+  <object name="ESUNavi" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,serial,map,mutex" include="$rocint/public/digint" remark="ESU Navigator">
+    <struct name="slot" typedef="*iOSlot" remark="Loco slot">
+      <var name="id" vt="char*"/>
+      <var name="addr" vt="int"/>
+      <var name="V" vt="int"/>
+      <var name="Vraw" vt="int"/>
+      <var name="steps" vt="int"/>
+      <var name="prot" vt="int"/>
+      <var name="fncnt" vt="int"/>
+      <var name="dir" vt="Boolean"/>
+      <var name="f0_12" vt="int"/>
+      <var name="f13_20" vt="int"/>
+    </struct>
+    <struct name="QCmd" typedef="*iQCmd" remark="Queue command.">
+      <var name="msg[256]" vt="char"/>
+      <var name="time" vt="unsigned long"/>
+      <var name="delay" vt="unsigned long"/>
+    </struct>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="run" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="connOK" vt="Boolean"/>
+      <var name="lcmux" vt="iOMutex"/>
+      <var name="lcmap" vt="iOMap"/>
+      <var name="timedQueue" vt="iOThread"/>
+      <var name="swtime" vt="int"/>
+      <var name="power" vt="Boolean"/>
+      <var name="A" vt="int"/>
+      <var name="V" vt="int"/>
+      <var name="T" vt="int"/>
+      </data>
+  </object>
+
+  <object name="SPL" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,serial,map,mutex" include="$rocint/public/digint" remark="Serial programable LEDs">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="splini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="connOK" vt="Boolean"/>
+      <var name="home[256]" vt="unsigned char"/>
+      <var name="control" vt="iOThread"/>
+      <var name="fromAddr" vt="int"/>
+      <var name="toAddr" vt="int"/>
+      <var name="nrLEDs" vt="int"/>
+    </data>
+  </object>
+
+  <object name="Inter10" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="initOK" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="device" vt="const char*"/>
+      <var name="bps" vt="serial_bps"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+    </data>
+  </object>
+
+  <object name="MGBOX" interface="$../rocint/rocint.xml:DigInt" use="node,trace,socket,serial,thread,mutex,map" include="$rocint/public/digint" remark="rocNet object">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode" remark="DigInt Ini"/>
+      <var name="mcs2ini" vt="iONode" remark="MCS2 Ini"/>
+      <var name="trace" vt="iOTrace" remark="Trace pointer"/>
+      <var name="listenerObj" vt="obj" remark="Listener pointer"/>
+      <var name="listenerFun" vt="digint_listener" remark="Listener Function pointer"/>
+      <var name="iid" vt="const char*" remark="Interface ID"/>
+      <var name="gbUID" vt="int" remark="Gleisbox UID"/>
+      <var name="ms2UID" vt="int" remark="MS2-GUI UID"/>
+      <var name="mcs2gfpUID" vt="int" remark="CS2 GFP UID"/>
+      <var name="mcs2guiUID" vt="int" remark="CS2-GUI UID"/>
+      <var name="run" vt="Boolean"/>
+      <var name="udp" vt="Boolean"/>
+      <var name="conOK" vt="Boolean"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="readUDP" vt="iOSocket"/>
+      <var name="writeUDP" vt="iOSocket"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="feedbackReader" vt="iOThread"/>
+      <var name="fbmod" vt="int"/>
+      <var name="swtime" vt="int"/>
+      <var name="power" vt="Boolean"/>
+      <var name="sensor" vt="Boolean"/>
+      <var name="discovery" vt="iOThread"/>
+      <var name="initASCII" vt="Boolean"/>
+      <var name="cmdpause" vt="int"/>
+      <var name="sensorbegin" vt="int"/>
+      <var name="sensorend" vt="int"/>
+      <var name="load" vt="int"/>
+      <var name="volt" vt="int"/>
+      <var name="temp" vt="int"/>
+      <var name="overload" vt="Boolean"/>
+      <var name="sod_fbmod" vt="int"/>
+      <var name="sod_sensorbegin" vt="int"/>
+      <var name="sod_sensorend" vt="int"/>
+      <var name="id" vt="char*" remark="Id name"/>
+      <var name="sid" vt="int" remark="address"/>
+      <var name="reguid" vt="unsigned int" remark="UID"/>
+      <var name="regloc" vt="Boolean" remark="flag to register/generate loco"/>
+      <var name="locolist" vt="iONode"/>
+      <var name="mfxbinder" vt="iOThread"/>
+      <var name="mfxDetectInProgress" vt="Boolean"/>
+      <var name="configchnl" vt="byte"/>
+      <var name="lastseqnr" vt="byte"/>
+      <var name="idxcnt" vt="byte"/>
+      <var name="loadStepRate" vt="float"/>
+      <var name="voltStepRate" vt="float"/>
+      <var name="tempStepRate" vt="float"/>
+      <var name="indices" vt="byte"/>
+    </data>
+  </object>
+
+  <object name="HUE" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,socket,map,mutex" include="$rocint/public/digint" remark="Philips HUE">
+    <typedef def="enum {HUE_GETBRIDGECONFIG=1, HUE_GETLIGHTSTATE, HUE_GETLIGHTS } huecmd"/>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <struct name="HueCmd" typedef="*iHueCmd" remark="Hue command.">
+      <var name="methode" vt="char*"/>
+      <var name="request" vt="char*"/>
+      <var name="cmd" vt="int"/>
+      <var name="addr" vt="int"/>
+    </struct>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="socket" vt="iOSocket"/>
+      <var name="run" vt="Boolean"/>
+      <var name="transactor" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="config" vt="iONode"/>
+    </data>
+  </object>
+
+  <object name="DCCar" interface="$../rocint/rocint.xml:DigInt" use="node,serial,trace,thread" include="$rocint/public/digint">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="run" vt="Boolean"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+      <var name="dummyio" vt="Boolean"/>
+      <var name="writepause" vt="int"/>
+    </data>
+  </object>
+
+  <object name="DMXArtNet" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,socket,map,mutex" include="$rocint/public/digint" remark="ArtNetNode">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="dmxini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="socket" vt="iOSocket"/>
+      <var name="run" vt="Boolean"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="writer" vt="iOThread"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="mapwhite" vt="Boolean"/>
+      <var name="framerate" vt="int"/>
+      <var name="refresh" vt="Boolean"/>
+      <var name="dmxchannel[513]" vt="byte"/>
+      <var name="transactor" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+    </data>
+  </object>
+
+  <object name="DMX4ALL" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,serial,map,mutex" include="$rocint/public/digint" remark="DMX4ALL">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="dmxini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="run" vt="Boolean"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="mapwhite" vt="Boolean"/>
+      <var name="framerate" vt="int"/>
+      <var name="refresh" vt="Boolean"/>
+      <var name="dmxchannel[513]" vt="byte"/>
+      <var name="transactor" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+    </data>
+  </object>
+
+  <object name="Raptor" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,serial,map,mutex" include="$rocint/public/digint" remark="Raptor">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="run" vt="Boolean"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="transactor" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+    </data>
+  </object>
+
+  <object name="DMXEUROLITE" interface="$../rocint/rocint.xml:DigInt" use="node,trace,thread,serial,map,mutex" include="$rocint/public/digint" remark="DMX USB Pro">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="const iONode" remark="Ini node"/>
+      <param name="trc" vt="const iOTrace" remark="Trace instance"/>
+    </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="dmxini" vt="iONode"/>
+      <var name="iid" vt="const char*"/>
+      <var name="serial" vt="iOSerial"/>
+      <var name="serialOK" vt="Boolean"/>
+      <var name="run" vt="Boolean"/>
+      <var name="mux" vt="iOMutex"/>
+      <var name="mapwhite" vt="Boolean"/>
+      <var name="framerate" vt="int"/>
+      <var name="refresh" vt="Boolean"/>
+      <var name="dmxchannel[513]" vt="byte"/>
+      <var name="transactor" vt="iOThread"/>
+      <var name="listenerObj" vt="obj"/>
+      <var name="listenerFun" vt="digint_listener"/>
+    </data>
+  </object>
 
 </Project>
+

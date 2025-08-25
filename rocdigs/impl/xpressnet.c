@@ -1,7 +1,10 @@
  /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -22,6 +25,7 @@
 #include "rocdigs/impl/xpressnet_impl.h"
 #include "rocdigs/impl/xpressnet/li101.h"
 #include "rocdigs/impl/xpressnet/liusb.h"
+#include "rocdigs/impl/xpressnet/lieth.h"
 #include "rocdigs/impl/xpressnet/elite.h"
 #include "rocdigs/impl/xpressnet/opendcc.h"
 #include "rocdigs/impl/xpressnet/atlas.h"
@@ -190,6 +194,97 @@ static void __handleSwitch(iOXpressNet xpressnet, int addr, int port, int value)
 }
 
 
+static int __modsel(int* spcnt, int* reqid) {
+  switch( *spcnt ) {
+  case 27:
+    *reqid  = 0x11;
+    return 0x01;
+  case 28:
+    *reqid  = 0x12;
+    return 0x02;
+  case 127:
+  case 128:
+    *reqid = 0x13;
+    *spcnt = 127;
+    break;
+  default:
+    *reqid = 0x10;
+    *spcnt = 14;
+    break;
+  }
+  return 0;
+}
+
+static int __lenzSpeed(iONode node, int spcnt) {
+  int lenzspeed = 0;
+  if( wLoc.getV( node ) != -1 ) {
+    if( StrOp.equals( wLoc.getV_mode( node ), wLoc.V_mode_percent ) )
+      lenzspeed = (wLoc.getV( node ) * spcnt) / 100;
+    else if( wLoc.getV_max( node ) > 0 )
+      lenzspeed = (wLoc.getV( node ) * spcnt) / wLoc.getV_max( node );
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "speed=%d", lenzspeed );
+  }
+
+  /* Remove e-stop in 14 and 127 speed step mode */
+  if ( spcnt == 14 || spcnt == 127 ){
+    if ( lenzspeed > 0 )
+      lenzspeed = lenzspeed + 1;
+    /* prevent bit overflow at max speed */
+    if ( lenzspeed > spcnt)
+      lenzspeed = spcnt;
+  }
+
+  /* Adjust bit positions for lenz command stations */
+  if (( spcnt == 27 ) || ( spcnt == 28 )){
+
+    /* Remove 2 unused speed step and e-stop speed step */
+    if ( lenzspeed > 0 )
+      lenzspeed = lenzspeed + 3;
+
+    /* Transfer LSB to front of bit 0-3 */
+    if ( lenzspeed & 0x01 )
+      lenzspeed = lenzspeed | 0x20;
+
+    /* Move all bit in right position */
+    lenzspeed = lenzspeed >> 1;
+  }
+  return lenzspeed;
+}
+
+
+/* fbmods is a comman separated address list of connected feedback modules. */
+static void __updateFB( iOXpressNet xpressnet, iONode fbInfo ) {
+  iOXpressNetData data = Data(xpressnet);
+  int cnt = NodeOp.getChildCnt( fbInfo );
+  int i = 0;
+
+  char* str = NodeOp.base.toString( fbInfo );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "updateFB\n%s", str );
+  StrOp.free( str );
+
+  /* reset the list: */
+  data->fbmodcnt = 0;
+  MemOp.set( data->fbmods, 0, 256 );
+
+  for( i = 0; i < cnt; i++ ) {
+    iONode fbmods = NodeOp.getChild( fbInfo, i );
+    const char* mods = wFbMods.getmodules( fbmods );
+    if( mods != NULL && StrOp.len( mods ) > 0 ) {
+      iOStrTok tok = StrTokOp.inst( mods, ',' );
+      int idx = 0;
+      while( StrTokOp.hasMoreTokens( tok ) ) {
+        int addr = atoi( StrTokOp.nextToken(tok) );
+        data->fbmods[idx] = addr - (data->fboffset / 8); /* xpressnet has groups of 8 */
+        idx++;
+      };
+      data->fbmodcnt = idx;
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "updateFB count=%d", idx );
+    }
+  }
+
+}
+
+
 static iONode __translate( iOXpressNet xpressnet, iONode node ) {
   iOXpressNetData data = Data(xpressnet);
   iONode rsp = NULL;
@@ -208,8 +303,11 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
     }
   }
 
+  if( StrOp.equals( NodeOp.getName( node ), wFbInfo.name() ) ) {
+    __updateFB( xpressnet, node );
+  }
   /* Switch command. */
-  if( StrOp.equals( NodeOp.getName( node ), wSwitch.name() ) ) {
+  else if( StrOp.equals( NodeOp.getName( node ), wSwitch.name() ) ) {
 
     int addr = wSwitch.getaddr1( node );
     int port = wSwitch.getport1( node );
@@ -284,8 +382,6 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
     int port   = wOutput.getport( node );
     int gate   = wOutput.getgate( node );
 
-    int state = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 0x01:0x00;
-
     if( port == 0 )
       AddrOp.fromFADA( addr, &addr, &port, &gate );
     else if( addr == 0 && port > 0 )
@@ -294,7 +390,10 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
     if( port > 0 ) port--;
     if( addr > 0 ) addr--;
 
-    if (StrOp.equals( wOutput.getcmd( node ), wOutput.on )){
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "output %d %d %d %s %s",
+         addr, port, gate, wOutput.getcmd( node ), wOutput.isaccessory(node)?" [as accessory]":"" );
+
+    if( wOutput.isaccessory(node) && StrOp.equals( wOutput.getcmd( node ), wOutput.on )){
 
       byte* outa = allocMem(32);
       outa[0] = 0x52;
@@ -310,6 +409,22 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
       cmd->out[1] = addr;
       cmd->out[2] = 0x80 | 0x00 | (port << 1) | gate;
       ThreadOp.post( data->timedQueue, (obj)cmd );
+    }
+    else {
+      if (StrOp.equals( wOutput.getcmd( node ), wOutput.on )){
+        byte* outa = allocMem(32);
+        outa[0] = 0x52;
+        outa[1] = addr;
+        outa[2] = 0x80 | 0x00 | (port << 1) | gate;
+        ThreadOp.post( data->transactor, (obj)outa );
+      }
+      else {
+        byte* outa = allocMem(32);
+        outa[0] = 0x52;
+        outa[1] = addr;
+        outa[2] = 0x80 | 0x08 | (port << 1) | gate;
+        ThreadOp.post( data->transactor, (obj)outa );
+      }
     }
 
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "output %d %d %d %s",
@@ -330,98 +445,41 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
     rsp = (iONode)NodeOp.base.clone( node );
   }
 
+  /* Loc info command. */
+  else if( StrOp.equals( NodeOp.getName( node ), wLoc.name() ) && StrOp.equals( wLoc.getcmd(node), wLoc.info) ) {
+    int   addr = wLoc.getaddr( node );
+    byte* outa = allocMem(32);
+    if( data->v2 ) {
+      int  spcnt = wLoc.getspcnt( node );
+      outa[0] = 0xA2;
+      outa[1] = addr;
+      outa[2] = 0;
+      if( spcnt == 27 )
+        outa[2] = 1;
+      if( spcnt == 28 )
+        outa[2] = 2;
+    }
+    else {
+      outa[0] = 0xE3;
+      outa[1] = 0x00;
+      __setLocAddr( addr, outa+2 );
+      outa[4] = addr / 256;
+      outa[5] = addr % 256;
+    }
+    ThreadOp.post( data->infoQueue, (obj)outa );
+  }
+
   /* Loc command. */
   else if( StrOp.equals( NodeOp.getName( node ), wLoc.name() ) ) {
     int   addr = wLoc.getaddr( node );
-    int  speed = 0;
-    int  lenzspeed = 0;
     Boolean fn = wLoc.isfn( node );
     int    dir = wLoc.isdir( node );
     int  spcnt = wLoc.getspcnt( node );
+    int reqid  = 0x10; /* default 14 speed steps */
+    int modsel = __modsel(&spcnt, &reqid);
+    int lenzspeed = __lenzSpeed(node, spcnt);
 
-    int reqid = 0x10; /* default 14 speed steps */
-    switch( spcnt ) {
-    case 27:
-      reqid = 0x11;
-      break;
-    case 28:
-      reqid = 0x12;
-      break;
-    case 127:
-    case 128:
-      reqid = 0x13;
-      spcnt = 127;
-      break;
-    default:
-      reqid = 0x10;
-      spcnt = 14;
-      break;
-    }
-    /*
-      General Lenz speed values
-
-      14
-      Step 0 Stop
-      Step 1 E-Stop
-      Step 2-15 Train in motion
-
-      27
-      Step 0 Stop
-      Step 1 Not used
-      Step 2 E-Stop
-      Step 3 Not used
-      Step 4-30 Train in motion
-      Step 31 Not used
-
-      28
-      Step 0 Stop
-      Step 1 Not used
-      Step 2 E-Stop
-      Step 3 Not used
-      Step 4-31 Train in motion
-
-      128
-      Step 0 Stop
-      Step 1 E-Stop
-      Step 2-127 Train in motion
-     */
-
-    if( wLoc.getV( node ) != -1 ) {
-      if( StrOp.equals( wLoc.getV_mode( node ), wLoc.V_mode_percent ) )
-        speed = (wLoc.getV( node ) * spcnt) / 100;
-      else if( wLoc.getV_max( node ) > 0 )
-        speed = (wLoc.getV( node ) * spcnt) / wLoc.getV_max( node );
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "speed=%d", speed );
-    }
-
-    lenzspeed = speed;
-
-    /* Remove e-stop in 14 and 127 speed step mode */
-    if ( spcnt == 14 || spcnt == 127 ){
-      if ( lenzspeed > 0 )
-        lenzspeed = lenzspeed + 1;
-      /* prevent bit overflow at max speed */
-      if ( lenzspeed > spcnt)
-        lenzspeed = spcnt;
-    }
-
-    /* Adjust bit positions for lenz command stations */
-    if (( spcnt == 27 ) || ( spcnt == 28 )){
-
-      /* Remove 2 unused speed step and e-stop speed step */
-      if ( lenzspeed > 0 )
-        lenzspeed = lenzspeed + 3;
-
-      /* Transfer LSB to front of bit 0-3 */
-      if ( lenzspeed & 0x01 )
-        lenzspeed = lenzspeed | 0x20;
-
-      /* Move all bit in right position */
-      lenzspeed = lenzspeed >> 1;
-    }
-
-
-    if( (data->lcfn[addr] & 0x10) != (fn?0x10:0) ) {
+    if( !data->v2 && (data->lcfn[addr] & 0x10) != (fn?0x10:0) ) {
       byte* outa = allocMem(32);
       outa[0] = 0xE4;
       outa[1] = 0x20;
@@ -441,20 +499,41 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
     }
 
     byte* outb = allocMem(32);
-    outb[0] = 0xE4;
-    outb[1] = reqid;
-    __setLocAddr( addr, outb+2 );
-    outb[4] = dir ? 0x80:0x00;
-    outb[4] |= lenzspeed;
+    if( data->v2 ) {
+      Boolean f1 = wFunCmd.isf1( node );
+      Boolean f2 = wFunCmd.isf2( node );
+      Boolean f3 = wFunCmd.isf3( node );
+      Boolean f4 = wFunCmd.isf4( node );
+      byte functions1 = (f1 ?0x01:0) + (f2 ?0x02:0) + (f3 ?0x04:0) + (f4 ?0x08:0);
+      outb[0] = 0xB4;
+      outb[1] = addr;
+      outb[2] = dir ? 0x40:0x00; /* direction, lights and speed byte */
+      outb[2] |= fn ? 0x20:0x00;
+      outb[2] |= lenzspeed;
+      outb[3] = functions1; /* function 1-4 */
+      outb[4] = modsel; /* step selection */
+    }
+    else {
+      outb[0] = 0xE4;
+      outb[1] = reqid;
+      __setLocAddr( addr, outb+2 );
+      outb[4] = dir ? 0x80:0x00;
+      outb[4] |= lenzspeed;
+    }
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loc %d velocity=%d direction=%s", addr, lenzspeed, (dir?"fwd":"rev") );
     ThreadOp.post( data->transactor, (obj)outb );
-
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loc %d velocity=%d direction=%s", addr, speed, (dir?"fwd":"rev") );
   }
 
   /* Function command. */
   else if( StrOp.equals( NodeOp.getName( node ), wFunCmd.name() ) ) {
-    int addr  = wFunCmd.getaddr( node );
-    int group = wFunCmd.getgroup( node );
+    int   addr = wFunCmd.getaddr( node );
+    int  group = wFunCmd.getgroup( node );
+    Boolean fn = wLoc.isfn( node );
+    int    dir = wLoc.isdir( node );
+    int  spcnt = wLoc.getspcnt( node );
+    int reqid  = 0x10; /* default 14 speed steps */
+    int modsel = __modsel(&spcnt, &reqid);
+    int lenzspeed = __lenzSpeed(node, spcnt);
 
     Boolean f0 = wFunCmd.isf0( node );
     Boolean f1 = wFunCmd.isf1( node );
@@ -498,59 +577,76 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
         (f5?"ON":"OFF"), (f6?"ON":"OFF"), (f7?"ON":"OFF"), (f8?"ON":"OFF"),
         (f9?"ON":"OFF"), (f10?"ON":"OFF"), (f11?"ON":"OFF"), (f12?"ON":"OFF") );
 
-    if( group == 0 || group == 1 ) {
-      byte* outa = allocMem(32);
-      outa[0] = 0xE4;
-      outa[1] = 0x20;
-      __setLocAddr( addr, outa+2 );
-      outa[4] = functions1;
-      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "function group 1" );
-      ThreadOp.post( data->transactor, (obj)outa );
-      /*ThreadOp.sleep(50);*/
+    if( data->v2 ) {
+      if( group == 0 || group == 1 ) {
+        byte* outb = allocMem(32);
+        outb[0] = 0xB4;
+        outb[1] = addr;
+        outb[2] = dir ? 0x40:0x00; /* direction, lights and speed byte */
+        outb[2] |= fn ? 0x20:0x00;
+        outb[2] |= lenzspeed;
+        outb[3] = functions1; /* function 1-4 */
+        outb[4] = modsel; /* step selection */
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "V2 function group 1" );
+        ThreadOp.post( data->transactor, (obj)outb );
+        /*ThreadOp.sleep(50);*/
+      }
     }
+    else {
+      if( group == 0 || group == 1 ) {
+        byte* outa = allocMem(32);
+        outa[0] = 0xE4;
+        outa[1] = 0x20;
+        __setLocAddr( addr, outa+2 );
+        outa[4] = functions1;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function group 1" );
+        ThreadOp.post( data->transactor, (obj)outa );
+        /*ThreadOp.sleep(50);*/
+      }
 
-    if( group == 0 || group == 2 ) {
-      byte* outb = allocMem(32);
-      outb[0] = 0xE4;
-      outb[1] = 0x21;
-      __setLocAddr( addr, outb+2 );
-      outb[4] = functions2;
-      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "function group 2" );
-      ThreadOp.post( data->transactor, (obj)outb );
-      /*ThreadOp.sleep(50);*/
-    }
+      if( group == 2 ) {
+        byte* outb = allocMem(32);
+        outb[0] = 0xE4;
+        outb[1] = 0x21;
+        __setLocAddr( addr, outb+2 );
+        outb[4] = functions2;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function group 2" );
+        ThreadOp.post( data->transactor, (obj)outb );
+        /*ThreadOp.sleep(50);*/
+      }
 
 
-    if( group == 0 || group == 3 ) {
-      byte* outc = allocMem(32);
-      outc[0] = 0xE4;
-      outc[1] = 0x22;
-      __setLocAddr( addr, outc+2 );
-      outc[4] = functions3;
-      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "function group 3" );
-      ThreadOp.post( data->transactor, (obj)outc );
-      /*ThreadOp.sleep(50);*/
-    }
+      if( group == 3 ) {
+        byte* outc = allocMem(32);
+        outc[0] = 0xE4;
+        outc[1] = 0x22;
+        __setLocAddr( addr, outc+2 );
+        outc[4] = functions3;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function group 3" );
+        ThreadOp.post( data->transactor, (obj)outc );
+        /*ThreadOp.sleep(50);*/
+      }
 
-    if( group == 0 || group == 4 || group == 5 ) {
-      byte* outc = allocMem(32);
-      outc[0] = 0xE4;
-      outc[1] = 0x23;
-      __setLocAddr( addr, outc+2 );
-      outc[4] = functions4;
-      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "function group 4" );
-      ThreadOp.post( data->transactor, (obj)outc );
-      /*ThreadOp.sleep(50);*/
-    }
+      if( group == 4 || group == 5 ) {
+        byte* outc = allocMem(32);
+        outc[0] = 0xE4;
+        outc[1] = 0x23;
+        __setLocAddr( addr, outc+2 );
+        outc[4] = functions4;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function group 4" );
+        ThreadOp.post( data->transactor, (obj)outc );
+        /*ThreadOp.sleep(50);*/
+      }
 
-    if( group == 0 || group == 6 || group == 7 ) {
-      byte* outc = allocMem(32);
-      outc[0] = 0xE4;
-      outc[1] = 0x28;
-      __setLocAddr( addr, outc+2 );
-      outc[4] = functions5;
-      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "function group 5" );
-      ThreadOp.post( data->transactor, (obj)outc );
+      if( group == 6 || group == 7 ) {
+        byte* outc = allocMem(32);
+        outc[0] = 0xE4;
+        outc[1] = 0x28;
+        __setLocAddr( addr, outc+2 );
+        outc[4] = functions5;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function group 5" );
+        ThreadOp.post( data->transactor, (obj)outc );
+      }
     }
 
     /* save the function1 byte to use for setting the lights function... */
@@ -561,8 +657,12 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
   else if( StrOp.equals( NodeOp.getName( node ), wSysCmd.name() ) ) {
     const char* cmd = wSysCmd.getcmd( node );
 
-    byte* outa = allocMem(32);
-    if( StrOp.equals( cmd, wSysCmd.stop ) ) {
+    if( StrOp.equals( cmd, wSysCmd.enablecom ) ) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "%s: %s communication", data->iid, wSysCmd.getval(node) == 1 ? "enable":"disable" );
+      data->enablecom = wSysCmd.getval(node) == 1 ? True:False;
+    }
+    else if( StrOp.equals( cmd, wSysCmd.stop ) ) {
+      byte* outa = allocMem(32);
       outa[0] = 0x21;
       outa[1] = 0x80;
       outa[2] = 0xA1;
@@ -570,6 +670,7 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
       ThreadOp.post( data->transactor, (obj)outa );
     }
     else if( StrOp.equals( cmd, wSysCmd.go ) ) {
+      byte* outa = allocMem(32);
       outa[0] = 0x21;
       outa[1] = 0x81;
       outa[2] = 0xA0;
@@ -577,24 +678,43 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
       ThreadOp.post( data->transactor, (obj)outa );
     }
     else if( StrOp.equals( cmd, wSysCmd.ebreak ) ) {
+      byte* outa = allocMem(32);
       outa[0] = 0x80;
       outa[1] = 0x80;
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Emergency break" );
       ThreadOp.post( data->transactor, (obj)outa );
     }
+    else if( StrOp.equals( cmd, wSysCmd.sod ) ) {
+      int i = 0;
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Start of Day" );
+      for( i = 0; i < data->fbmodcnt; i++ ) {
+        byte* outa = allocMem(32);
+        outa[0] = 0x42;
+        outa[1] = data->fbmods[i];
+        outa[2] = 0x80 + 0; /* nibble 0 */
+        ThreadOp.post( data->transactor, (obj)outa );
 
-
+        outa = allocMem(32);
+        outa[0] = 0x42;
+        outa[1] = data->fbmods[i];
+        outa[2] = 0x80 + 1; /* nibble 1 */
+        ThreadOp.post( data->transactor, (obj)outa );
+      }
+    }
   }
+
+
+
   /* Program command. */
   else if( StrOp.equals( NodeOp.getName( node ), wProgram.name() ) ) {
 
     if( wProgram.getcmd( node ) == wProgram.get ) {
       int cv = wProgram.getcv( node );
       int addr = wProgram.getaddr( node );
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "get CV%d on %s...", cv, wProgram.ispom(node)?"POM":"PT" );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "get CV%d on %s...", cv, wProgram.ispom(node)?"POM":"PT" );
 
       if( wProgram.ispom(node) ) {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "POM: read CV%d of loc %d...", cv, addr );
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "POM: read CV%d of loc %d...", cv, addr );
         if( data->power ) {
           if (cv > 0) cv--;
 
@@ -613,13 +733,35 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
         }
       }
       else {
-        byte* outa = allocMem(32);
-        outa[0] = 0x22;
-        outa[1] = 0x15;
-        outa[2] = cv & 0xFF;
-        ThreadOp.post( data->transactor, (obj)outa );
-        /*ThreadOp.sleep(50);*/
-
+        if( wProgram.getmode(node) == wProgram.mode_register ) {
+          byte* outa = allocMem(32);
+          outa[0] = 0x22;
+          outa[1] = 0x11;
+          outa[2] = cv & 0x0F;
+          ThreadOp.post( data->transactor, (obj)outa );
+        }
+        else {
+          byte* outa = allocMem(32);
+          outa[0] = 0x22;
+          if( cv < 256 ) {
+            outa[1] = 0x15;
+            outa[2] = cv & 0xFF;
+          }
+          else if( cv < 512 ) {
+            outa[1] = 0x19;
+            outa[2] = (cv % 256) & 0xFF;
+          }
+          else if( cv < 768 ) {
+            outa[1] = 0x1A;
+            outa[2] = (cv % 256) & 0xFF;
+          }
+          else {
+            outa[1] = 0x1B;
+            outa[2] = (cv % 256) & 0xFF;
+          }
+          ThreadOp.post( data->transactor, (obj)outa );
+          /*ThreadOp.sleep(50);*/
+        }
         byte* outb = allocMem(32);
         outb[0] = 0x21;
         outb[1] = 0x10;
@@ -635,7 +777,7 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
 
 
       if( wProgram.ispom(node) ) {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "POM: set CV%d of loc %d to %d...", cv, decaddr, value );
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "POM: set CV%d of loc %d to %d...", cv, decaddr, value );
 
         if( data->power) {
           if (cv > 0) cv--;
@@ -665,15 +807,38 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
       }
       else {
 
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set CV%d to %d...", cv, value );
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "set CV%d to %d...", cv, value );
 
-        byte* outa = allocMem(32);
-        outa[0] = 0x23;
-        outa[1] = 0x16;
-        outa[2] = cv & 0xFF;
-        outa[3] = value & 0xFF;
-        ThreadOp.post( data->transactor, (obj)outa );
-        /*ThreadOp.sleep(50);*/
+        if( wProgram.getmode(node) == wProgram.mode_register ) {
+          byte* outa = allocMem(32);
+          outa[0] = 0x23;
+          outa[1] = 0x12;
+          outa[2] = cv & 0x0F;
+          outa[3] = value & 0xFF;
+          ThreadOp.post( data->transactor, (obj)outa );
+        }
+        else {
+          byte* outa = allocMem(32);
+          outa[0] = 0x23;
+          if( cv < 256 ) {
+            outa[1] = 0x16;
+            outa[2] = cv & 0xFF;
+          }
+          else if( cv < 512 ) {
+            outa[1] = 0x1D;
+            outa[2] = (cv % 256) & 0xFF;
+          }
+          else if( cv < 768 ) {
+            outa[1] = 0x1E;
+            outa[2] = (cv % 256) & 0xFF;
+          }
+          else {
+            outa[1] = 0x1F;
+            outa[2] = (cv % 256) & 0xFF;
+          }
+          outa[3] = value & 0xFF;
+          ThreadOp.post( data->transactor, (obj)outa );
+        }
 
         byte* outb = allocMem(32);
         outb[0] = 0x21;
@@ -708,6 +873,129 @@ static iONode __translate( iOXpressNet xpressnet, iONode node ) {
 }
 
 
+static void __evaluateLocoV2( iOXpressNet xpressnet, byte* in ) {
+  iOXpressNetData data = Data(xpressnet);
+  iONode  nodeC = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+  int     addr  = in[1];
+  int     speed = in[2];
+  Boolean dir   = ((speed & 0x40) ? True:False);
+  Boolean fn    = ((speed & 0x20) ? True:False);
+  int     F0    = in[3];
+  int     steps = 14;
+  if( in[4] == 1 )
+    steps = 27;
+  if( in[4] == 2 )
+    steps = 28;
+
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
+      "locoV2 %d(%d) dir=%s fn=%d speed=%d steps=%d F0=0x%02X",
+      addr, data->infoaddr, dir?"fwd":"rev", fn, speed, steps, F0 );
+
+  wLoc.setthrottleid( nodeC, "xpressnet" );
+  if( data->iid != NULL )
+    wLoc.setiid( nodeC, data->iid );
+  wLoc.setaddr( nodeC, addr );
+  wLoc.setV_raw( nodeC, speed );
+  wLoc.setV_rawMax( nodeC, steps );
+  wLoc.setspcnt( nodeC, steps );
+  wLoc.setdir( nodeC, dir );
+  wLoc.setcmd( nodeC, wLoc.dirfun );
+  wLoc.setfn( nodeC, fn );
+  data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+  /*
+   * F0: ZustandderFunktionen1bis4. 0000F4F3F2F1
+   */
+
+  nodeC = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+  wFunCmd.setaddr( nodeC, addr );
+  wLoc.setthrottleid( nodeC, "xpressnet" );
+  if( data->iid != NULL )
+    wLoc.setiid( nodeC, data->iid );
+  wFunCmd.setf0(nodeC, fn);
+  wFunCmd.setf1(nodeC, (F0 & 0x01) ? True:False);
+  wFunCmd.setf2(nodeC, (F0 & 0x02) ? True:False);
+  wFunCmd.setf3(nodeC, (F0 & 0x04) ? True:False);
+  wFunCmd.setf4(nodeC, (F0 & 0x08) ? True:False);
+  data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+
+  data->infoaddr = 0;
+}
+
+
+static void __evaluateLoco( iOXpressNet xpressnet, byte* in ) {
+  iOXpressNetData data = Data(xpressnet);
+  iONode nodeC = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+  int steps = in[1] & 0x07;
+  int speed = in[2];
+  int F0 = in[3];
+  int F1 = in[4];
+
+  Boolean dir = (speed & 0x80) ? True:False;
+  speed = speed & 0x7F;
+  if( steps == 0 ) steps = 14;
+  else if( steps == 0x01 ) steps = 27;
+  else if( steps == 0x02 ) steps = 28;
+  else steps = 127;
+
+  if( steps == 27 || steps == 28 ) {
+    int bit4 = (speed & 0x10) >> 4;
+    speed &= 0x0F;
+    speed = (speed << 1) + bit4;
+  }
+
+  if( speed > 0 ) {
+    /* remove ebreak */
+    speed--;
+  }
+
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
+      "loco %d dir=%s fn=%d speed=%d steps=%d F0=0x%02X F1=0x%02X",
+      data->infoaddr, dir?"fwd":"rev", (F0 & 0x10) ? True:False, speed, steps, F0, F1 );
+
+  wLoc.setaddr( nodeC, data->infoaddr );
+  wLoc.setV_raw( nodeC, speed );
+  wLoc.setV_rawMax( nodeC, steps );
+  wLoc.setspcnt( nodeC, steps );
+  wLoc.setdir( nodeC, dir );
+  wLoc.setcmd( nodeC, wLoc.dirfun );
+  wLoc.setfn( nodeC, ((F0 & 0x10) ? True:False) );
+  wLoc.setthrottleid( nodeC, "xpressnet" );
+  if( data->iid != NULL )
+    wLoc.setiid( nodeC, data->iid );
+  data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+  /*
+   * F0: ZustandderFunktionen0bis4. 000F0F4F3F2F1
+   * F1: Zustand der Funktionen 5 bis 12 F12 F11 F10 F9 F8 F7 F6 F5
+   */
+
+  nodeC = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+  wFunCmd.setaddr( nodeC, data->infoaddr );
+  wLoc.setthrottleid( nodeC, "xpressnet" );
+  if( data->iid != NULL )
+    wLoc.setiid( nodeC, data->iid );
+  wFunCmd.setf0(nodeC, (F0 & 0x10) ? True:False);
+  wFunCmd.setf1(nodeC, (F0 & 0x01) ? True:False);
+  wFunCmd.setf2(nodeC, (F0 & 0x02) ? True:False);
+  wFunCmd.setf3(nodeC, (F0 & 0x04) ? True:False);
+  wFunCmd.setf4(nodeC, (F0 & 0x08) ? True:False);
+  wFunCmd.setf5(nodeC, (F1 & 0x01) ? True:False);
+  wFunCmd.setf6(nodeC, (F1 & 0x02) ? True:False);
+  wFunCmd.setf7(nodeC, (F1 & 0x04) ? True:False);
+  wFunCmd.setf8(nodeC, (F1 & 0x08) ? True:False);
+  wFunCmd.setf9(nodeC, (F1 & 0x10) ? True:False);
+  wFunCmd.setf10(nodeC,(F1 & 0x20) ? True:False);
+  wFunCmd.setf11(nodeC,(F1 & 0x40) ? True:False);
+  wFunCmd.setf12(nodeC,(F1 & 0x80) ? True:False);
+  data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+
+  data->infoaddr = 0;
+}
+
+
 static void __evaluateResponse( iOXpressNet xpressnet, byte* in ) {
   iOXpressNetData data = Data(xpressnet);
 
@@ -729,24 +1017,26 @@ static void __evaluateResponse( iOXpressNet xpressnet, byte* in ) {
   __dec2bin( &b3[0], i3);
 
   /* Turnout broadcast: */
-  if ( i0 == 0x42 && i1 <= 0x80 && (b2[1] == 0 && b2[2] == 0) || (b2[1] == 0 && b2[2] == 1)) {
-    int baseadress = i1;
-    int k, start;
+  if ( i0 == 0x42 ) {
+    if( (i1 <= 0x80 && (b2[1] == 0 && b2[2] == 0)) || ((b2[1] == 0 && b2[2] == 1)) ) {
+      int baseadress = i1;
+      int k, start;
 
-    if( b2[3] == 0 )
-      start = 1;
-    else
-      start = 3;
+      if( b2[3] == 0 )
+        start = 1;
+      else
+        start = 3;
 
-    for (k = 0; k < 2; k++) {
-      if( (b2[7-k*2] + b2[6-k*2]) == 1 ) {       // only handle changed turnouts ignore those unchanged (00) or invalid (11)
-        __handleSwitch(xpressnet, baseadress, start+k, b2[7-k*2]);
-        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Lenz turnout status change address %d port %d", baseadress+1, start+k );
-      } else {
-        if( (b2[7-k*2] + b2[6-k*2]) == 2 )       // turnout reported invalid position
-          TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Lenz turnout reports invalid position address %d port %d", baseadress+1, start+k );
-        else                                     // turnout not yet operated since power on
-          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Lenz turnout not operated yet address %d port %d", baseadress+1, start+k );
+      for (k = 0; k < 2; k++) {
+        if( (b2[7-k*2] + b2[6-k*2]) == 1 ) {       // only handle changed turnouts ignore those unchanged (00) or invalid (11)
+          __handleSwitch(xpressnet, baseadress, start+k, b2[7-k*2]);
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Lenz turnout status change address %d port %d", baseadress+1, start+k );
+        } else {
+          if( (b2[7-k*2] + b2[6-k*2]) == 2 )       // turnout reported invalid position
+            TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Lenz turnout reports invalid position address %d port %d", baseadress+1, start+k );
+          else                                     // turnout not yet operated since power on
+            TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Lenz turnout not operated yet address %d port %d", baseadress+1, start+k );
+        }
       }
     }
   }
@@ -776,11 +1066,11 @@ static void __evaluateResponse( iOXpressNet xpressnet, byte* in ) {
           if( data->iid != NULL )
             wFeedback.setiid( nodeC, data->iid );
 
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+              "Sensor %d=%s", iAddr + data->fboffset, data->fbState[iAddr]?"on":"off");
           if( data->listenerFun != NULL && data->listenerObj != NULL )
             data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
 
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-              "Sensor %d=%s", iAddr + data->fboffset, data->fbState[iAddr]?"on":"off");
         }
 
       }
@@ -788,10 +1078,17 @@ static void __evaluateResponse( iOXpressNet xpressnet, byte* in ) {
   }
 
   /* SM response Direct CV mode: */
-  if( in[0] == 0x63 && in[1] == 0x14 ) {
+  if( in[0] == 0x63 && (in[1] == 0x14 || in[1] == 0x15 || in[1] == 0x16 || in[1] == 0x17 ) ) {
     int cv = in[2];
     int value = in[3];
     iONode node = NULL;
+
+    if( in[1] == 0x15 )
+      cv += 256;
+    else if( in[1] == 0x16 )
+      cv += 512;
+    else if( in[1] == 0x17 )
+      cv += 768;
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "cv %d has a value of %d", cv, value );
 
@@ -805,6 +1102,82 @@ static void __evaluateResponse( iOXpressNet xpressnet, byte* in ) {
     if( data->listenerFun != NULL && data->listenerObj != NULL )
       data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
   }
+
+  /* BiDi 0x75 0xF2 SID_H SID_L D+AddrH AddrL */
+  if( in[0] == 0x75 && in[1] == 0xF2 ) {
+    int addr = in[2] * 256 + in[3];
+    long identifier = (in[4]&0x7F) * 256 + in[5];
+    char ident[32];
+    iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+
+    wFeedback.setaddr( nodeC, addr );
+    wFeedback.setstate( nodeC, True );
+    wFeedback.setdirection( nodeC, in[4]&0x80?True:False);
+    StrOp.fmtb(ident, "%ld", identifier);
+    wFeedback.setidentifier( nodeC, ident);
+    if( data->iid != NULL )
+      wFeedback.setiid( nodeC, data->iid );
+
+    if( data->listenerFun != NULL && data->listenerObj != NULL )
+      data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "BiDi Sensor %d ident=%ld direction=%s", addr, ident, in[4]&0x80?"fwd":"rev");
+  }
+
+  /* BiDi 0x73 0xF0 SID_H SID_L */
+  if( in[0] == 0x73 && in[1] == 0xF0 ) {
+    int addr = in[2] * 256 + in[3];
+    iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+
+    wFeedback.setaddr( nodeC, addr );
+    wFeedback.setstate( nodeC, False );
+    if( data->iid != NULL )
+      wFeedback.setiid( nodeC, data->iid );
+
+    if( data->listenerFun != NULL && data->listenerObj != NULL )
+      data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "BiDi Sensor %d=%s", addr, "off");
+  }
+
+  /* BiDi 0x73 0xF1 SID_H SID_L  */
+  if( in[0] == 0x73 && in[1] == 0xF1 ) {
+    int addr = in[2] * 256 + in[3];
+    iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+
+    wFeedback.setaddr( nodeC, addr );
+    wFeedback.setstate( nodeC, True );
+    if( data->iid != NULL )
+      wFeedback.setiid( nodeC, data->iid );
+
+    if( data->listenerFun != NULL && data->listenerObj != NULL )
+      data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "BiDi Sensor %d=%s", addr, "on");
+  }
+
+  /* BiDi 0x76 0xE1 Type+AddrH AddrL CV_H CV_L DAT */
+  if( in[0] == 0x76 && in[1] == 0xE1 ) {
+    int addr = (in[2]&0x3F) * 256 + in[3];
+    int cv = in[4] * 256 + in[5];
+    int value = in[6];
+    iONode node = NULL;
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "POM cv %d has a value of %d for address %d", cv, value, addr );
+
+    node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    wProgram.setaddr( node, addr );
+    wProgram.setcv( node, cv );
+    wProgram.setvalue( node, value );
+    wProgram.setcmd( node, wProgram.datarsp );
+    if( data->iid != NULL )
+      wProgram.setiid( node, data->iid );
+
+    if( data->listenerFun != NULL && data->listenerObj != NULL )
+      data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+
 
 }
 
@@ -858,16 +1231,40 @@ static Boolean __checkLiRc(iOXpressNetData data, byte* in) {
 }
 
 
+static void __infoqueue( void* threadinst ) {
+  iOThread        th = (iOThread)threadinst;
+  iOXpressNet     xpressnet = (iOXpressNet)ThreadOp.getParm(th);
+  iOXpressNetData data = Data(xpressnet);
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "info queue started" );
+
+  while( data->run ) {
+    if( data->infoaddr == 0 ) {
+      byte* cmd = (byte*)ThreadOp.getPost( th );
+      if (cmd != NULL) {
+        data->infoaddr = cmd[4]*256 + cmd[5];
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "info request for %d", data->infoaddr );
+        ThreadOp.post( data->transactor, (obj)cmd );
+      }
+    }
+    ThreadOp.sleep(10);
+  }
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "info queue ended" );
+}
+
+
 static void __timedqueue( void* threadinst ) {
   iOThread        th = (iOThread)threadinst;
   iOXpressNet     xpressnet = (iOXpressNet)ThreadOp.getParm(th);
   iOXpressNetData data = Data(xpressnet);
 
   iOList list = ListOp.inst();
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "timed queue started" );
 
   while( data->run ) {
     iQCmd cmd = (iQCmd)ThreadOp.getPost( th );
     if (cmd != NULL) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "new timed command time=%d delay=%d tick=%d", cmd->time, cmd->delay, SystemOp.getTick() );
       ListOp.add(list, (obj)cmd);
     }
 
@@ -877,6 +1274,7 @@ static void __timedqueue( void* threadinst ) {
       if( (cmd->time + cmd->delay) <= SystemOp.getTick() ) {
         byte* outa = allocMem(32);
         MemOp.copy( outa, cmd->out, 32 );
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "timed command" );
         ThreadOp.post( data->transactor, (obj)outa );
         ListOp.removeObj(list, (obj)cmd);
         freeMem(cmd);
@@ -887,6 +1285,7 @@ static void __timedqueue( void* threadinst ) {
     ThreadOp.sleep(10);
   }
 
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "timed queue ended" );
 }
 
 
@@ -899,7 +1298,7 @@ static void __transactor( void* threadinst ) {
   byte in[32];
   byte lastPacket[32];
   int  inlen = 0;
-  int  repeats = 0;
+  int  timeout = 0;
   Boolean rspReceived = True;
   Boolean rspExpected = False;
   Boolean reSend      = False;
@@ -915,6 +1314,8 @@ static void __transactor( void* threadinst ) {
     if (rspReceived) {
       if( reSend ) {
         reSend = False;
+        ThreadOp.sleep(500);
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "resend request" );
         if( data->subWrite( (obj)xpressnet, out, &rspExpected ) ) {
           rspReceived = !rspExpected;
         }
@@ -926,7 +1327,7 @@ static void __transactor( void* threadinst ) {
       else {
         post = ThreadOp.getPost( th );
         if (post != NULL) {
-          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "processing post..." );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "processing post 0x%08X...", post );
           MemOp.copy(out, post, 32);
           MemOp.copy(lastPacket, post, 32);
           freeMem( post);
@@ -945,7 +1346,20 @@ static void __transactor( void* threadinst ) {
     inlen = 0;
 
     if( rspExpected || data->subAvail( (obj)xpressnet ) ) {
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "read incomming packet..." );
+      MemOp.set( in, 0, 32 );
       inlen = data->subRead((obj)xpressnet, in, &rspReceived);
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "incomming packet = %d", inlen );
+    }
+
+    if( inlen == 0 && rspExpected ) {
+      timeout++;
+      if( timeout > 500 ) {
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "timeout on response" );
+        rspReceived = True;
+        rspExpected = False;
+        timeout = 0;
+      }
     }
 
     if ( inlen > 0 ) {
@@ -982,6 +1396,7 @@ static void __transactor( void* threadinst ) {
           wState.setiid( node, data->iid );
         wState.setpower( node, False );
         wState.settrackbus( node, False );
+        wState.setenablecom( node, data->enablecom );
 
         if( data->listenerFun != NULL && data->listenerObj != NULL )
           data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
@@ -1000,6 +1415,7 @@ static void __transactor( void* threadinst ) {
         wState.settrackbus( node, False );
         wState.setsensorbus( node, False );
         wState.setaccessorybus( node, False );
+        wState.setenablecom( node, data->enablecom );
 
         if( data->listenerFun != NULL && data->listenerObj != NULL )
           data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
@@ -1018,6 +1434,7 @@ static void __transactor( void* threadinst ) {
         wState.settrackbus( node, True );
         wState.setsensorbus( node, True );
         wState.setaccessorybus( node, True );
+        wState.setenablecom( node, data->enablecom );
 
         if( data->listenerFun != NULL && data->listenerObj != NULL )
           data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
@@ -1045,15 +1462,13 @@ static void __transactor( void* threadinst ) {
       else if (in[0] == 0x61 && in[1] == 0x81){
         /* Just ignore this as done in lenz.c :!: */
         TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "LZV busy. [%s]", data->iid );
-        //if( !data->ignoreBusy ) {
-          rspReceived = True;
-          reSend = True;
-          ThreadOp.sleep(10);
-        //}
+        rspReceived = True;
+        reSend = True;
+        ThreadOp.sleep(10);
       }
       /* PT busy*/
       else if (in[0] == 0x61 && in[1] == 0x1F){
-        //TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "PT: Busy; Resend.");
+        TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "PT: Busy; Resend.");
         reSend = True;
       }
       /* Command not known*/
@@ -1063,7 +1478,7 @@ static void __transactor( void* threadinst ) {
       }
       /* Shortcut*/
       else if (in[0] == 0x61 && in[1] == 0x12){
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "PT: Shortcut! [%s]", data->iid);
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "PT: short circuit! [%s]", data->iid);
         rspReceived = True;
       }
       /* No data*/
@@ -1096,7 +1511,7 @@ static void __transactor( void* threadinst ) {
         else if( in[3] == 0x03 )
           csname = "Control Plus";
         else if( in[3] == 0x10 )
-          csname = "S88XpressNetLi";
+          csname = "Multimaus or S88XpressNetLi";
 
         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Command Station: %s version: %d.%d [%s]",
             csname, (in[2] & 0xF0)/16 , (in[2] & 0x0F), data->iid);
@@ -1131,6 +1546,16 @@ static void __transactor( void* threadinst ) {
       /* clock */
       else if (in[0] == 0x05){
         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "clock...");
+        rspReceived = True;
+      }
+      else if (in[0] == 0xE4 ){
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "loco info...");
+        __evaluateLoco( xpressnet, in );
+        rspReceived = True;
+      }
+      else if ( data->v2 && in[0] == 0x84 ){
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "loco info v2...");
+        __evaluateLocoV2( xpressnet, in );
         rspReceived = True;
       }
       else if (!rspReceived) {
@@ -1185,7 +1610,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOXpressNetData data = Data(inst);
   data->run = False;
 
@@ -1200,6 +1625,7 @@ static void _halt( obj inst, Boolean poweroff ) {
   }
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
   data->subDisConn(inst);
+  ThreadOp.sleep(500);
   return;
 }
 
@@ -1272,6 +1698,10 @@ static struct OXpressNet* _inst( const iONode ini ,const iOTrace trc ) {
   data->fbmod         = wDigInt.getfbmod( ini );
   data->readfb        = wDigInt.isreadfb( ini );
   data->ignoreBusy    = wDigInt.isignorebusy( ini );
+  data->v2            = wDigInt.getprotver( ini ) == 2;
+  data->fbmodcnt      = 0;
+  data->enablecom     = True;
+
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "XpressNet %d.%d.%d", vmajor, vminor, patch );
@@ -1284,9 +1714,11 @@ static struct OXpressNet* _inst( const iONode ini ,const iOTrace trc ) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bps             = %d", wDigInt.getbps( ini ) );
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "timeout         = %d", wDigInt.gettimeout( ini ) );
   }
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "version         = %d", wDigInt.getprotver( ini ) );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sublib          = %s", wDigInt.getsublib( ini ) );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "switchtime      = %d", data->swtime );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sensor offset   = %d", data->fboffset );
+  if( data->fboffset != 0 )
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "sensor offset   = %d -> This option is deprecated; Do not use.", data->fboffset );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fast clock      = %s", data->fastclock ? "yes":"no" );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid             = %s", data->iid );
@@ -1305,6 +1737,15 @@ static struct OXpressNet* _inst( const iONode ini ,const iOTrace trc ) {
     data->subWrite   = liusbWrite;
     data->subDisConn = liusbDisConnect;
     data->subAvail   = liusbAvail;
+  }
+  else if( StrOp.equals( wDigInt.sublib_lenz_ethernet, wDigInt.getsublib( ini ) ) ) {
+    /* LI-ETH */
+    data->subConnect = liethConnect;
+    data->subInit    = liethInit;
+    data->subRead    = liethRead;
+    data->subWrite   = liethWrite;
+    data->subDisConn = liethDisConnect;
+    data->subAvail   = liethAvail;
   }
   else if( StrOp.equals( wDigInt.sublib_lenz_elite, wDigInt.getsublib( ini ) ) ) {
     /* Elite */
@@ -1362,9 +1803,9 @@ static struct OXpressNet* _inst( const iONode ini ,const iOTrace trc ) {
     data->subAvail   = li101Avail;
   }
 
+  data->run = True;
   if( data->subConnect((obj)__XpressNet) ) {
     /* start transactor */
-    data->run = True;
 
     data->transactor = ThreadOp.inst( "transactor", &__transactor, __XpressNet );
     ThreadOp.start( data->transactor );
@@ -1375,11 +1816,15 @@ static struct OXpressNet* _inst( const iONode ini ,const iOTrace trc ) {
     data->timedQueue = ThreadOp.inst( "timedqueue", &__timedqueue, __XpressNet );
     ThreadOp.start( data->timedQueue );
 
+    data->infoQueue = ThreadOp.inst( "infoqueue", &__infoqueue, __XpressNet );
+    ThreadOp.start( data->infoQueue );
+
 
     data->initializer = ThreadOp.inst( "initializer", &__initializer, __XpressNet );
     ThreadOp.start( data->initializer );
   }
   else {
+    data->run = False;
     TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "unable to initialize the XpressNet connection" );
   }
 

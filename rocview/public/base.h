@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -27,12 +30,20 @@
 class Base
 {
 public:
-  static wxColor getWhite (){ return wxColor( 255, 255, 255 ); }
-  static wxColor getBlack (){ return wxColor(   0,   0,   0 ); }
-  static wxColor getRed   (){ return wxColor( 255, 200, 200 ); }
-  static wxColor getYellow(){ return wxColor( 255, 255,   0 ); }
-  static wxColor getGreen (){ return wxColor( 200, 255, 200 ); }
-  static wxColor getBlue  (){ return wxColor( 200, 200, 255 ); }
+  static wxColor getWhite ();
+  static wxColor getBlack ();
+  static wxColor getRed   ();
+  static wxColor getOrange();
+  static wxColor getTurquoise();
+  static wxColor getYellow();
+  static wxColor getYellow2();
+  static wxColor getGreen ();
+  static wxColor getBlue  ();
+  static wxColor getGrey  ();
+  static wxColor getDarkGrey  ();
+  static wxColor getNoneActiveColor();
+  static wxColor getResColor();
+  static wxColor getRes2Color();
 };
 
 #endif

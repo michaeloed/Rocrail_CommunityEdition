@@ -1,3 +1,9 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef __basenotebook__
 #define __basenotebook__
 

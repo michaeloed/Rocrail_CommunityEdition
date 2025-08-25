@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -28,6 +31,7 @@
 #include "rocrail/wrapper/public/Response.h"
 #include "rocrail/wrapper/public/BinCmd.h"
 #include "rocrail/wrapper/public/SysCmd.h"
+#include "rocrail/wrapper/public/FunCmd.h"
 
 #include "rocs/public/mem.h"
 #include "rocs/public/lib.h"
@@ -157,7 +161,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
     if(  wProgram.getcmd( cmd ) == wProgram.set && wProgram.ispom( cmd )) {
       iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
       char* str = StrOp.fmt( "XPD %d, %d, %d\r", wProgram.getaddr(cmd), wProgram.getcv(cmd), wProgram.getvalue(cmd) );
-      char* byteStr = StrOp.byteToStr( str, StrOp.len(str) );
+      char* byteStr = StrOp.byteToStr( (byte*)str, StrOp.len(str) );
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, str );
       wBinCmd.setoutlen( lccmd, StrOp.len(str) );
       wBinCmd.setinlen( lccmd, 256 );
@@ -171,7 +175,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
       iONode rsp = NULL;
       iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
       char* str = StrOp.fmt( "XPTWD %d, %d\r", wProgram.getcv(cmd), wProgram.getvalue(cmd) );
-      char* byteStr = StrOp.byteToStr( str, StrOp.len(str) );
+      char* byteStr = StrOp.byteToStr( (byte*)str, StrOp.len(str) );
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, str );
       wBinCmd.setoutlen( lccmd, StrOp.len(str) );
       wBinCmd.setinlen( lccmd, 256 );
@@ -191,18 +195,39 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
         if( data->iid != NULL )
           wProgram.setiid( response, data->iid );
         freeMem(cvdata);
+        NodeOp.base.del(rsp);
       }
 
+    }
+    else if(  wProgram.getcmd( cmd ) == wProgram.get && wProgram.ispom( cmd )) {
+      iONode rsp = NULL;
+      iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
+      char* str = StrOp.fmt( "XPD %d, %d\r", wProgram.getaddr(cmd), wProgram.getcv(cmd) );
+      char* byteStr = StrOp.byteToStr( (byte*)str, StrOp.len(str) );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, str );
+      wBinCmd.setoutlen( lccmd, StrOp.len(str) );
+      wBinCmd.setinlen( lccmd, 256 );
+      wBinCmd.setinendbyte( lccmd, ']' );
+      wBinCmd.setout( lccmd, byteStr );
+      StrOp.free( byteStr );
+      StrOp.free( str );
+      rsp = data->sublib->cmd((obj)data->sublib, lccmd);
+      if(rsp != NULL) {
+        /* -> response is useless, must use other way 
+           -> just ignore
+        */
+        NodeOp.base.del(rsp);
+      }
     }
     else if(  wProgram.getcmd( cmd ) == wProgram.get ) {
       iONode rsp = NULL;
       iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
       char* str = StrOp.fmt( "XPTRD %d\r", wProgram.getcv(cmd) );
-      char* byteStr = StrOp.byteToStr( str, StrOp.len(str) );
+      char* byteStr = StrOp.byteToStr( (byte*)str, StrOp.len(str) );
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, str );
       wBinCmd.setoutlen( lccmd, StrOp.len(str) );
       wBinCmd.setinlen( lccmd, 256 );
-      wBinCmd.setinendbyte( lccmd, '\r' );
+      wBinCmd.setinendbyte( lccmd, ']' );
       wBinCmd.setout( lccmd, byteStr );
       StrOp.free( byteStr );
       StrOp.free( str );
@@ -210,14 +235,18 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
       if(rsp != NULL) {
       /* inform listener */
-        char* cvdata = (char*)StrOp.strToByte(NodeOp.getStr(rsp, "data", "" ));
-        response = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
-        wProgram.setcv( response, wProgram.getcv(cmd) );
-        wProgram.setvalue( response, atoi(cvdata ));
-        wProgram.setcmd( response, wProgram.datarsp );
-        if( data->iid != NULL )
-          wProgram.setiid( response, data->iid );
-        freeMem(cvdata);
+        const char* rawdata = NodeOp.getStr(rsp, "data", "" );
+        if( StrOp.len(rawdata ) > 0 ) {
+          char* cvdata = (char*)StrOp.strToByte(rawdata);
+          response = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+          wProgram.setcv( response, wProgram.getcv(cmd) );
+          wProgram.setvalue( response, atoi(cvdata ));
+          wProgram.setcmd( response, wProgram.datarsp );
+          if( data->iid != NULL )
+            wProgram.setiid( response, data->iid );
+          freeMem(cvdata);
+        }
+        NodeOp.base.del(rsp);
       }
 
     }
@@ -234,6 +263,47 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
       response = data->sublib->cmd((obj)data->sublib, iocmd);
     }
   }
+  else if( StrOp.equals( NodeOp.getName( cmd ), wFunCmd.name() ) && wFunCmd.getgroup(cmd)  > 4 ) {
+    /*
+    *** XFunc34 (0x8A) - L‰nge = 1+4 bytes
+       Command:
+      0: 0x8A XFunc34
+      1: LSB der Lokadresse
+      2: MSB der Lokadresse (Adresse im Bereich 1 .. 10239)
+      3: Status der Funktionen F17 (Bit #0) bis F24 (Bit #7)
+      4: Status der Funktionen F25 (Bit #0) bis F28 (Bit #3), die Bits #4 bis
+         #7 sind reserviert
+
+       Antwort: 1 Byte
+      0: Error-Code
+
+       Mˆgliche Error-Codes:
+      OK  - OK, Befehl ausgef¸hrt
+      XBADPRM - Lokadresse auﬂerhalb des Bereichs (1 .. 10239)
+      XNOSLOT - Kein Platz in Refresh-Queue
+    */
+    int   addr = wFunCmd.getaddr( cmd );
+    iONode fxcmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
+    char* byteStr = NULL;
+    byte outBytes[6];
+    outBytes[0] = (byte)'x';
+    outBytes[1] = 0x8A;
+    outBytes[2] = addr % 256;
+    outBytes[3] = addr / 256;
+    outBytes[4] = (wFunCmd.isf17(cmd)?0x01:0x00) + (wFunCmd.isf18(cmd)?0x02:0x00) + (wFunCmd.isf19(cmd)?0x04:0x00) + (wFunCmd.isf20(cmd)?0x08:0x00) +
+                  (wFunCmd.isf21(cmd)?0x10:0x00) + (wFunCmd.isf22(cmd)?0x20:0x00) + (wFunCmd.isf23(cmd)?0x40:0x00) + (wFunCmd.isf24(cmd)?0x80:0x00);
+    outBytes[5] = (wFunCmd.isf25(cmd)?0x01:0x00) + (wFunCmd.isf26(cmd)?0x02:0x00) + (wFunCmd.isf27(cmd)?0x04:0x00) + (wFunCmd.isf28(cmd)?0x08:0x00);
+
+    byteStr = StrOp.byteToStr( outBytes, 6 );
+    wBinCmd.setoutlen( fxcmd, 6 );
+    wBinCmd.setinlen( fxcmd, 1 );
+    wBinCmd.setout( fxcmd, byteStr );
+    StrOp.free( byteStr );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "XFunc34" );
+    response = data->sublib->cmd((obj)data->sublib, fxcmd);
+
+  }
+
   else {
     response = data->sublib->cmd((obj)data->sublib, cmd);
   }
@@ -243,10 +313,10 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst ,Boolean poweroff ) {
+static void _halt( obj inst ,Boolean poweroff, Boolean shutdown ) {
   iOTamsMCData data = Data(inst);
   data->run = False;
-  data->sublib->halt((obj)data->sublib, poweroff);
+  data->sublib->halt((obj)data->sublib, poweroff, shutdown);
 }
 
 

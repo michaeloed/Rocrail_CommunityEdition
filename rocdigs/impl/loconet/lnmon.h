@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -20,7 +23,7 @@
 #ifndef LNMON_H_
 #define LNMON_H_
 
-void traceLocoNet(byte* msg);
+void traceLocoNet(byte* msg, Boolean GBM16xn);
 
 
 #endif /*LNMON_H_*/

@@ -1,8 +1,6 @@
 /*
- * openthrottle.c
- *
- *  Created on: 14.10.2008
- *      Author: jmf
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
  */
 #include "openthrottle.h"
 #include "rocdigs/impl/lenz_impl.h"

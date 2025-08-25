@@ -1,7 +1,10 @@
 <!--
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+  
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -155,7 +158,7 @@
 
 
   <object name="Doc" use="node" remark="XML Document parser and builder.">
-    <typedef def="enum {MaxNodeNameLen=1024,MaxAttrNameLen=1024,MaxAttrValLen=1024} parserConst" remark="File type."/>
+    <typedef def="enum {MaxNodeNameLen=1024,MaxAttrNameLen=1024,MaxAttrValLen=2048} parserConst" remark="File type."/>
     <def name="startToken" vt="string" val="&lt;%s"/>
     <def name="endToken" vt="string" val="&lt;/%s&gt;"/>
     <def name="endInline" vt="string" val="/&gt;"/>
@@ -609,6 +612,7 @@
       <param name="line" vt="int" remark="Sourceline."/>
     </fun>
     <fun name="getAllocCount" implname="_mem_getAllocCount" vt="long" remark="Returns number of allocated memory objects."/>
+    <fun name="dumpStrings" vt="void" remark="Print out all allocated strings."/>
     <fun name="freeObj" implname="_mem_freeObj" vt="void" remark="Free up obj memory.">
       <param name="p" vt="void**" remark="Object to free up."/>
     </fun>
@@ -949,7 +953,7 @@
     <typedef def="enum {onestopbit=1,twostopbits=2} serial_stopbits"/>
     <typedef def="enum {eight=8,seven=7} serial_databits"/>
     <typedef def="enum {undefined=0,mm=1,dcc=2,mma=3} serial_mode"/>
-    <typedef def="serial_bps"/>
+    <typedef def="int serial_bps"/>
     <fun name="inst" vt="this" remark="Object creator.">
       <param name="device" vt="const char*" remark="Device name like com1 or ttyS0."/>
     </fun>
@@ -1050,6 +1054,15 @@
     </fun>
     <fun name="getReadCnt" vt="int" remark="Get actual readed byte count.">
       <param name="inst" vt="this" remark="Serial instance."/>
+    </fun>
+    <fun name="fmt" vt="Boolean" remark="Formats a string.">
+      <param name="inst" vt="this" remark="Serial instance."/>
+      <param name="format" vt="const char*" remark="Format rules."/>
+      <param name="" vt="..." remark="Multiple parameters."/>
+    </fun>
+    <fun name="readln" vt="char*" remark="Read till a linefeed is detected.">
+      <param name="inst" vt="this" remark="Serial instance."/>
+      <param name="buffer" vt="char*" remark="Read buffer."/>
     </fun>
     <struct name="_line">
       <var name="bps" vt="int"/>
@@ -1173,6 +1186,10 @@
       <param name="inst" vt="this" remark="Socket instance."/>
       <param name="keepalive" vt="Boolean" remark=""/>
     </fun>
+    <fun name="setBroadcast" implname="rocs_socket_setBroadcast" vt="Boolean" remark="">
+      <param name="inst" vt="this" remark="Socket instance."/>
+      <param name="broadcast" vt="Boolean" remark=""/>
+    </fun>
     <fun name="setNodelay" implname="rocs_socket_setNodelay" vt="Boolean" remark="">
       <param name="inst" vt="this" remark="Socket instance."/>
       <param name="flag" vt="Boolean" remark=""/>
@@ -1203,6 +1220,9 @@
     </fun>
     <fun name="gethostname" vt="const char*" static="true" remark="Get local hostname."/>
     <fun name="gethostaddr" vt="const char*" static="true" remark="Get local host dotted address."/>
+    <fun name="getsockname" vt="const char*">
+      <param name="inst" vt="this" remark="Socket instance."/>
+    </fun>
     <fun name="getPeeked" vt="long" remark="Get number of peeked bytes.">
       <param name="inst" vt="this" remark="Socket instance."/>
     </fun>
@@ -1418,9 +1438,9 @@
       <param name="charB" vt="char" remark="Replacement"/>
     </fun>
     <fun name="replaceAllSub" vt="char*" static="true" remark="Replace all substrings with the replacement.">
-      <param name="inputString" vt="char*" remark="Input string"/>
-      <param name="substring" vt="char*" remark="Substring to replace"/>
-      <param name="replacement" vt="char*" remark="Replacement"/>
+      <param name="inputString" vt="const char*" remark="Input string"/>
+      <param name="substring" vt="const char*" remark="Substring to replace"/>
+      <param name="replacement" vt="const char*" remark="Replacement"/>
     </fun>
     <fun name="replaceAllSubstitutions" vt="char*" static="true" remark="Replace all environment variables with there current values.">
       <param name="str" vt="const char*" remark="Input string."/>
@@ -1466,6 +1486,12 @@
     <fun name="nextToken" vt="const char*" remark="A token.">
       <param name="inst" vt="this" remark="String instance."/>
     </fun>
+    <fun name="replaceAll" vt="char*">
+      <param name="str" vt="const char*" remark="Initial string value."/>
+      <param name="sep" vt="char" remark="String separator."/>
+      <param name="oldTok" vt="const char*" remark="String token to be replaced."/>
+      <param name="newTok" vt="const char*" remark="Replacement for the old token."/>
+    </fun>
     <data>
       <var name="str" vt="char*" remark="String value."/>
       <var name="sep" vt="char" remark="Separator."/>
@@ -1491,6 +1517,9 @@
     </fun>
     <fun name="getMillis" implname="rocs_system_getMillis" vt="int" static="true" remark=""/>
     <fun name="uBusyWait" implname="rocs_system_uBusyWait" vt="Boolean" static="true" remark="">
+      <param name="us" vt="int" remark="Wait time in us"/>
+    </fun>
+    <fun name="usWait" implname="rocs_system_usWait" vt="Boolean" static="true" remark="">
       <param name="us" vt="int" remark="Wait time in us"/>
     </fun>
     <fun name="getFileSeparator" vt="char" static="true" remark=""/>
@@ -1527,6 +1556,9 @@
     <fun name="latin2utf" vt="char*" remark="Translates Latin 15 into UTF-8.">
       <param name="latinstr" vt="const char*" remark="Latin 15 encoded string."/>
     </fun>
+    <fun name="latin2cp850" vt="char*" remark="Translates Latin 15 into CP850.">
+      <param name="latinstr" vt="const char*"/>
+    </fun>
     <fun name="getTick" vt="unsigned long" remark="System tick in 10ms."/>
     <fun name="cp1252toISO885915" vt="char*" remark="Translates Windows CP1252 into Latin 15.">
       <param name="str" vt="const char*" remark="CP1252 encoded string."/>
@@ -1559,13 +1591,18 @@
     <fun name="isExpired" vt="Boolean">
       <param name="s" vt="const char*"/>
       <param name="expdate" vt="char**"/>
-    </fun>
+      <param name="expdays" vt="long*"/>
+      <param name="vmajor" vt="int"/>
+      <param name="vminor" vt="int"/>
+      </fun>
     <fun name="decode" vt="char*">
       <param name="b" vt="const byte*"/>
       <param name="len" vt="int"/>
       <param name="k" vt="const char*"/>
     </fun>
     <fun name="getEyecatcher" vt="const char*">
+    </fun>
+    <fun name="getUnlimEyecatcher" vt="const char*">
     </fun>
     <data include="thread">
       <var name="WSName[64]" vt="char" remark=""/>
@@ -1628,6 +1665,9 @@
     <fun name="getPost" vt="obj" remark="Get post from the queue. (NULL if nothing is in queue.)">
       <param name="inst" vt="this" remark="Thread instance."/>
     </fun>
+    <fun name="hasPost" vt="Boolean" remark="Check if there is post the queue.">
+      <param name="inst" vt="this" remark="Thread instance."/>
+    </fun>
     <fun name="findById" vt="this" remark="Find a thread by id.">
       <param name="id" vt="unsigned long" remark="Thread id."/>
     </fun>
@@ -1687,7 +1727,7 @@
                         TRCLEVEL_BYTE     =0x0010,TRCLEVEL_METHOD=0x0020,TRCLEVEL_MEMORY =0x0040,TRCLEVEL_PARAM  =0x0080,
                         TRCLEVEL_PROTOCOL =0x0100,TRCLEVEL_ERROR =0x0200,TRCLEVEL_PARSE  =0x0400,TRCLEVEL_WRAPPER=0x0800,
                         TRCLEVEL_USER1    =0x1000,TRCLEVEL_USER2 =0x2000,TRCLEVEL_MONITOR=0x4000,TRCLEVEL_XMLH   =0x8000,
-                        TRCLEVEL_USER     =0xF000,TRCLEVEL_CALC  =0x10000,TRCLEVEL_ALL   =0xFFFFFF} tracelevel" remark="Trace levels."/>
+                        TRCLEVEL_USER     =0xF000,TRCLEVEL_CALC  =0x10000,TRCLEVEL_STATUS=0x20000,TRCLEVEL_ALL   =0xFFFFFF} tracelevel" remark="Trace levels."/>
     <def name="TRC_DUMPSIZE" vt="int" val="128"/>
     <def name="TRC_FILESIZE" vt="int" val="100"/>
     <def name="TRC_NRFILES" vt="int" val="10"/>
@@ -1839,7 +1879,7 @@
       <param name="xml" vt="const char*" remark="Messages XML as C-String."/>
       <param name="lang" vt="const char*" remark="Language.(de,en...)"/>
     </fun>
-    <fun name="addTranslation" vt="const char*" remark="Add translation. Existing IDs are overwritten.">
+    <fun name="addTranslation" vt="void" remark="Add translation. Existing IDs are overwritten.">
       <param name="inst" vt="this" remark="res instance."/>
       <param name="xml" vt="const char*" remark="Xml string."/>
     </fun>
@@ -2010,15 +2050,70 @@
 
 
   <object name="Mime64" remark="Mime64 converter">
-    <fun name="encode" vt="Boolean" remark="encode the input file into mime64">
+    <fun name="encodeFile" vt="Boolean" remark="encode the input file into mime64">
       <param name="infile" vt="const char*"/>
       <param name="outfile" vt="const char*"/>
     </fun>
-    <fun name="decode" vt="Boolean" remark="decode the input file into it's ">
+    <fun name="decodeFile" vt="Boolean" remark="decode the input file into it's ">
       <param name="infile" vt="const char*"/>
       <param name="outfile" vt="const char*"/>
+    </fun>
+    <fun name="sha1" vt="char*" remark="generate a sha1 key">
+      <param name="str" vt="const char*"/>
+    </fun>
+    <fun name="encode" vt="int" remark="encode the input into mime64">
+      <param name="dst" vt="unsigned char*"/>
+      <param name="dlen" vt="int*"/>
+      <param name="src" vt="const unsigned char*"/>
+      <param name="slen" vt="int"/>
+    </fun>
+    <fun name="decode" vt="int" remark="decode the input from mime64 to binary">
+      <param name="dst" vt="unsigned char*"/>
+      <param name="dlen" vt="int*"/>
+      <param name="src" vt="const unsigned char*"/>
+      <param name="slen" vt="int"/>
+    </fun>
+    </object>
+
+  <object name="USB" remark="LibUSB interface">
+    <fun name="inst" vt="this" remark="Object creator."/>
+    <fun name="open" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="vendor" vt="int"/>
+      <param name="product" vt="int"/>
+      <param name="configNr" vt="int"/>
+      <param name="interfaceNr" vt="int"/>
+    </fun>
+    <fun name="close" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="read" vt="int">
+      <param name="inst" vt="this"/>
+      <param name="buf" vt="unsigned char*"/>
+      <param name="len" vt="int"/>
+      <param name="timeout" vt="int"/>
+      </fun>
+    <fun name="write" vt="int">
+      <param name="inst" vt="this"/>
+      <param name="buf" vt="unsigned char*"/>
+      <param name="len" vt="int"/>
+      <param name="timeout" vt="int"/>
+      </fun>
+    <data>
+      <var name="husb" vt="void*"/>
+      <var name="interfaceNr" vt="int"/>
+      <var name="input_ep" vt="int"/>
+      <var name="output_ep" vt="int"/>
+      </data>
+  </object>
+  
+  <object name="JSon" use="node" remark="JSon converter">
+    <fun name="toXML" vt="iONode" remark="Convert a JSon string to XML.">
+      <param name="json" vt="const char*"/>
+    </fun>
+    <fun name="toJSon" vt="char*" remark="Convert XML to a JSon string.">
+      <param name="xml" vt="iONode"/>
     </fun>
   </object>
-
-
+  
 </Project>

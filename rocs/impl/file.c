@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -30,7 +33,11 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef _MSC_VER
+#include <sys/utime.h>
+#else
 #include <utime.h>
+#endif
 
 #if defined _AIX
 #define _POSIX_SOURCE
@@ -141,10 +148,10 @@ static Boolean __openFile( iOFileData data ) {
   if( data->path == NULL )
     return False;
   else {
-    char* a = "wba";
+    char* a = "ab";
     switch( data->openflag ) {
       case OPEN_WRITE:
-        a = "wba";
+        a = "wb";
         break;
       case OPEN_READWRITE:
         a = "rb+";
@@ -234,7 +241,11 @@ static Boolean _rmDir( const char* dirname ) {
 
 static Boolean _cd( const char* dirname ) {
   _convertPath2OSType( dirname );
+#if defined _WIN32
+  return _chdir( dirname ) == 0 ? True:False;
+#else
   return chdir( dirname ) == 0 ? True:False;
+#endif
 }
 
 static Boolean _cp( const char* src, const char* dst ) {
@@ -599,9 +610,8 @@ static Boolean _readFile( iOFile inst, char* buffer, long size ) {
   else {
     data->readed = fread( buffer, 1, size, data->fh );
     data->rc = errno;
-    if( data->readed != size && data->rc!= 0 ) {
-      TraceOp.terrno( name, TRCLEVEL_EXCEPTION, __LINE__, 501, data->rc, "Error read file [%s]",
-                     data->path );
+    if( data->readed != size ) {
+      TraceOp.terrno( name, TRCLEVEL_EXCEPTION, __LINE__, 501, data->rc, "Error read file [%s]", data->path );
     }
     return data->readed == size ? True:False;
   }
@@ -611,6 +621,7 @@ static Boolean _readStr( iOFile inst, char* buffer ) {
   iOFileData data = Data(inst);
   data->readed = 0;
   int idx = 0;
+  Boolean newLine = False;
   int rc = 0;
   char c = '\0';
 
@@ -625,8 +636,10 @@ static Boolean _readStr( iOFile inst, char* buffer ) {
     if( idx > 0 && rc != 1 )
       break;
 
-    if(c == '\n')
+    if(c == '\n') {
+      newLine = True;
       break;
+    }
 
     buffer[idx] = c;
     idx++;
@@ -635,7 +648,7 @@ static Boolean _readStr( iOFile inst, char* buffer ) {
 
   data->readed = idx;
   data->rc = errno;
-  return idx > 0 ? True:False;
+  return (idx > 0 || newLine) ? True:False;
 
 }
 

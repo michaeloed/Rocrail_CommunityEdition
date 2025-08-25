@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -27,6 +30,7 @@
 #include "sym.h"
 
 #include "rocview/public/guiapp.h"
+#include "rocview/public/base.h"
 
 #include "rocrail/wrapper/public/Item.h"
 #include "rocrail/wrapper/public/Block.h"
@@ -43,6 +47,8 @@
 #include "rocrail/wrapper/public/SelTab.h"
 #include "rocrail/wrapper/public/SelTabPos.h"
 #include "rocrail/wrapper/public/DataReq.h"
+#include "rocrail/wrapper/public/Program.h"
+#include "rocrail/wrapper/public/Color.h"
 
 #include "rocs/public/system.h"
 
@@ -55,19 +61,38 @@
 static double PI25DT = 3.141592653589793238462643;
 
 
-SymbolRenderer::SymbolRenderer( iONode props, wxWindow* parent, iOMap symmap, int itemidps ) {
+SymbolRenderer::SymbolRenderer( iONode props, wxWindow* parent, iOMap symmap, int itemidps, int textps, double scale ) {
   m_Props = props;
   m_Parent = parent;
   m_SymMap = symmap;
   m_bRotateable = true;
   m_bShowID = false;
+  m_bShowCounters = false;
   m_iOccupied = 0;
   m_Bitmap = NULL;
-  m_Scale = 1.0;
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "symbol map size = %d", symmap == NULL ? 0:MapOp.size(symmap) );
-  initSym();
-  m_Label = StrOp.dup("...");
+  m_Scale = scale;
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "symbol map size = %d", symmap == NULL ? 0:MapOp.size(symmap) );
+  if( m_Props != NULL )
+    initSym();
+  m_Label = StrOp.dup("-");
   m_iItemIDps = itemidps;
+  m_iTextps = textps;
+  m_DC = NULL;
+  m_LocoImage = "";
+  m_bLocoPlacing = true;
+  m_bLocoManual = false;
+}
+
+
+bool SymbolRenderer::hasSVG(const char* svgname) {
+  if( StrOp.equals( seltabtype::seltab, svgname) || StrOp.equals( turntabletype::turntable, svgname) ) {
+    // internal symbols
+    return true;
+  }
+  svgSymbol* SvgSym = (svgSymbol*)MapOp.get( m_SymMap, svgname );
+  if( SvgSym != NULL )
+    return true;
+  return false;
 }
 
 
@@ -92,10 +117,22 @@ void SymbolRenderer::initSym() {
   m_SvgSym15 = NULL;
   m_SvgSym16 = NULL;
 
+
+  // Aspect array
+  for( int i = 0; i < 32; i++) {
+    m_SvgSym[i] = NULL;
+    m_SvgSymOcc[i] = NULL;
+    m_SvgSymRoute[i] = NULL;
+  }
+
   const char* nodeName = NodeOp.getName( m_Props );
 
   TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "nodename=%s", nodeName );
 
+  if( m_SymMap == NULL ) {
+    TraceOp.trc( "render", TRCLEVEL_EXCEPTION, __LINE__, 9999, "Symbol map is not initialized." );
+    return;
+  }
   // TRACKS
   if( StrOp.equals( wTrack.name(), nodeName ) ) {
     m_iSymType = symtype::i_track;
@@ -111,6 +148,36 @@ void SymbolRenderer::initSym() {
           m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::curve_occ );
           m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::curve_route );
           m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::curve_occroute );
+        }
+      }
+    }
+    else if( StrOp.equals( wTrack.curve90, wTrack.gettype( m_Props ) ) ) {
+      m_iSymSubType = tracktype::i_curve;
+      if( m_SymMap != NULL ) {
+        if( wItem.isroad( m_Props ) ) {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::road_curve_90 );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::road_curve_occ_90 );
+        }
+        else {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::curve );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::curve_occ );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::curve_route );
+          m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::curve_occroute );
+        }
+      }
+    }
+    else if( StrOp.equals( wTrack.dcurve, wTrack.gettype( m_Props ) ) ) {
+      m_iSymSubType = tracktype::i_curve;
+      if( m_SymMap != NULL ) {
+        if( wItem.isroad( m_Props ) ) {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::road_dcurve );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::road_dcurve_occ );
+        }
+        else {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dcurve );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dcurve_occ );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dcurve_route );
+          m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dcurve_occroute );
         }
       }
     }
@@ -130,6 +197,22 @@ void SymbolRenderer::initSym() {
         m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::connector_route );
       }
     }
+    else if( StrOp.equals( wTrack.concurveright, wTrack.gettype( m_Props ) ) ) {
+      m_iSymSubType = tracktype::i_connector;
+      if( m_SymMap != NULL ) {
+        m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::connector_curve_right );
+        m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::connector_curve_right_occ );
+        m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::connector_curve_right_route );
+      }
+    }
+    else if( StrOp.equals( wTrack.concurveleft, wTrack.gettype( m_Props ) ) ) {
+      m_iSymSubType = tracktype::i_connector;
+      if( m_SymMap != NULL ) {
+        m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::connector_curve_left );
+        m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::connector_curve_left_occ );
+        m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::connector_curve_left_route );
+      }
+    }
     else if( StrOp.equals( wTrack.dir, wTrack.gettype( m_Props ) ) ) {
       m_iSymSubType = tracktype::i_dir;
       if( m_SymMap != NULL ) {
@@ -147,9 +230,14 @@ void SymbolRenderer::initSym() {
     else if( StrOp.equals( wTrack.dirall, wTrack.gettype( m_Props ) ) ) {
       m_iSymSubType = tracktype::i_dirall;
       if( m_SymMap != NULL ) {
-        m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dirall );
-        m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dirall_occ );
-        m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dirall_route );
+        if( wItem.isroad( m_Props ) ) {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::road_dirall );
+        }
+        else {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dirall );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dirall_occ );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, tracktype::dirall_route );
+        }
       }
     }
     else if( StrOp.equals( wTrack.tracknr, wTrack.gettype( m_Props ) ) ) {
@@ -160,6 +248,16 @@ void SymbolRenderer::initSym() {
       StrOp.fmtb( key, tracktype::tracknr_occ, wTrack.gettknr( m_Props ) );
       m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, key );
       StrOp.fmtb( key, tracktype::tracknr_route, wTrack.gettknr( m_Props ) );
+      m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, key );
+    }
+    else if( StrOp.equals( wTrack.curvenr, wTrack.gettype( m_Props ) ) ) {
+      char key[256];
+      m_iSymSubType = tracktype::i_curvenr;
+      StrOp.fmtb( key, tracktype::curvenr, wTrack.gettknr( m_Props ) );
+      m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, key );
+      StrOp.fmtb( key, tracktype::curvenr_occ, wTrack.gettknr( m_Props ) );
+      m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, key );
+      StrOp.fmtb( key, tracktype::curvenr_route, wTrack.gettknr( m_Props ) );
       m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, key );
     }
     else {
@@ -196,19 +294,45 @@ void SymbolRenderer::initSym() {
       m_iSymSubType = switchtype::i_crossing;
       if( m_SymMap != NULL ) {
         if( wItem.isroad( m_Props ) ) {
-          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing );
-          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing_t );
-          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing_t );
+          if( wSwitch.isrectcrossing(m_Props) ) {
+            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing90 );
+            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing90_t );
+            m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing90_t );
+          }
+          else {
+            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing );
+            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing_t );
+            m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_crossing_t );
+          }
         }
         else {
-          if( wSwitch.isrectcrossing(m_Props) && wSwitch.getaddr1( m_Props ) == 0 && wSwitch.getport1( m_Props ) == 0 ) {
+          if( wSwitch.isrectcrossing(m_Props) ) {
             m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::crossing );
+            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::crossing_t );
             m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::crossing_occ );
+            m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::crossing_t_occ );
+            m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::crossing_route );
+            m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::crossing_t_route );
+            m_SvgSym8 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::crossing_route );
           }
           else if( wSwitch.getaddr1( m_Props ) == 0 && wSwitch.getport1( m_Props ) == 0 ) {
-            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft0m : switchtype::crossingright0m );
-            m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft0m_occ : switchtype::crossingright0m_occ );
+            if( raster ) {
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_r_0m : switchtype::crossingright_r_0m );
+              m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_r_0m_occ : switchtype::crossingright_r_0m_occ );
+            }
+            else {
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft0m : switchtype::crossingright0m );
+              m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft0m_occ : switchtype::crossingright0m_occ );
+              m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft0m_route : switchtype::crossingright0m_route );
+            }
             m_iSymSubType = wSwitch.isdir(m_Props) ? switchtype::i_crossingleft : switchtype::i_crossingright;
+          }
+          else if( raster ) {
+            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_r:switchtype::crossingright_r );
+            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_r_t:switchtype::crossingright_r_t );
+            m_iSymSubType = wSwitch.isdir(m_Props) ? switchtype::i_crossingleft : switchtype::i_crossingright;
+            m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_r_occ:switchtype::crossingright_r_occ );
+            m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_r_t_occ:switchtype::crossingright_r_t_occ );
           }
           else {
             m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft : switchtype::crossingright );
@@ -216,6 +340,16 @@ void SymbolRenderer::initSym() {
             m_iSymSubType = wSwitch.isdir(m_Props) ? switchtype::i_crossingleft : switchtype::i_crossingright;
             m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_occ : switchtype::crossingright_occ );
             m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_t_occ : switchtype::crossingright_t_occ );
+            m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_route : switchtype::crossingright_route );
+            m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_t_route : switchtype::crossingright_t_route );
+            m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_l_occ : switchtype::crossingright_l_occ );
+            m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_t_l_occ : switchtype::crossingright_t_l_occ );
+            m_SvgSym[16] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_b_route : switchtype::crossingright_b_route );
+            m_SvgSym[17] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_t_b_route : switchtype::crossingright_t_b_route );
+            m_SvgSym12 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_l_route : switchtype::crossingright_l_route );
+            m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_t_l_route : switchtype::crossingright_t_l_route );
+            m_SvgSym[18] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_lb_route : switchtype::crossingright_lb_route );
+            m_SvgSym[19] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::crossingleft_t_lb_route : switchtype::crossingright_t_lb_route );
           }
         }
       }
@@ -229,13 +363,20 @@ void SymbolRenderer::initSym() {
         else {
           m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::ccrossing );
           m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::ccrossing_occ );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::ccrossing_route );
         }
       }
     }
     else if( StrOp.equals( wSwitch.dcrossing, wSwitch.gettype( m_Props ) ) ) {
       m_iSymSubType = wSwitch.isdir(m_Props) ? switchtype::i_dcrossingleft:switchtype::i_dcrossingright;
       if( m_SymMap != NULL ) {
-        if( raster ) {
+        if( wItem.isroad( m_Props ) ) {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_dcrossingright );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_dcrossingright_t );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_dcrossingright_tl );
+          m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_dcrossingright_tr );
+        }
+        else if( raster ) {
           m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_r:switchtype::dcrossingright_r );
           m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_r_t:switchtype::dcrossingright_r_t );
           m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_r_tl:switchtype::dcrossingright_r_tl );
@@ -254,6 +395,27 @@ void SymbolRenderer::initSym() {
           m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_t_occ:switchtype::dcrossingright_t_occ );
           m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tl_occ:switchtype::dcrossingright_tl_occ );
           m_SvgSym8 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tr_occ:switchtype::dcrossingright_tr_occ );
+          m_SvgSym9 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_route:switchtype::dcrossingright_route );
+          m_SvgSym10 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_t_route:switchtype::dcrossingright_t_route );
+          m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tl_route:switchtype::dcrossingright_tl_route );
+          m_SvgSym12 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tr_route:switchtype::dcrossingright_tr_route );
+
+          m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_l_occ:switchtype::dcrossingright_l_occ );
+          m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_t_l_occ:switchtype::dcrossingright_t_l_occ );
+          m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tl_l_occ:switchtype::dcrossingright_tl_l_occ );
+          m_SvgSym16 = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tr_l_occ:switchtype::dcrossingright_tl_l_occ );
+          m_SvgSym[17] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_b_route:switchtype::dcrossingright_b_route );
+          m_SvgSym[18] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_l_route:switchtype::dcrossingright_l_route );
+          m_SvgSym[19] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_lb_route:switchtype::dcrossingright_lb_route );
+          m_SvgSym[20] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_t_b_route:switchtype::dcrossingright_t_b_route );
+          m_SvgSym[21] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_t_l_route:switchtype::dcrossingright_t_l_route );
+          m_SvgSym[22] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_t_lb_route:switchtype::dcrossingright_t_lb_route );
+          m_SvgSym[23] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tl_b_route:switchtype::dcrossingright_tl_b_route );
+          m_SvgSym[24] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tl_l_route:switchtype::dcrossingright_tl_l_route );
+          m_SvgSym[25] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tl_lb_route:switchtype::dcrossingright_tl_lb_route );
+          m_SvgSym[26] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tr_b_route:switchtype::dcrossingright_tr_b_route );
+          m_SvgSym[27] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tr_l_route:switchtype::dcrossingright_tr_l_route );
+          m_SvgSym[28] = (svgSymbol*)MapOp.get( m_SymMap, wSwitch.isdir(m_Props) ? switchtype::dcrossingleft_tr_lb_route:switchtype::dcrossingright_tr_lb_route );
         }
       }
     }
@@ -273,12 +435,63 @@ void SymbolRenderer::initSym() {
     else if( StrOp.equals( wSwitch.threeway, wSwitch.gettype( m_Props ) ) ) {
       m_iSymSubType = switchtype::i_threeway;
       if( m_SymMap != NULL ) {
-        m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway );
-        m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tl );
-        m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tr );
-        m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_occ );
-        m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tl_occ );
-        m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tr_occ );
+        if( wItem.isroad( m_Props ) ) {
+          if( wSwitch.isrectcrossing(m_Props) ) {
+            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_rect_threeway );
+            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_rect_threeway_tl );
+            m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_rect_threeway_tr );
+          }
+          else {
+            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_threeway );
+            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_threeway_tl );
+            m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_threeway_tr );
+          }
+        }
+        else if( raster ) {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_r );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_r_tl );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_r_tr );
+          m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_r_occ );
+          m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_r_tl_occ );
+          m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_r_tr_occ );
+        }
+        else {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tl );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tr );
+          m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_occ );
+          m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tl_occ );
+          m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tr_occ );
+          m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_route );
+          m_SvgSym8 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tl_route );
+          m_SvgSym9 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::threeway_tr_route );
+        }
+      }
+    }
+    else if( StrOp.equals( wSwitch.twoway, wSwitch.gettype( m_Props ) ) ) {
+      m_iSymSubType = switchtype::i_twoway;
+      if( m_SymMap != NULL ) {
+        if( wItem.isroad( m_Props ) ) {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_twoway_tr );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_twoway_tl );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_twoway_tl );
+        }
+        else if( raster ) {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_r_tr );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_r_tl );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_r_tl );
+          m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_r_tr_occ );
+          m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_r_tl_occ );
+        }
+        else {
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_tr );
+          m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_tl );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_tl );
+          m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_tr_occ );
+          m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_tl_occ );
+          m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_tr_route );
+          m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::twoway_tl_route );
+        }
       }
     }
     else if( StrOp.equals( wSwitch.accessory, wSwitch.gettype( m_Props ) ) ) {
@@ -293,6 +506,10 @@ void SymbolRenderer::initSym() {
         m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, key );
         StrOp.fmtb( key, switchtype::accessory_off_occ, wSwitch.getaccnr( m_Props ) );
         m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, key );
+        StrOp.fmtb( key, switchtype::accessory_on_route, wSwitch.getaccnr( m_Props ) );
+        m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, key );
+        StrOp.fmtb( key, switchtype::accessory_off_route, wSwitch.getaccnr( m_Props ) );
+        m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, key );
       }
     }
     else if( StrOp.equals( wSwitch.left, wSwitch.gettype( m_Props ) ) ) {
@@ -305,6 +522,16 @@ void SymbolRenderer::initSym() {
           m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_t );
           m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_occ );
           m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_t_occ );
+          m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_route );
+          m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_t_route );
+          m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_b_route );
+          m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_t_b_route );
+          m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_l_occ );
+          m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_t_l_occ );
+          m_SvgSym16 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_l_route );
+          m_SvgSym[17] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_t_l_route );
+          m_SvgSym[26] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_lb_route );
+          m_SvgSym[27] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_r_t_lb_route );
         }
         else {
           if( wItem.isroad( m_Props ) ) {
@@ -313,11 +540,38 @@ void SymbolRenderer::initSym() {
             m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_turnoutleft_t );
           }
           else {
-            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft );
-            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t );
-            m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t );
-            m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_occ );
-            m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t_occ );
+            if( wSwitch.getaccnr( m_Props ) > 1 ) {
+              char key[256];
+              StrOp.fmtb( key, switchtype::accessory_on, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_off, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_on_occ, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_off_occ, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_on_route, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_off_route, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, key );
+            }
+            else {
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft );
+              m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t );
+              m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t );
+              m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_occ );
+              m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t_occ );
+              m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_route );
+              m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t_route );
+              m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_b_route );
+              m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t_b_route );
+              m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_l_occ );
+              m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t_l_occ );
+              m_SvgSym16 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_l_route );
+              m_SvgSym[17] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t_l_route );
+              m_SvgSym[26] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_lb_route );
+              m_SvgSym[27] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutleft_t_lb_route );
+            }
           }
         }
       }
@@ -332,6 +586,16 @@ void SymbolRenderer::initSym() {
           m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_t );
           m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_occ );
           m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_t_occ );
+          m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_route );
+          m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_t_route );
+          m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_b_route );
+          m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_t_b_route );
+          m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_l_occ );
+          m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_t_l_occ );
+          m_SvgSym16 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_l_route );
+          m_SvgSym[17] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_t_l_route );
+          m_SvgSym[26] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_lb_route );
+          m_SvgSym[27] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_r_t_lb_route );
         }
         else {
           if( wItem.isroad( m_Props ) ) {
@@ -340,11 +604,38 @@ void SymbolRenderer::initSym() {
             m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::road_turnoutright_t );
           }
           else {
-            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright );
-            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t );
-            m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t );
-            m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_occ );
-            m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t_occ );
+            if( wSwitch.getaccnr( m_Props ) > 1 ) {
+              char key[256];
+              StrOp.fmtb( key, switchtype::accessory_on, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_off, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_on_occ, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_off_occ, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_on_route, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, key );
+              StrOp.fmtb( key, switchtype::accessory_off_route, wSwitch.getaccnr( m_Props ) );
+              m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, key );
+            }
+            else {
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright );
+              m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t );
+              m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t );
+              m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_occ );
+              m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t_occ );
+              m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_route );
+              m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t_route );
+              m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_b_route );
+              m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t_b_route );
+              m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_l_occ );
+              m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t_l_occ );
+              m_SvgSym16 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_l_route );
+              m_SvgSym[17] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t_l_route );
+              m_SvgSym[26] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_lb_route );
+              m_SvgSym[27] = (svgSymbol*)MapOp.get( m_SymMap, switchtype::turnoutright_t_lb_route );
+            }
           }
         }
       }
@@ -356,7 +647,26 @@ void SymbolRenderer::initSym() {
     int aspects = wSignal.getaspects( m_Props );
     Boolean dwarf = wSignal.isdwarf( m_Props );
     m_iSymType = symtype::i_signal;
-    if( StrOp.equals( wSignal.semaphore, wSignal.gettype( m_Props ) ) ) {
+    if( wSignal.getaspects( m_Props ) > 4 || wSignal.isusesymbolprefix( m_Props ) ) {
+      m_iSymSubType = signaltype::i_signalaspect;
+      if( m_SymMap != NULL ) {
+        const char* prefix = wSignal.getsymbolprefix( m_Props );
+        char key[256];
+        for( int i = 0; i < wSignal.getaspects( m_Props ); i++ ) {
+          StrOp.fmtb( key, signaltype::signalaspect, prefix, i );
+          m_SvgSym[i] = (svgSymbol*)MapOp.get( m_SymMap, key );
+          StrOp.fmtb( key, signaltype::signalaspect_occ, prefix, i );
+          m_SvgSymOcc[i] = (svgSymbol*)MapOp.get( m_SymMap, key );
+          StrOp.fmtb( key, signaltype::signalaspect_route, prefix, i );
+          m_SvgSymRoute[i] = (svgSymbol*)MapOp.get( m_SymMap, key );
+        }
+
+      }
+    }
+    else if( StrOp.equals( wSignal.blockstate, wSignal.getsignal( m_Props ) ) ) {
+      m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::blockstate );
+    }
+    else if( StrOp.equals( wSignal.semaphore, wSignal.gettype( m_Props ) ) ) {
       if( StrOp.equals( wSignal.main, wSignal.getsignal( m_Props ) ) ) {
         m_iSymSubType = signaltype::i_semaphoremain;
         if( m_SymMap != NULL ) {
@@ -419,7 +729,7 @@ void SymbolRenderer::initSym() {
           m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::semaphoreshunting_2_r_occ );
           m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::semaphoreshunting_2_w_occ );
           m_SvgSym9  = (svgSymbol*)MapOp.get( m_SymMap, signaltype::semaphoreshunting_2_r_route );
-          m_SvgSym12 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::semaphoreshunting_2_w_route );
+          m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::semaphoreshunting_2_w_route );
         }
       }
     }
@@ -427,7 +737,7 @@ void SymbolRenderer::initSym() {
       if( StrOp.equals( wSignal.main, wSignal.getsignal( m_Props ) ) ) {
         m_iSymSubType = signaltype::i_signalmain;
         if( m_SymMap != NULL ) {
-          if( aspects == 2 ) {
+          if( aspects == 2 && !wItem.isroad( m_Props ) ) {
             m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalmain_2_r );
             m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalmain_2_g );
             m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalmain_2_r_occ );
@@ -436,21 +746,28 @@ void SymbolRenderer::initSym() {
             m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalmain_2_g_route );
           }
           else {
-            m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_r:signaltype::signalmain_r );
-            m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_y:signaltype::signalmain_y );
-            m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_g:signaltype::signalmain_g );
-            m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w:signaltype::signalmain_w );
-            m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_r_occ:signaltype::signalmain_r_occ );
-            m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_y_occ:signaltype::signalmain_y_occ );
-            m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_g_occ:signaltype::signalmain_g_occ );
-            m_SvgSym8 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_occ:signaltype::signalmain_w_occ );
-            m_SvgSym9  = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_r_occ:signaltype::signalmain_r_route );
-            m_SvgSym10 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_y_occ:signaltype::signalmain_y_route );
-            m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_g_occ:signaltype::signalmain_g_route );
-            m_SvgSym12 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_occ:signaltype::signalmain_w_route );
-            m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w:signaltype::signalmain_b );
-            m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_occ:signaltype::signalmain_b_occ );
-            m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_occ:signaltype::signalmain_b_route );
+            if( wItem.isroad( m_Props ) ) {
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::road_signalmain_dwarf_r:signaltype::road_signalmain_r );
+              m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::road_signalmain_dwarf_y:signaltype::road_signalmain_y );
+              m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::road_signalmain_dwarf_g:signaltype::road_signalmain_g );
+            }
+            else {
+              m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_r:signaltype::signalmain_r );
+              m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_y:signaltype::signalmain_y );
+              m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_g:signaltype::signalmain_g );
+              m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w:signaltype::signalmain_w );
+              m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_r_occ:signaltype::signalmain_r_occ );
+              m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_y_occ:signaltype::signalmain_y_occ );
+              m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_g_occ:signaltype::signalmain_g_occ );
+              m_SvgSym8 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_occ:signaltype::signalmain_w_occ );
+              m_SvgSym9  = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_r_route:signaltype::signalmain_r_route );
+              m_SvgSym10 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_y_route:signaltype::signalmain_y_route );
+              m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_g_route:signaltype::signalmain_g_route );
+              m_SvgSym12 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_route:signaltype::signalmain_w_route );
+              m_SvgSym13 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w:signaltype::signalmain_b );
+              m_SvgSym14 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_occ:signaltype::signalmain_b_occ );
+              m_SvgSym15 = (svgSymbol*)MapOp.get( m_SymMap, dwarf?signaltype::signalmain_dwarf_w_route:signaltype::signalmain_b_route );
+            }
           }
         }
       }
@@ -492,7 +809,7 @@ void SymbolRenderer::initSym() {
           m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalshunting_2_r_occ );
           m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalshunting_2_w_occ );
           m_SvgSym9  = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalshunting_2_r_route );
-          m_SvgSym12 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalshunting_2_w_route );
+          m_SvgSym11 = (svgSymbol*)MapOp.get( m_SymMap, signaltype::signalshunting_2_w_route );
         }
       }
     }
@@ -533,6 +850,10 @@ void SymbolRenderer::initSym() {
         m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, blocktype::road_block_occ );
         m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, blocktype::road_block_res );
         m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, blocktype::road_block_ent );
+        m_SvgSym7  = (svgSymbol*)MapOp.get( m_SymMap, blocktype::road_block_s );
+        m_SvgSym8  = (svgSymbol*)MapOp.get( m_SymMap, blocktype::road_block_occ_s );
+        m_SvgSym9  = (svgSymbol*)MapOp.get( m_SymMap, blocktype::road_block_res_s );
+        m_SvgSym10 = (svgSymbol*)MapOp.get( m_SymMap, blocktype::road_block_ent_s );
       }
       else {
         m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, blocktype::block );
@@ -563,6 +884,8 @@ void SymbolRenderer::initSym() {
       m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, stagetype::stage_occ );
       m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, stagetype::stage_res );
       m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, stagetype::stage_ent );
+      m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, stagetype::stage_closed );
+      m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, stagetype::stage_ghost );
     }
   }
   else if( StrOp.equals( wSelTab.name(), nodeName ) ) {
@@ -591,17 +914,17 @@ void SymbolRenderer::initSym() {
       else {
         if( wFeedback.getaccnr(m_Props) > 0 ) {
           char key[256];
-          StrOp.fmtb( key, feedbacktype::accessory_on, wFeedback.getaccnr( m_Props ) );
-          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, key );
           StrOp.fmtb( key, feedbacktype::accessory_off, wFeedback.getaccnr( m_Props ) );
+          m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, key );
+          StrOp.fmtb( key, feedbacktype::accessory_on, wFeedback.getaccnr( m_Props ) );
           m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, key );
-          StrOp.fmtb( key, feedbacktype::accessory_on_occ, wFeedback.getaccnr( m_Props ) );
-          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, key );
           StrOp.fmtb( key, feedbacktype::accessory_off_occ, wFeedback.getaccnr( m_Props ) );
+          m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, key );
+          StrOp.fmtb( key, feedbacktype::accessory_on_occ, wFeedback.getaccnr( m_Props ) );
           m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, key );
-          StrOp.fmtb( key, feedbacktype::accessory_on_route, wFeedback.getaccnr( m_Props ) );
-          m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, key );
           StrOp.fmtb( key, feedbacktype::accessory_off_route, wFeedback.getaccnr( m_Props ) );
+          m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, key );
+          StrOp.fmtb( key, feedbacktype::accessory_on_route, wFeedback.getaccnr( m_Props ) );
           m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, key );
           m_iSymSubType = feedbacktype::i_accessory;
         }
@@ -634,10 +957,20 @@ void SymbolRenderer::initSym() {
       m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, routetype::route_locked );
       m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, routetype::route_selected );
       m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, routetype::route_deselected );
+      m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, routetype::route_closed );
     }
   }
   else if( StrOp.equals( wTurntable.name(), nodeName ) ) {
     m_iSymType = symtype::i_turntable;
+    m_iSymSubType = 0;
+    m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, traversertype::traverser );
+    m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, traversertype::traverser_bridge );
+    m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, traversertype::traverser_bridge_occ );
+    m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, traversertype::traverser_bridge_res );
+    m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, traversertype::traverser_bridge_ent );
+  }
+  else if( StrOp.equals( wSelTab.name(), nodeName ) ) {
+    m_iSymType = symtype::i_selecttable;
     m_iSymSubType = 0;
   }
   else if( StrOp.equals( wSelTab.name(), nodeName ) ) {
@@ -697,10 +1030,14 @@ void SymbolRenderer::sizeToScale( double symsize, double scale, double bktext, i
       // vertical
       *cx = 1;
       *cy = wSelTab.getnrtracks(m_Props);
+      if( *cy > 32 )
+        *cy = 32;
     }
     else { // horizontal
       *cx = wSelTab.getnrtracks(m_Props);
       *cy = 1;
+      if( *cx > 32 )
+        *cx = 32;
     }
     /*
       wxFont* font = new wxFont( m_BlockLabel->GetFont() );
@@ -708,13 +1045,17 @@ void SymbolRenderer::sizeToScale( double symsize, double scale, double bktext, i
     }
     */
   }
-  else if( StrOp.equals( wSelTab.name(), NodeOp.getName( m_Props ) ) ) {
-    *cx = 4;
-    *cy = 1;
-  }
-  else if( StrOp.equals( wTurntable.name(), NodeOp.getName( m_Props ) ) ) {
-    *cx = 5;
-    *cy = 5;
+  else if( StrOp.equals( wTurntable.name(), NodeOp.getName( m_Props ) ) && !wTurntable.istraverser(m_Props) ) {
+    int ttdiam = wTurntable.getsymbolsize( m_Props );
+
+    if (ttdiam < 1)
+      ttdiam = 1;
+
+    if (ttdiam > 13)
+      ttdiam = 13;
+
+    *cx = ttdiam;
+    *cy = ttdiam;
   }
   else if( StrOp.equals( wSwitch.name(), NodeOp.getName( m_Props ) ) &&
            StrOp.equals( wSwitch.dcrossing, wSwitch.gettype( m_Props ) ) ) {
@@ -744,6 +1085,18 @@ void SymbolRenderer::sizeToScale( double symsize, double scale, double bktext, i
     else {
       *cx = m_SvgSym7->width  / 32;
       *cy = m_SvgSym7->height / 32;
+    }
+  }
+  else if( StrOp.equals( wTurntable.name(), NodeOp.getName( m_Props ) ) ) {
+    if( wTurntable.istraverser(m_Props ) && m_SvgSym1 != NULL ) {
+      if( StrOp.equals( ori, wItem.north ) || StrOp.equals( ori, wItem.south ) ) {
+        *cy = m_SvgSym1->width  / 32;
+        *cx = m_SvgSym1->height / 32;
+      }
+      else {
+        *cx = m_SvgSym1->width  / 32;
+        *cy = m_SvgSym1->height / 32;
+      }
     }
   }
   else if( m_SvgSym1 != NULL ) {
@@ -776,7 +1129,87 @@ wxBrush* SymbolRenderer::getBrush( const char* fill, wxPaintDC& dc ) {
     return new wxBrush(wxString(fill,wxConvUTF8), wxSOLID);
 }
 
-void SymbolRenderer::drawSvgSym( wxPaintDC& dc, svgSymbol* svgsym, const char* ori ) {
+
+bool SymbolRenderer::sizeSvgSym( const char* symname, const char* ori, int* cx, int* cy ) {
+  svgSymbol* svgsym = (svgSymbol*)MapOp.get( m_SymMap, symname );
+  if( svgsym != NULL ) {
+    *cx = svgsym->width  / 32;
+    *cy = svgsym->height / 32;
+    return true;
+  }
+
+  if( StrOp.equals( seltabtype::seltab, symname) || StrOp.equals( "text", symname) ) {
+    *cx = 4;
+    *cy = 1;
+    return true;
+  }
+
+  if( StrOp.equals( turntabletype::turntable, symname) ) {
+    *cx = 4;
+    *cy = 4;
+    return true;
+  }
+
+  return false;
+}
+
+
+void SymbolRenderer::drawSvgSym( wxPaintDC& dc, int x, int y, const char* symname, const char* ori, int* cx, int* cy, bool draw ) {
+  m_GC = NULL;
+  m_UseGC = false;
+  m_DC = &dc;
+  m_bAlt = false;
+  svgSymbol* svgsym = (svgSymbol*)MapOp.get( m_SymMap, symname );
+  if( svgsym != NULL ) {
+    if( draw ) {
+      drawSvgSym(dc, svgsym, ori, x, y, false);
+    }
+    *cx = svgsym->width  / 32;
+    *cy = svgsym->height / 32;
+  }
+  else {
+    if( StrOp.equals( seltabtype::seltab, symname) ) {
+      if( draw ) {
+        m_Props = NodeOp.inst( wSelTab.name(), NULL, ELEMENT_NODE );
+        wSelTab.setnrtracks(m_Props, 4);
+        drawSelTab( dc, false, ori );
+        NodeOp.base.del(m_Props);
+        m_Props = NULL;
+      }
+      *cx = 4;
+      *cy = 1;
+    }
+    else if( StrOp.equals( turntabletype::turntable, symname) ) {
+      if( draw ) {
+        m_Props = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
+        wTurntable.setsymbolsize( m_Props, 4 );
+        double bridgepos = 0.0;
+        drawTurntable( dc, false, &bridgepos, ori );
+        NodeOp.base.del(m_Props);
+        m_Props = NULL;
+      }
+      *cx = 4;
+      *cy = 4;
+    }
+    else if( StrOp.equals( "text", symname) ) {
+      if( draw ) {
+        m_Props = NodeOp.inst( wText.name(), NULL, ELEMENT_NODE );
+        //wText.setpointsize( m_Props, 13 );
+        StrOp.free(m_Label);
+        m_Label = StrOp.dup("Text");
+        drawText( dc, false, ori );
+        NodeOp.base.del(m_Props);
+        m_Props = NULL;
+      }
+      *cx = 4;
+      *cy = 1;
+    }
+    else
+      TraceOp.trc( "render", TRCLEVEL_WARNING, __LINE__, 9999, "symbol [%s] is not in the map...", symname );
+  }
+}
+
+void SymbolRenderer::drawSvgSym( wxPaintDC& dc, svgSymbol* svgsym, const char* ori, int xOff, int yOff, bool gridOffset ) {
   const wxBrush& b = dc.GetBrush();
 
   int xOffset = 0;
@@ -785,94 +1218,187 @@ void SymbolRenderer::drawSvgSym( wxPaintDC& dc, svgSymbol* svgsym, const char* o
   if( StrOp.equals( wItem.north, ori ) && m_cy > 1) {
     yOffset = 32 * (m_cy-1);
   }
-  else if( StrOp.equals( wItem.east, ori ) && m_cx > 1) {
+  if( StrOp.equals( wItem.east, ori ) && m_cx > 1) {
     xOffset = 32 * (m_cx-1);
   }
-  else if( StrOp.equals( wItem.east, ori ) && m_cy > 1) {
+  if( StrOp.equals( wItem.east, ori ) && m_cy > 1) {
     yOffset = 32 * (m_cy-1);
   }
-  else if( StrOp.equals( wItem.south, ori ) && m_cx > 1) {
+  if( StrOp.equals( wItem.south, ori ) && m_cx > 1) {
     xOffset = 32 * (m_cx-1);
   }
 
+  if( gridOffset ) {
+    xOffset += xOff * 32;
+    yOffset += yOff * 32;
+  }
+  else {
+    xOffset += xOff;
+    yOffset += yOff;
+  }
 
-  int cnt = ListOp.size( svgsym->polyList );
+  iOList polyList   = svgsym->polyList;
+  iOList circleList = svgsym->circleList;
+  if( m_bAlt && svgsym->polyListAlt != NULL )
+    polyList = svgsym->polyListAlt;
+  if( m_bAlt && svgsym->circleListAlt != NULL )
+    circleList = svgsym->circleListAlt;
+
+  if( svgsym->polyListAlt != NULL || svgsym->circleListAlt != NULL )
+    m_bHasAlt = true;
+  else
+    m_bHasAlt = false;
+
+
+  int cnt = ListOp.size( polyList );
   for( int i = 0; i < cnt; i++ ) {
-    svgPoly* svgpoly = (svgPoly*)ListOp.get(svgsym->polyList, i);
+    svgPoly* svgpoly = (svgPoly*)ListOp.get(polyList, i);
     wxPen* pen = getPen(svgpoly->stroke);
-    pen->SetWidth(1);
-    dc.SetPen(*pen);
+    pen->SetWidth(atoi(svgpoly->stroke_width));
     wxBrush* brush = getBrush(svgpoly->fill, dc );
-    dc.SetBrush( *brush );
+    setPen( *pen );
+    setBrush( *brush );
     if( svgpoly->arc ) {
       wxPoint* points = rotateShape( svgpoly->poly, svgpoly->cnt, ori );
-      dc.DrawArc( points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y );
+      if( m_UseGC ) {
+        TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "TODO: Find a way to draw arcs in GC." );
+      }
+      else {
+        dc.DrawArc( points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y );
+      }
     }
-    else
-      dc.DrawPolygon( svgpoly->cnt, rotateShape( svgpoly->poly, svgpoly->cnt, ori ), xOffset, yOffset );
+    else {
+      wxPoint* p = rotateShape( svgpoly->poly, svgpoly->cnt, ori );
+      if( m_UseGC ) {
+        wxGraphicsPath path = m_GC->CreatePath();
+        path.MoveToPoint(p[0].x+xOffset, p[0].y+yOffset);
+        for( int s = 1; s < svgpoly->cnt; s++ )
+          path.AddLineToPoint(p[s].x+xOffset, p[s].y+yOffset);
+        path.AddLineToPoint(p[0].x+xOffset, p[0].y+yOffset);
+        m_GC->FillPath(path);
+        m_GC->StrokePath(path);
+      }
+      else {
+        dc.DrawPolygon( svgpoly->cnt, p, xOffset, yOffset );
+      }
+    }
     delete pen;
     delete brush;
   }
 
-  if( svgsym->circleList != NULL ) {
-    cnt = ListOp.size( svgsym->circleList );
+  if( circleList != NULL ) {
+    cnt = ListOp.size( circleList );
     for( int i = 0; i < cnt; i++ ) {
-      svgCircle* svgcircle = (svgCircle*)ListOp.get(svgsym->circleList, i);
+      svgCircle* svgcircle = (svgCircle*)ListOp.get(circleList, i);
       wxPen* pen = getPen(svgcircle->stroke);
-      pen->SetWidth(1);
-      dc.SetPen(*pen);
+      pen->SetWidth(atoi(svgcircle->stroke_width));
       wxBrush* brush = getBrush(svgcircle->fill, dc );
-      dc.SetBrush( *brush );
       wxPoint point = wxPoint(svgcircle->cx, svgcircle->cy);
       wxPoint* points = rotateShape( &point, 1, ori );
-      dc.DrawCircle( points[0].x, points[0].y, svgcircle->r );
+      setPen( *pen );
+      setBrush( *brush );
+      if( m_UseGC ) {
+        m_GC->DrawEllipse(points[0].x-svgcircle->r + xOffset, points[0].y-svgcircle->r + yOffset, svgcircle->r*2, svgcircle->r*2);
+      }
+      else {
+        dc.DrawCircle( points[0].x + xOffset, points[0].y + yOffset, svgcircle->r );
+      }
       delete pen;
       delete brush;
     }
   }
 
-  dc.SetBrush( b );
 }
 
+
+wxFont* SymbolRenderer::setFont(int pointsize, int red, int green, int blue, bool bold, bool italic, bool underlined)
+{
+  wxFont* font = new wxFont( m_DC->GetFont() );
+  font->SetPointSize( pointsize > 0 ? pointsize:m_iItemIDps );
+
+  if( bold )
+    font->SetWeight(wxFONTWEIGHT_BOLD);
+  if( italic )
+    font->SetStyle(wxFONTSTYLE_ITALIC);
+
+  font->SetUnderlined( underlined ? true:false);
+
+  if( m_UseGC ) {
+    m_GC->SetFont(*font, wxColour(red,green,blue));
+  }
+  else {
+    m_DC->SetTextForeground(wxColour(red,green,blue));
+    m_DC->SetFont(*font);
+  }
+  return font;
+}
+
+void SymbolRenderer::drawString(const wxString& text, int x, int y, double degrees, bool setfont)
+{
+  wxFont* font = NULL;
+  if( setfont )
+    font = setFont();
+
+  if( m_UseGC ) {
+    if( degrees > 0.0 )
+      m_GC->DrawText( text, x, y, getRadians(degrees) );
+    else
+      m_GC->DrawText( text, x, y );
+  }
+  else {
+    m_DC->DrawRotatedText( text, x, y, degrees );
+  }
+
+  if( setfont )
+    delete font;
+}
 
 /**
  * Track object
  */
 void SymbolRenderer::drawTrack( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
-  const wxBrush& b = dc.GetBrush();
-
   // SVG Symbol:
   if( actroute && occupied && m_SvgSym4!=NULL ) {
     drawSvgSym(dc, m_SvgSym4, ori);
-    dc.SetBrush( b );
-    return;
   }
-
-  if( occupied && m_SvgSym2!=NULL ) {
+  else if( occupied && m_SvgSym2!=NULL ) {
     drawSvgSym(dc, m_SvgSym2, ori);
-    dc.SetBrush( b );
-    return;
   }
   else if( actroute && m_SvgSym3!=NULL ) {
     drawSvgSym(dc, m_SvgSym3, ori);
-    dc.SetBrush( b );
-    return;
   }
   else if( actroute && m_SvgSym2!=NULL ) {
     drawSvgSym(dc, m_SvgSym2, ori);
-    dc.SetBrush( b );
-    return;
   }
   else if( m_SvgSym1!=NULL ) {
     drawSvgSym(dc, m_SvgSym1, ori);
-    dc.SetBrush( b );
-    return;
   }
 
+  if( m_bShowID ) {
+    if( StrOp.equals( wTrack.connector, wTrack.gettype( m_Props ) ) ) {
+
+      if( StrOp.equals( ori, wItem.north ) ) {
+        drawString(wxString::Format(_T("%d"),wTrack.gettknr(m_Props)), 10, 10, 270.0);
+      }
+      else if( StrOp.equals( ori, wItem.south ) ) {
+        drawString(wxString::Format(_T("%d"),wTrack.gettknr(m_Props)), 20, 20, 90.0);
+      }
+      else if( StrOp.equals( ori, wItem.east ) ) {
+        drawString(wxString::Format(_T("%d"),wTrack.gettknr(m_Props)), 10, 20, 0.0);
+      }
+      else
+        drawString(wxString::Format(_T("%d"),wTrack.gettknr(m_Props)), 1, 1, 0.0);
+
+    }
+
+    else if( StrOp.equals( wTrack.concurveright, wTrack.gettype( m_Props ) ) || StrOp.equals( wTrack.concurveleft,  wTrack.gettype( m_Props ) ) ) {
+      drawString( wxString::Format(_T("%d"),wTrack.gettknr(m_Props)), 10, 10, 0.0 );
+    }
+  }
 }
 
 
-void SymbolRenderer::drawCCrossing( wxPaintDC& dc, bool occupied, const char* ori ) {
+void SymbolRenderer::drawCCrossing( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSwitch.getstate( m_Props );
   Boolean hasUnit = wSwitch.getaddr1( m_Props ) > 0 ? True:False;
 
@@ -880,62 +1406,99 @@ void SymbolRenderer::drawCCrossing( wxPaintDC& dc, bool occupied, const char* or
     hasUnit = True;
 
   // SVG Symbol:
-  if( m_SvgSym1 != NULL && m_SvgSym2 != NULL ) {
-    drawSvgSym(dc, occupied? m_SvgSym2:m_SvgSym1, ori);
-  }
-  else if( m_SvgSym1 != NULL ) {
+  if( occupied && m_SvgSym2 != NULL )
+    drawSvgSym(dc, m_SvgSym2, ori);
+  else if( actroute && m_SvgSym3 != NULL )
+    drawSvgSym(dc, m_SvgSym3, ori);
+  else if( m_SvgSym1 != NULL )
     drawSvgSym(dc, m_SvgSym1, ori);
-  }
 }
 
 
 /**
  * Crossing Switch object
  */
-void SymbolRenderer::drawCrossing( wxPaintDC& dc, bool occupied, const char* ori ) {
+void SymbolRenderer::drawCrossing( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSwitch.getstate( m_Props );
+  const char* savepos = wSwitch.getsavepos( m_Props );
+  Boolean islocked = (wSwitch.getlocid( m_Props )==NULL)?False:True;
+  Boolean isset = wSwitch.isset( m_Props );
+  Boolean issavepos = (Boolean)( !StrOp.equals( savepos, wSwitch.none ) && !StrOp.equals( state, savepos ) );
+  Boolean raster = StrOp.equals( wSwitch.getswtype( m_Props ), wSwitch.swtype_raster );
+
+  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "Crossing %s occ=%d route=%d",
+      wSwitch.getid( m_Props ), occupied, actroute );
+
+  if( wSwitch.getlocid( m_Props )!=NULL && StrOp.equals( wSwitch.unlocked, wSwitch.getlocid( m_Props )) )
+    islocked = False;
+
+  if( islocked || issavepos || !isset || !wGui.isshowroute4switch(wxGetApp().getIni()) )
+    actroute = !occupied;
 
   // SVG Symbol:
   if( m_SvgSym2!=NULL && StrOp.equals( state, wSwitch.turnout ) ) {
     if( occupied && m_SvgSym5 != NULL )
-      drawSvgSym(dc, m_SvgSym5, ori);
+      if( islocked && m_SvgSym15 != NULL )
+        drawSvgSym(dc, m_SvgSym15, ori);
+      else
+        drawSvgSym(dc, m_SvgSym5, ori);
+    else if( actroute && m_SvgSym7 != NULL )
+      if( !isset && m_SvgSym[17] != NULL )
+        drawSvgSym(dc, m_SvgSym[17], ori);
+      else if( islocked && m_SvgSym13 != NULL )
+        drawSvgSym(dc, m_SvgSym13, ori);
+      else if( issavepos && m_SvgSym[19] != NULL )
+        drawSvgSym(dc, m_SvgSym[19], ori);
+      else
+        drawSvgSym(dc, m_SvgSym7, ori);
     else
       drawSvgSym(dc, m_SvgSym2, ori);
   }
   else if( m_SvgSym1!=NULL ) {
     if( occupied && m_SvgSym4 != NULL )
-      drawSvgSym(dc, m_SvgSym4, ori);
+      if( islocked && m_SvgSym14 != NULL )
+        drawSvgSym(dc, m_SvgSym14, ori);
+      else
+        drawSvgSym(dc, m_SvgSym4, ori);
+    else if( actroute && m_SvgSym8 != NULL )
+      drawSvgSym(dc, m_SvgSym8, ori);
+    else if( actroute && m_SvgSym6 != NULL )
+      if( !isset && m_SvgSym[16] != NULL )
+        drawSvgSym(dc, m_SvgSym[16], ori);
+      else if( islocked && m_SvgSym12 != NULL )
+        drawSvgSym(dc, m_SvgSym12, ori);
+      else if( issavepos && m_SvgSym[18] != NULL )
+        drawSvgSym(dc, m_SvgSym[18], ori);
+      else
+        drawSvgSym(dc, m_SvgSym6, ori);
     else
       drawSvgSym(dc, m_SvgSym1, ori);
   }
 
 
   if( m_bShowID ) {
-    wxFont* font = new wxFont( dc.GetFont() );
-    font->SetPointSize( m_iItemIDps );
-    dc.SetFont(*font);
-
     if( m_iSymSubType == switchtype::i_crossingright ) {
-      if( StrOp.equals( ori, wItem.south ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 63, 90.0 );
-      else if( StrOp.equals( ori, wItem.north ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 63, 90.0 );
-      else if( StrOp.equals( ori, wItem.east ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 0, 0.0 );
-      else
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 0, 0.0 );
+      if( StrOp.equals( ori, wItem.south ) || StrOp.equals( ori, wItem.north ) ) {
+        if( raster )
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 0, 31, 90.0);
+        else
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 0, 63, 90.0);
+      }
+      else {
+        drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 0, 0, 0.0);
+      }
     }
     else {
-      if( StrOp.equals( ori, wItem.south ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 20, 63, 90.0 );
-      else if( StrOp.equals( ori, wItem.north ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 20, 63, 90.0 );
-      else if( StrOp.equals( ori, wItem.east ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 21, 0.0 );
-      else
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 21, 0.0 );
+      if( StrOp.equals( ori, wItem.south ) || StrOp.equals( ori, wItem.north ) ) {
+        if( raster )
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 20, 31, 90.0);
+        else
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 20, 63, 90.0);
+      }
+      else {
+        drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 0, 21, 0.0);
+      }
     }
-    delete font;
   }
 
 }
@@ -944,33 +1507,94 @@ void SymbolRenderer::drawCrossing( wxPaintDC& dc, bool occupied, const char* ori
 /**
  * DoubleCrossing Switch object
  */
-void SymbolRenderer::drawDCrossing( wxPaintDC& dc, bool occupied, const char* ori ) {
+void SymbolRenderer::drawDCrossing( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSwitch.getstate( m_Props );
+  const char* savepos = wSwitch.getsavepos( m_Props );
+  Boolean islocked = (wSwitch.getlocid( m_Props )==NULL)?False:True;
+  Boolean isset = wSwitch.isset( m_Props );
+  Boolean issavepos = (Boolean)( !StrOp.equals( savepos, wSwitch.none ) && !StrOp.equals( state, savepos ) );
   Boolean has2Units = ( wSwitch.getaddr2( m_Props ) > 0 || wSwitch.getport2( m_Props ) > 0 )  ? True:False;
+  Boolean raster = StrOp.equals( wSwitch.getswtype( m_Props ), wSwitch.swtype_raster );
+
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "drawDCrossing %s state=%s", wSwitch.getid( m_Props ), state );
+
+  if( wSwitch.getlocid( m_Props )!=NULL && StrOp.equals( wSwitch.unlocked, wSwitch.getlocid( m_Props )) )
+    islocked = False;
+
+  if( islocked || issavepos || !isset || !wGui.isshowroute4switch(wxGetApp().getIni()) )
+    actroute = !occupied;
 
   // SVG Symbol:
   if( has2Units ) {
     if( m_SvgSym3!=NULL && StrOp.equals( state, wSwitch.left ) ) {
       if( occupied && m_SvgSym7 != NULL )
-        drawSvgSym(dc, m_SvgSym7, ori);
+        if( islocked && m_SvgSym15 != NULL )
+          drawSvgSym(dc, m_SvgSym15, ori);
+        else
+          drawSvgSym(dc, m_SvgSym7, ori);
+      else if( actroute && m_SvgSym11 != NULL )
+        if( !isset && m_SvgSym[23] != NULL )
+          drawSvgSym(dc, m_SvgSym[23], ori);
+        else if( islocked && m_SvgSym[24] != NULL )
+          drawSvgSym(dc, m_SvgSym[24], ori);
+        else if( issavepos && m_SvgSym[25] != NULL )
+          drawSvgSym(dc, m_SvgSym[25], ori);
+        else
+          drawSvgSym(dc, m_SvgSym11, ori);
       else
         drawSvgSym(dc, m_SvgSym3, ori);
     }
     else if( m_SvgSym4!=NULL && StrOp.equals( state, wSwitch.right ) ) {
       if( occupied && m_SvgSym8 != NULL )
-        drawSvgSym(dc, m_SvgSym8, ori);
+        if( islocked && m_SvgSym16 != NULL )
+          drawSvgSym(dc, m_SvgSym16, ori);
+        else
+          drawSvgSym(dc, m_SvgSym8, ori);
+      else if( actroute && m_SvgSym12 != NULL )
+        if( !isset && m_SvgSym[26] != NULL )
+          drawSvgSym(dc, m_SvgSym[26], ori);
+        else if( islocked && m_SvgSym[27] != NULL )
+          drawSvgSym(dc, m_SvgSym[27], ori);
+        else if( issavepos && m_SvgSym[28] != NULL )
+          drawSvgSym(dc, m_SvgSym[28], ori);
+        else
+          drawSvgSym(dc, m_SvgSym12, ori);
       else
         drawSvgSym(dc, m_SvgSym4, ori);
     }
     else if( m_SvgSym2!=NULL && StrOp.equals( state, wSwitch.turnout ) ) {
       if( occupied && m_SvgSym6 != NULL )
-        drawSvgSym(dc, m_SvgSym6, ori);
+        if( islocked && m_SvgSym14 != NULL )
+          drawSvgSym(dc, m_SvgSym14, ori);
+        else
+          drawSvgSym(dc, m_SvgSym6, ori);
+      else if( actroute && m_SvgSym10 != NULL )
+        if( !isset && m_SvgSym[20] != NULL )
+          drawSvgSym(dc, m_SvgSym[20], ori);
+        else if( islocked && m_SvgSym[21] != NULL )
+          drawSvgSym(dc, m_SvgSym[21], ori);
+        else if( issavepos && m_SvgSym[22] != NULL )
+          drawSvgSym(dc, m_SvgSym[22], ori);
+        else
+          drawSvgSym(dc, m_SvgSym10, ori);
       else
         drawSvgSym(dc, m_SvgSym2, ori);
     }
     else if( m_SvgSym1!=NULL ) {
       if( occupied && m_SvgSym5 != NULL )
-        drawSvgSym(dc, m_SvgSym5, ori);
+        if( islocked && m_SvgSym13 != NULL )
+          drawSvgSym(dc, m_SvgSym13, ori);
+        else
+          drawSvgSym(dc, m_SvgSym5, ori);
+      else if( actroute && m_SvgSym9 != NULL )
+        if( !isset && m_SvgSym[17] != NULL )
+          drawSvgSym(dc, m_SvgSym[17], ori);
+        else if( islocked && m_SvgSym[18] != NULL )
+          drawSvgSym(dc, m_SvgSym[18], ori);
+        else if( issavepos && m_SvgSym[19] != NULL )
+          drawSvgSym(dc, m_SvgSym[19], ori);
+        else
+          drawSvgSym(dc, m_SvgSym9, ori);
       else
         drawSvgSym(dc, m_SvgSym1, ori);
     }
@@ -978,45 +1602,75 @@ void SymbolRenderer::drawDCrossing( wxPaintDC& dc, bool occupied, const char* or
 
   else if( m_SvgSym2!=NULL && StrOp.equals( state, wSwitch.turnout ) ) {
     if( occupied && m_SvgSym6 != NULL )
-      drawSvgSym(dc, m_SvgSym6, ori);
+      if( islocked && m_SvgSym14 != NULL )
+        drawSvgSym(dc, m_SvgSym14, ori);
+      else
+        drawSvgSym(dc, m_SvgSym6, ori);
+    else if( actroute && m_SvgSym10 != NULL )
+      if( !isset && m_SvgSym[20] != NULL )
+        drawSvgSym(dc, m_SvgSym[20], ori);
+      else if( islocked && m_SvgSym[21] != NULL )
+        drawSvgSym(dc, m_SvgSym[21], ori);
+      else if( issavepos && m_SvgSym[22] != NULL )
+        drawSvgSym(dc, m_SvgSym[22], ori);
+      else
+        drawSvgSym(dc, m_SvgSym10, ori);
     else
       drawSvgSym(dc, m_SvgSym2, ori);
   }
 
   else if( m_SvgSym1!=NULL ) {
     if( occupied && m_SvgSym5 != NULL )
-      drawSvgSym(dc, m_SvgSym5, ori);
+      if( islocked && m_SvgSym[13] != NULL )
+        drawSvgSym(dc, m_SvgSym[13], ori);
+      else
+        drawSvgSym(dc, m_SvgSym5, ori);
+    else if( actroute && m_SvgSym9 != NULL )
+      if( !isset && m_SvgSym[17] != NULL )
+        drawSvgSym(dc, m_SvgSym[17], ori);
+      else if( islocked && m_SvgSym[18] != NULL )
+        drawSvgSym(dc, m_SvgSym[18], ori);
+      else if( issavepos && m_SvgSym[19] != NULL )
+        drawSvgSym(dc, m_SvgSym[19], ori);
+      else
+        drawSvgSym(dc, m_SvgSym9, ori);
     else
       drawSvgSym(dc, m_SvgSym1, ori);
   }
 
 
   if( m_bShowID ) {
-    wxFont* font = new wxFont( dc.GetFont() );
-    font->SetPointSize( m_iItemIDps );
-    dc.SetFont(*font);
-
     if( m_iSymSubType == switchtype::i_dcrossingright ) {
-      if( StrOp.equals( ori, wItem.south ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
-      else if( StrOp.equals( ori, wItem.north ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 63, 90.0 );
-      else if( StrOp.equals( ori, wItem.east ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
-      else
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
+      if( StrOp.equals( ori, wItem.south ) ) {
+        drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0);
+      }
+      else if( StrOp.equals( ori, wItem.north ) ) {
+        if( raster )
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 1, 31, 90.0);
+        else
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 1, 63, 90.0);
+      }
+      else {
+        drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0);
+      }
     }
     else {
-      if( StrOp.equals( ori, wItem.south ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 32, 270.0 );
-      else if( StrOp.equals( ori, wItem.north ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
-      else if( StrOp.equals( ori, wItem.east ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
-      else
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
+      if( StrOp.equals( ori, wItem.south ) ) {
+        if( raster )
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 10, 0, 270.0);
+        else
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 32, 32, 270.0);
+      }
+      else if( StrOp.equals( ori, wItem.north ) ) {
+        if( raster )
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 10, 0, 270.0);
+        else
+          drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0);
+      }
+      else {
+        drawString(wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0);
+      }
     }
-    delete font;
   }
 
 
@@ -1026,45 +1680,84 @@ void SymbolRenderer::drawDCrossing( wxPaintDC& dc, bool occupied, const char* or
 /**
  * Threeway Switch object
  */
-void SymbolRenderer::drawThreeway( wxPaintDC& dc, bool occupied, const char* ori ) {
+void SymbolRenderer::drawThreeway( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSwitch.getstate( m_Props );
+  Boolean raster = StrOp.equals( wSwitch.getswtype( m_Props ), wSwitch.swtype_raster );
+
+  if( !wGui.isshowroute4switch(wxGetApp().getIni()) )
+    actroute = !occupied;
 
   // SVG Symbol:
   if( m_SvgSym2!=NULL && StrOp.equals( state, wSwitch.left ) ) {
     if( occupied && m_SvgSym5 != NULL )
       drawSvgSym(dc, m_SvgSym5, ori);
+    else if( actroute && m_SvgSym8 != NULL )
+      drawSvgSym(dc, m_SvgSym8, ori);
     else
       drawSvgSym(dc, m_SvgSym2, ori);
   }
   else if( m_SvgSym3!=NULL && StrOp.equals( state, wSwitch.right ) ) {
     if( occupied && m_SvgSym6 != NULL )
       drawSvgSym(dc, m_SvgSym6, ori);
+    else if( actroute && m_SvgSym9 != NULL )
+      drawSvgSym(dc, m_SvgSym9, ori);
     else
       drawSvgSym(dc, m_SvgSym3, ori);
   }
   else if( m_SvgSym1!=NULL ) {
     if( occupied && m_SvgSym4 != NULL )
       drawSvgSym(dc, m_SvgSym4, ori);
+    else if( actroute && m_SvgSym7 != NULL )
+      drawSvgSym(dc, m_SvgSym7, ori);
     else
       drawSvgSym(dc, m_SvgSym1, ori);
   }
 
   if( m_bShowID ) {
-    wxFont* font = new wxFont( dc.GetFont() );
-    font->SetPointSize( m_iItemIDps );
-    dc.SetFont(*font);
+    wxFont* font = setFont();
+    double width = 0;
+    double height = 0;
+    double descent = 0;
+    double externalLeading = 0;
+    if( m_UseGC )
+      m_GC->GetTextExtent( wxString(wItem.getid(m_Props),wxConvUTF8).Trim(), (wxDouble*)&width,(wxDouble*)&height,(wxDouble*)&descent,(wxDouble*)&externalLeading);
+    else {
+      wxCoord w;
+      wxCoord h;
+      dc.GetTextExtent(wxString(wItem.getid(m_Props),wxConvUTF8).Trim(), &w, &h, 0,0, font);
+      width  = w;
+      height = h;
+    }
 
-    wxSize wxfontsize = dc.GetTextExtent( wxString(wItem.getid(m_Props),wxConvUTF8) );
 
-    if( StrOp.equals( ori, wItem.south ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, wxfontsize.GetWidth(), 90.0 );
-    else if( StrOp.equals( ori, wItem.north ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 31, 90.0 );
-    else if( StrOp.equals( ori, wItem.east ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32 - wxfontsize.GetWidth(), 1, 0.0 );
-    else
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
-
+    if( raster ) {
+      if( StrOp.equals( ori, wItem.south ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 31, 90.0, false );
+      }
+      else if( StrOp.equals( ori, wItem.north ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 31, 1, 270.0, false );
+      }
+      else if( StrOp.equals( ori, wItem.east ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0, false );
+      }
+      else {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 31 - width, 1, 0.0, false );
+      }
+    }
+    else {
+      if( StrOp.equals( ori, wItem.south ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, width, 90.0, false );
+      }
+      else if( StrOp.equals( ori, wItem.north ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0, false );
+      }
+      else if( StrOp.equals( ori, wItem.east ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 32 - width, 1, 0.0, false );
+      }
+      else {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0, false );
+      }
+    }
     delete font;
   }
 
@@ -1076,20 +1769,24 @@ void SymbolRenderer::drawThreeway( wxPaintDC& dc, bool occupied, const char* ori
 /**
  * Accessory Switch object
  */
-void SymbolRenderer::drawAccessory( wxPaintDC& dc, bool occupied, const char* ori ) {
+void SymbolRenderer::drawAccessory( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSwitch.getstate( m_Props );
 
   // SVG Symbol:
-  if( m_SvgSym2!=NULL && StrOp.equals( state, wSwitch.turnout ) ) {
-    if( occupied && m_SvgSym4!=NULL)
+  if( StrOp.equals( state, wSwitch.turnout ) ) { // off
+    if( occupied && m_SvgSym4!=NULL )
       drawSvgSym(dc, m_SvgSym4, ori);
-    else
+    else if( actroute && m_SvgSym6!=NULL )
+      drawSvgSym(dc, m_SvgSym6, ori);
+    else if( m_SvgSym2!=NULL )
       drawSvgSym(dc, m_SvgSym2, ori);
   }
-  else if( m_SvgSym1!=NULL ) {
+  else { // on
     if( occupied && m_SvgSym3!=NULL)
       drawSvgSym(dc, m_SvgSym3, ori);
-    else
+    else if( actroute && m_SvgSym5!=NULL )
+      drawSvgSym(dc, m_SvgSym5, ori);
+    else if( m_SvgSym1!=NULL )
       drawSvgSym(dc, m_SvgSym1, ori);
   }
 }
@@ -1098,50 +1795,115 @@ void SymbolRenderer::drawAccessory( wxPaintDC& dc, bool occupied, const char* or
 /**
  * Turnout Switch object
  */
-void SymbolRenderer::drawTurnout( wxPaintDC& dc, bool occupied, const char* ori ) {
+void SymbolRenderer::drawTurnout( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSwitch.getstate( m_Props );
+  const char* savepos = wSwitch.getsavepos( m_Props );
+  Boolean islocked = (wSwitch.getlocid( m_Props )==NULL)?False:True;
+  Boolean isset = wSwitch.isset( m_Props );
+  Boolean issavepos = (Boolean)( !StrOp.equals( savepos, wSwitch.none ) && !StrOp.equals( state, savepos ) );
   Boolean raster = StrOp.equals( wSwitch.getswtype( m_Props ), wSwitch.swtype_raster );
+
+  if( wSwitch.getlocid( m_Props )!=NULL && StrOp.equals( wSwitch.unlocked, wSwitch.getlocid( m_Props )) )
+    islocked = False;
+
+  if( islocked || issavepos || !isset || !wGui.isshowroute4switch(wxGetApp().getIni()) )
+    actroute = !occupied;
 
   // SVG Symbol:
   if( m_SvgSym2!=NULL && StrOp.equals( state, wSwitch.turnout ) ) {
     if( occupied && m_SvgSym5 != NULL )
-      drawSvgSym(dc, m_SvgSym5, ori);
+      if( islocked && m_SvgSym15 != NULL )
+        drawSvgSym(dc, m_SvgSym15, ori);
+      else
+        drawSvgSym(dc, m_SvgSym5, ori);
+    else if( actroute && m_SvgSym7 != NULL )
+      if( !isset && m_SvgSym13 != NULL )
+        drawSvgSym(dc, m_SvgSym13, ori);
+      else if( islocked && m_SvgSym[17] != NULL )
+        drawSvgSym(dc, m_SvgSym[17], ori);
+      else if( issavepos && m_SvgSym[27] != NULL )
+        drawSvgSym(dc, m_SvgSym[27], ori);
+      else
+        drawSvgSym(dc, m_SvgSym7, ori);
     else
       drawSvgSym(dc, m_SvgSym2, ori);
   }
   else if( m_SvgSym1!=NULL ) {
     if( occupied && m_SvgSym4 != NULL )
-      drawSvgSym(dc, m_SvgSym4, ori);
+      if( islocked && m_SvgSym14 != NULL )
+        drawSvgSym(dc, m_SvgSym14, ori);
+      else
+        drawSvgSym(dc, m_SvgSym4, ori);
+    else if( actroute && m_SvgSym6 != NULL )
+      if( !isset && m_SvgSym11 != NULL )
+        drawSvgSym(dc, m_SvgSym11, ori);
+      else if( islocked && m_SvgSym16 != NULL )
+        drawSvgSym(dc, m_SvgSym16, ori);
+      else if( issavepos && m_SvgSym[26] != NULL )
+        drawSvgSym(dc, m_SvgSym[26], ori);
+      else
+        drawSvgSym(dc, m_SvgSym6, ori);
     else
       drawSvgSym(dc, m_SvgSym1, ori);
   }
 
   if( m_bShowID ) {
-    wxFont* font = new wxFont( dc.GetFont() );
-    font->SetPointSize( m_iItemIDps );
-    dc.SetFont(*font);
-
-    if( m_iSymSubType == switchtype::i_turnoutleft ) {
-      if( StrOp.equals( ori, wItem.south ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
-      else if( StrOp.equals( ori, wItem.north ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
-      else if( StrOp.equals( ori, wItem.east ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
-      else
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
+    /* twoway switch is different */
+    if( m_iSymSubType == switchtype::i_twoway && raster ) {
+      if( StrOp.equals( ori, wItem.south ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
+      }
+      else if( StrOp.equals( ori, wItem.north ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
+      }
+      else if( StrOp.equals( ori, wItem.east ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
+      }
+      else {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 13, 1, 0.0 );
+      }
+    }
+    else if( m_iSymSubType == switchtype::i_twoway ) {
+      if( StrOp.equals( ori, wItem.south ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 18, 1, 270.0 );
+      }
+      else if( StrOp.equals( ori, wItem.north ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 14, 32, 90.0 );
+      }
+      else if( StrOp.equals( ori, wItem.east ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 12, 12, 0.0 );
+      }
+      else {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 12, 0.0 );
+      }
+    }
+    else if( m_SvgSym16 != NULL ) {
+      if( StrOp.equals( ori, wItem.south ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 17, 270.0 );
+      }
+      else if( StrOp.equals( ori, wItem.north ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 17, 90.0 );
+      }
+      else if( StrOp.equals( ori, wItem.east ) ) {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
+      }
+      else {
+        drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 17, 1, 0.0 );
+      }
+    }
+    /* standard switches non raster and raster */
+    else if( StrOp.equals( ori, wItem.south ) ) {
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
+    }
+    else if( StrOp.equals( ori, wItem.north ) ) {
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
+    }
+    else if( StrOp.equals( ori, wItem.east ) ) {
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
     }
     else {
-      if( StrOp.equals( ori, wItem.south ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
-      else if( StrOp.equals( ori, wItem.north ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
-      else if( StrOp.equals( ori, wItem.east ) )
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
-      else
-        dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
     }
-    delete font;
   }
 
 }
@@ -1152,80 +1914,89 @@ void SymbolRenderer::drawTurnout( wxPaintDC& dc, bool occupied, const char* ori 
 void SymbolRenderer::drawSwitch( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSwitch.getstate( m_Props );
 
-  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "Switch %s state=%s", wSwitch.getid( m_Props ), state );
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "Switch %s state=%s subtype=%d ori=%s occ=%d route=%d",
+      wSwitch.getid( m_Props ), state, m_iSymSubType, ori, occupied, actroute );
 
-  /*
-        m_SvgSym1 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler );
-        m_SvgSym2 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler_occ );
-        m_SvgSym3 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler_on );
-        m_SvgSym4 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler_on_occ );
-        m_SvgSym5 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler_route );
-        m_SvgSym6 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler_on_route );
-        m_SvgSym7 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler_on_occ_route );
-        m_SvgSym8 = (svgSymbol*)MapOp.get( m_SymMap, switchtype::decoupler_occ_route );
-
-   */
   switch( m_iSymSubType ) {
     case switchtype::i_decoupler:
-      // SVG Symbol:
-      if( m_SvgSym3!=NULL && StrOp.equals( state, wSwitch.straight ) ) {
-        if( occupied && !actroute && m_SvgSym4 != NULL )
-          drawSvgSym(dc, m_SvgSym4, ori);
-        else if( occupied && actroute && m_SvgSym7 != NULL )
-          drawSvgSym(dc, m_SvgSym7, ori);
-        else if( occupied && actroute && m_SvgSym4 != NULL )
-          drawSvgSym(dc, m_SvgSym4, ori);
-        else if( !occupied && actroute && m_SvgSym6 != NULL )
-          drawSvgSym(dc, m_SvgSym6, ori);
-        else if( m_SvgSym3 != NULL )
-          drawSvgSym(dc, m_SvgSym3, ori);
-        return;
-      }
-      else if( m_SvgSym1!=NULL ) {
-        if( occupied && !actroute && m_SvgSym2 != NULL )
-          drawSvgSym(dc, m_SvgSym2, ori);
-        else if( occupied && actroute && m_SvgSym8 != NULL )
-          drawSvgSym(dc, m_SvgSym8, ori);
-        else if( occupied && actroute && m_SvgSym2 != NULL )
-          drawSvgSym(dc, m_SvgSym2, ori);
-        else if( !occupied && actroute && m_SvgSym5 != NULL )
-          drawSvgSym(dc, m_SvgSym5, ori);
-        else if( m_SvgSym1 != NULL )
-          drawSvgSym(dc, m_SvgSym1, ori);
-        return;
-      }
+      drawDecoupler( dc, occupied, actroute, ori );
       break;
 
     case switchtype::i_ccrossing:
-      drawCCrossing( dc, occupied, ori );
+      drawCCrossing( dc, occupied, actroute, ori );
       break;
 
     case switchtype::i_crossing:
     case switchtype::i_crossingleft:
     case switchtype::i_crossingright:
-      drawCrossing( dc, occupied, ori );
+      drawCrossing( dc, occupied, actroute, ori );
       break;
 
     case switchtype::i_dcrossingleft:
     case switchtype::i_dcrossingright:
-      drawDCrossing( dc, occupied, ori );
+      drawDCrossing( dc, occupied, actroute, ori );
       break;
 
     case switchtype::i_threeway:
-      drawThreeway( dc, occupied, ori );
+      drawThreeway( dc, occupied, actroute, ori );
       break;
 
     case switchtype::i_accessory:
-      drawAccessory( dc, occupied, ori );
+      drawAccessory( dc, occupied, actroute, ori );
       break;
 
     case switchtype::i_turnoutleft:
     case switchtype::i_turnoutright:
-      drawTurnout( dc, occupied, ori );
+    case switchtype::i_twoway:
+      drawTurnout( dc, occupied, actroute, ori );
       break;
 
   }
 }
+
+
+void SymbolRenderer::drawDecoupler( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
+  const char* state = wSwitch.getstate( m_Props );
+
+  // SVG Symbol:
+  if( m_SvgSym3!=NULL && StrOp.equals( state, wSwitch.straight ) ) {
+    if( occupied && m_SvgSym4 != NULL )
+      drawSvgSym(dc, m_SvgSym4, ori);
+    else if( occupied && actroute && m_SvgSym7 != NULL )
+      drawSvgSym(dc, m_SvgSym7, ori);
+    else if( occupied && actroute && m_SvgSym4 != NULL )
+      drawSvgSym(dc, m_SvgSym4, ori);
+    else if( !occupied && actroute && m_SvgSym6 != NULL )
+      drawSvgSym(dc, m_SvgSym6, ori);
+    else if( m_SvgSym3 != NULL )
+      drawSvgSym(dc, m_SvgSym3, ori);
+  }
+  else if( m_SvgSym1!=NULL ) {
+    if( occupied && m_SvgSym2 != NULL )
+      drawSvgSym(dc, m_SvgSym2, ori);
+    else if( occupied && actroute && m_SvgSym8 != NULL )
+      drawSvgSym(dc, m_SvgSym8, ori);
+    else if( occupied && actroute && m_SvgSym2 != NULL )
+      drawSvgSym(dc, m_SvgSym2, ori);
+    else if( !occupied && actroute && m_SvgSym5 != NULL )
+      drawSvgSym(dc, m_SvgSym5, ori);
+    else if( m_SvgSym1 != NULL )
+      drawSvgSym(dc, m_SvgSym1, ori);
+  }
+
+  if( m_bShowID ) {
+    if( StrOp.equals( ori, wItem.south ) ) {
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
+    }
+    else if( StrOp.equals( ori, wItem.north ) ) {
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
+    }
+    else
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
+  }
+}
+
+
 
 
 /**
@@ -1234,10 +2005,35 @@ void SymbolRenderer::drawSwitch( wxPaintDC& dc, bool occupied, bool actroute, co
 void SymbolRenderer::drawSignal( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wSignal.getstate( m_Props );
   int aspects = wSignal.getaspects( m_Props );
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "setting signal %s to %s", wSignal.getid( m_Props ), state );
+  int nr = wSignal.getaspect(m_Props);
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "setting %d aspect signal %s to %s (nr=%d)", aspects, wSignal.getid( m_Props ), state, nr );
+
+  if( nr == -1 )
+    nr = 0;
+
+  if( nr >= 0 && nr < 5 && wSignal.getusepatterns( m_Props ) == wSignal.use_aspectnrs ) {
+    if( wSignal.getgreennr(m_Props) == nr )
+      state = wSignal.green;
+    else if( wSignal.getrednr(m_Props) == nr )
+      state = wSignal.red;
+    else if( wSignal.getyellownr(m_Props) == nr )
+      state = wSignal.yellow;
+    else if( wSignal.getwhitenr(m_Props) == nr )
+      state = wSignal.white;
+    else if( wSignal.getblanknr(m_Props) == nr )
+      state = wSignal.blank;
+  }
 
   // SVG Symbol:
-  if( m_SvgSym2!=NULL && StrOp.equals( state, wSignal.yellow ) ) {
+  if( nr >= 0 && nr < 32 && (aspects > 4 || wSignal.isusesymbolprefix(m_Props) ) && m_SvgSym[nr] != NULL) {
+    if( occupied && m_SvgSymOcc[nr] != NULL)
+      drawSvgSym(dc, m_SvgSymOcc[nr], ori);
+    else if( actroute && m_SvgSymRoute[nr] != NULL)
+      drawSvgSym(dc, m_SvgSymRoute[nr], ori);
+    else
+      drawSvgSym(dc, m_SvgSym[nr], ori);
+  }
+  else if( m_SvgSym2!=NULL && StrOp.equals( state, wSignal.yellow ) ) {
     if( occupied && m_SvgSym5 != NULL)
       drawSvgSym(dc, m_SvgSym5, ori);
     else if( actroute && m_SvgSym10 != NULL)
@@ -1287,21 +2083,81 @@ void SymbolRenderer::drawSignal( wxPaintDC& dc, bool occupied, bool actroute, co
       drawSvgSym(dc, m_SvgSym1, ori);
   }
 
-  if( m_bShowID ) {
-    wxFont* font = new wxFont( dc.GetFont() );
-    font->SetPointSize( m_iItemIDps );
-    dc.SetFont(*font);
+  if( StrOp.equals( wSignal.blockstate, wSignal.getsignal( m_Props ) ) && StrOp.len(m_Label) > 0 ) {
+    int red    = 0;
+    int green  = 0;
+    int blue   = 0;
+    bool underline = false;
 
-    if( StrOp.equals( ori, wItem.north ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
-    else if( StrOp.equals( ori, wItem.south ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
-    else if( StrOp.equals( ori, wItem.east ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
-    else
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
+    if( m_iOccupied == 1 ) {
+      setPen( wxPen(Base::getGreen()));
+      setBrush( wxBrush(Base::getGreen()));
+    }
+    else if( m_iOccupied == 2 ) {
+      setPen( wxPen(Base::getRed()));
+      setBrush( wxBrush(Base::getRed()));
+    }
+    else if( m_iOccupied == 3 ) {
+      setPen( wxPen(Base::getBlue()));
+      setBrush( wxBrush(Base::getBlue()));
+    }
+    else if( m_iOccupied == 4 ) {
+      setPen( wxPen(Base::getYellow()));
+      setBrush( wxBrush(Base::getYellow()));
+    }
+    else if( m_iOccupied == 5 ) {
+      setPen( wxPen(Base::getGreen()));
+      setBrush( wxBrush(Base::getGreen()));
+      underline = true;
+    }
+    else if( m_iOccupied == 6 ) {
+      setPen( wxPen(Base::getYellow()));
+      setBrush( wxBrush(Base::getYellow()));
+      underline = true;
+    }
+    else {
+      setPen( wxPen(Base::getGrey()));
+      setBrush( wxBrush(Base::getGrey()));
+    }
+
+    if( m_UseGC ) {
+      m_GC->DrawRectangle(6,6,19,19);
+    }
+    else {
+      dc.DrawRectangle(6,6,19,19);
+    }
+
+    wxFont* font = setFont(m_iTextps, red, green, blue, true, false, underline);
+    /* center the text */
+    double width = 0;
+    double height = 0;
+    double descent = 0;
+    double externalLeading = 0;
+    if( m_UseGC )
+      m_GC->GetTextExtent( wxString(m_Label,wxConvUTF8).Trim(),(wxDouble*)&width,(wxDouble*)&height,(wxDouble*)&descent,(wxDouble*)&externalLeading);
+    else {
+      wxCoord w;
+      wxCoord h;
+      dc.GetTextExtent(wxString(m_Label,wxConvUTF8).Trim(), &w, &h, 0,0, font);
+      width  = w;
+      height = h;
+    }
+
+    drawString( wxString(m_Label,wxConvUTF8), (32-width)/2, (32-height)/2, 0.0, false );
 
     delete font;
+  }
+
+  if( m_bShowID && !StrOp.equals( wSignal.blockstate, wSignal.getsignal( m_Props ) ) ) {
+    if( StrOp.equals( ori, wItem.north ) )
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
+    else if( StrOp.equals( ori, wItem.south ) )
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
+    else if( StrOp.equals( ori, wItem.east ) )
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
+    else
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 20, 0.0 );
+
   }
 }
 
@@ -1311,10 +2167,45 @@ void SymbolRenderer::drawSignal( wxPaintDC& dc, bool occupied, bool actroute, co
  */
 void SymbolRenderer::drawOutput( wxPaintDC& dc, bool occupied, bool actroute, const char* ori ) {
   const char* state = wOutput.getstate( m_Props );
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "setting output %s to %s", wSignal.getid( m_Props ), state );
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "setting output %s to %s", wSignal.getid( m_Props ), state );
 
+  if( m_UseGC && (wOutput.getporttype(m_Props) == wProgram.porttype_backlight || wOutput.getporttype(m_Props) == wProgram.porttype_light) ) {
+    // Render light.
+    wxPen* pen = (wxPen*)wxBLACK_PEN;
+    pen->SetWidth(2);
+    pen->SetStyle(wxSOLID);
+    if( m_UseGC ) {
+      int bri = wOutput.getvalue(m_Props);
+      if( StrOp.equals( wOutput.off, state ) )
+        bri = 0;
+      float factor = (1.0 / 255.0) * (float)bri;
+      setPen( *pen );
+      setBrush( wxBrush(wxColour(bri, bri, bri)) );
+      m_GC->DrawEllipse(6, 6, 20, 20);
+      if( wOutput.getcolor(m_Props) != NULL && wOutput.iscolortype(m_Props) ) {
+        iONode color = wOutput.getcolor(m_Props);
+        TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "setting output %s to brightness %d, factor=%.2f RGBW=%d,%d,%d,%d",
+            wOutput.getid( m_Props ), bri, factor, wColor.getred(color), wColor.getgreen(color), wColor.getblue(color), wColor.getwhite(color) );
+        int w = wColor.getwhite(color);
+        int r = wColor.getred(color) + w;
+        int g = wColor.getgreen(color) + w;
+        int b = wColor.getblue(color) + w;
+        if( r > 255 ) r = 255;
+        if( g > 255 ) g = 255;
+        if( b > 255 ) b = 255;
+        setPen( wxPen(wxColour(r,g,b)));
+        setBrush( wxBrush(wxColour(r,g,b)) );
+      }
+      else {
+        TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "setting output %s to brightness %d, factor=%.2f", wOutput.getid( m_Props ), bri, factor );
+        setPen( wxPen(wxColour(255, 255, 0)));
+        setBrush( wxBrush(wxColour(255, 255, 0)) );
+      }
+      m_GC->DrawEllipse(6.0 + (10.0 - 10.0 * factor), 6.0 + (10.0 - 10.0 * factor), 19.0 * factor, 19.0 * factor);
+    }
+  }
   // SVG Symbol:
-  if( m_SvgSym3!=NULL && StrOp.equals( state, wOutput.active ) ) {
+  else if( m_SvgSym3!=NULL && StrOp.equals( state, wOutput.active ) ) {
     if(occupied && m_SvgSym6!= NULL)
       drawSvgSym(dc, m_SvgSym6, ori);
     else if(actroute && m_SvgSym9!= NULL)
@@ -1323,7 +2214,6 @@ void SymbolRenderer::drawOutput( wxPaintDC& dc, bool occupied, bool actroute, co
       drawSvgSym(dc, m_SvgSym6, ori);
     else
       drawSvgSym(dc, m_SvgSym3, ori);
-    return;
   }
   else if( m_SvgSym2!=NULL && StrOp.equals( state, wOutput.on ) ) {
     if(occupied && m_SvgSym5!= NULL)
@@ -1334,7 +2224,6 @@ void SymbolRenderer::drawOutput( wxPaintDC& dc, bool occupied, bool actroute, co
       drawSvgSym(dc, m_SvgSym5, ori);
     else
       drawSvgSym(dc, m_SvgSym2, ori);
-    return;
   }
   else if( m_SvgSym1!=NULL ) {
     if(occupied && m_SvgSym4!= NULL)
@@ -1345,22 +2234,10 @@ void SymbolRenderer::drawOutput( wxPaintDC& dc, bool occupied, bool actroute, co
       drawSvgSym(dc, m_SvgSym4, ori);
     else
       drawSvgSym(dc, m_SvgSym1, ori);
-    return;
   }
 
-  dc.DrawCircle( 16, 16, 12 );
-
-  if( StrOp.equals( state, wOutput.on ) ) {
-    const wxBrush& b = dc.GetBrush();
-    dc.SetBrush( *wxRED_BRUSH );
-    dc.DrawCircle( 16, 16, 10 );
-    dc.SetBrush( b );
-  }
-  else {
-    const wxBrush& b = dc.GetBrush();
-    dc.SetBrush( *wxGREEN_BRUSH );
-    dc.DrawCircle( 16, 16, 10 );
-    dc.SetBrush( b );
+  if( m_bShowID ) {
+    drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 0, 0.0 );
   }
 }
 
@@ -1379,7 +2256,7 @@ void SymbolRenderer::drawStage( wxPaintDC& dc, bool occupied, const char* ori ) 
     // occupied
     drawSvgSym(dc, m_SvgSym2, ori);
   }
-  else if( m_SvgSym3!=NULL && m_iOccupied == 2 || m_SvgSym3!=NULL && m_SvgSym4==NULL && m_iOccupied == 3 ) {
+  else if( m_SvgSym3!=NULL && m_iOccupied == 2 ) {
     /* reserved state */
     drawSvgSym(dc, m_SvgSym3, ori);
   }
@@ -1387,20 +2264,16 @@ void SymbolRenderer::drawStage( wxPaintDC& dc, bool occupied, const char* ori ) 
     /* enter state */
     drawSvgSym(dc, m_SvgSym4, ori);
   }
-
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-  //wxFont* font = new wxFont( dc.GetFont() );
-  //font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  //dc.SetFont(*font);
-#else
-  wxFont* font = new wxFont( dc.GetFont() );
-  font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  dc.SetFont(*font);
-#endif
+  else if( m_SvgSym5!=NULL && m_iOccupied == 4 ) {
+    /* closed state */
+    drawSvgSym(dc, m_SvgSym5, ori);
+  }
+  else if( m_SvgSym6!=NULL && m_iOccupied == 5 ) {
+    /* ghost state */
+    drawSvgSym(dc, m_SvgSym6, ori);
+  }
 
   if( StrOp.len(m_Label) > 0 ) {
-    wxColour tfc = dc.GetTextForeground();
-
     int red = 0;
     int green = 0;
     int blue = 0;
@@ -1408,38 +2281,118 @@ void SymbolRenderer::drawStage( wxPaintDC& dc, bool occupied, const char* ori ) 
 
     iONode planpanelIni = wGui.getplanpanel(wxGetApp().getIni());
     if( planpanelIni != NULL ) {
-      red = wPlanPanel.getbktext_red(planpanelIni);
+      red   = wPlanPanel.getbktext_red(planpanelIni);
       green = wPlanPanel.getbktext_green(planpanelIni);
-      blue = wPlanPanel.getbktext_blue(planpanelIni);
+      blue  = wPlanPanel.getbktext_blue(planpanelIni);
     }
 
-    dc.SetTextForeground(wxColour(red,green,blue));
+    wxFont* font = setFont(m_iTextps, red, green, blue);
 
-    if( StrOp.equals( ori, wItem.south ) )
-      dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 32-5, 3, 270.0 );
-    else if( StrOp.equals( ori, wItem.north ) )
-      dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 7, (32 * len)-3, 90.0 );
-    else
-      dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 3, 5, 0.0 );
+    if( StrOp.equals( ori, wItem.south ) ) {
+      drawString( wxString(m_Label,wxConvUTF8), 32-5, 3, 270.0, false );
+    }
+    else if( StrOp.equals( ori, wItem.north ) ) {
+      drawString( wxString(m_Label,wxConvUTF8), 7, (32 * len)-3, 90.0, false );
+    }
+    else {
+      drawString( wxString(m_Label,wxConvUTF8), 3, 5, 0.0, false );
+    }
 
-    // restore previous color
-    dc.SetTextForeground(tfc);
+    delete font;
   }
 
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-#else
-  delete font;
-#endif
 }
 
+
+double SymbolRenderer::getRadians( double degrees ) {
+  static double PI= 3.14159265358979;
+  return (degrees / 360) * (2.0 * PI);
+}
 
 /**
  * Block object
  */
+void SymbolRenderer::drawBlockTriangle( wxPaintDC& dc, const char* ori ) {
+  if( m_iOccupied == 0 || m_iOccupied == 2 || m_iOccupied == 4 || m_iOccupied == 6 || m_iOccupied == 7  )
+    return;
+
+  const wxBrush& b = dc.GetBrush();
+  setBrush( *wxBLACK );
+  setPen( wxPen( *wxBLACK, 1));
+  static wxPoint p[4];
+  int end ;
+
+  if( StrOp.equals( wItem.west, ori ) || StrOp.equals( wItem.east, ori ) ) {
+    // horizontal triangle
+    if( m_cx <= 3 ) {
+      p[0].x =  8; p[0].y =  8;
+      p[1].x = 11; p[1].y = 11;
+      p[2].x = 11; p[2].y =  5;
+      p[3].x =  8; p[3].y =  8;
+    }
+    else {
+      p[0].x = 3; p[0].y = 15;
+      p[1].x = 6; p[1].y = 18;
+      p[2].x = 6; p[2].y = 12;
+      p[3].x = 3; p[3].y = 15;
+    }
+
+    if(  ( StrOp.equals( wItem.east, ori ) && ! m_rotate )
+      || ( StrOp.equals( wItem.west, ori ) && m_rotate )
+      ) {
+      // mirror to other end
+      end = (m_cx*32) - 1 ;
+      p[0].x = end - p[0].x;
+      p[1].x = end - p[1].x;
+      p[2].x = end - p[2].x;
+      p[3].x = end - p[3].x;
+    }
+  }
+  else {
+    // vertical triangle
+    if( m_cy <= 3 ) {
+      p[0].x =  8; p[0].y =  8;
+      p[1].x = 11; p[1].y = 11;
+      p[2].x =  5; p[2].y = 11;
+      p[3].x =  8; p[3].y =  8;
+    }
+    else {
+      p[0].x = 15; p[0].y = 3;
+      p[1].x = 18; p[1].y = 6;
+      p[2].x = 12; p[2].y = 6;
+      p[3].x = 15; p[3].y = 3;
+    }
+
+    if(  ( StrOp.equals( wItem.north, ori ) && ! m_rotate )
+      || ( StrOp.equals( wItem.south, ori ) && m_rotate )
+      ) {
+      // mirror to other end
+      end = (m_cy*32) - 1 ;
+      p[0].y = end - p[0].y;
+      p[1].y = end - p[1].y;
+      p[2].y = end - p[2].y;
+      p[3].y = end - p[3].y;
+    }
+  }
+
+  if( m_UseGC ) {
+    wxGraphicsPath path = m_GC->CreatePath();
+    path.MoveToPoint(p[0].x, p[0].y);
+    path.AddLineToPoint(p[1].x, p[1].y);
+    path.AddLineToPoint(p[2].x, p[2].y);
+    path.AddLineToPoint(p[3].x, p[3].y);
+    path.AddLineToPoint(p[4].x, p[4].y);
+    m_GC->FillPath(path);
+  }
+  else {
+    dc.DrawPolygon( 4, p, 0, 0 );
+  }
+
+}
+
 void SymbolRenderer::drawBlock( wxPaintDC& dc, bool occupied, const char* ori ) {
   m_bRotateable = true;
   Boolean m_bSmall = wBlock.issmallsymbol(m_Props);
-  int blocklen = m_bSmall ? 2:4;
   const char* textOri = ori;
 
   svgSymbol* svgSym[9];
@@ -1453,31 +2406,17 @@ void SymbolRenderer::drawBlock( wxPaintDC& dc, bool occupied, const char* ori ) 
   svgSym[7] = (m_bSmall && m_SvgSym14 != NULL)?m_SvgSym14:m_SvgSym13;
   svgSym[8] = (m_bSmall && m_SvgSym16 != NULL)?m_SvgSym16:m_SvgSym15;
 
-  //if( StrOp.equals( ori, wItem.east ) )
-    //ori = wItem.west;
-
-  if( m_rotate) {
-    if( StrOp.equals(ori, wItem.west))
-        ori = wItem.east;
-    else if(StrOp.equals(ori, wItem.east))
-        ori = wItem.west;
-    else if(StrOp.equals(ori, wItem.north))
-        ori = wItem.south;
-    else if(StrOp.equals(ori, wItem.south))
-        ori = wItem.north;
-  }
-
   // SVG Symbol:
-  if( svgSym[1]!=NULL && m_iOccupied == 0 ||
-      svgSym[1]!=NULL && svgSym[5]==NULL && m_iOccupied == 4 ||
-      svgSym[1]!=NULL && svgSym[6]==NULL && m_iOccupied == 5  )
+  if( (svgSym[1]!=NULL && m_iOccupied == 0) ||
+      (svgSym[1]!=NULL && svgSym[5]==NULL && m_iOccupied == 4) ||
+      (svgSym[1]!=NULL && svgSym[6]==NULL && m_iOccupied == 5)  )
   {
     drawSvgSym(dc, svgSym[1], ori);
   }
   else if( svgSym[2]!=NULL && m_iOccupied == 1 ) {
     drawSvgSym(dc, svgSym[2], ori);
   }
-  else if( svgSym[3]!=NULL && m_iOccupied == 2 || svgSym[3]!=NULL && svgSym[4]==NULL && m_iOccupied == 3 ) {
+  else if( (svgSym[3]!=NULL && m_iOccupied == 2) || (svgSym[3]!=NULL && svgSym[4]==NULL && m_iOccupied == 3) ) {
     /* reserved state */
     drawSvgSym(dc, svgSym[3], ori);
   }
@@ -1499,24 +2438,120 @@ void SymbolRenderer::drawBlock( wxPaintDC& dc, bool occupied, const char* ori ) 
   }
   else if( svgSym[8]!=NULL && m_iOccupied == 7 ) {
      /* aident */
-     drawSvgSym(dc, svgSym[8], ori);
-   }
+    drawSvgSym(dc, svgSym[8], ori);
+  }
   else if( svgSym[1]!=NULL ) {
-     drawSvgSym(dc, svgSym[1], ori);
-   }
-  // TODO: Blocktext scaling!!!
-  wxFont* font = new wxFont( dc.GetFont() );
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-  //font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  //dc.SetFont(*font);
-#else
-  font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  dc.SetFont(*font);
-#endif
+    drawSvgSym(dc, svgSym[1], ori);
+  }
 
-  if( StrOp.len(m_Label) > 0 ) {
-    wxColour tfc = dc.GetTextForeground();
+  drawBlockTriangle( dc, ori );
 
+  int labelOffset  = 0;
+  int symbolLength = 128;
+  int imageWidth   = 0;
+
+  bool l_ImageOK = false;
+  if( (m_iOccupied == 1 || m_iOccupied == 3) && m_LocoImage != NULL && StrOp.len(m_LocoImage) > 0 ) {
+    // Show loco image.
+    const char* imagepath = wGui.getimagepath(wxGetApp().getIni());
+    static char pixpath[256];
+    StrOp.fmtb( pixpath, "%s%c%s", imagepath, SystemOp.getFileSeparator(), FileOp.ripPath( m_LocoImage ) );
+
+    if( FileOp.exist(pixpath) && StrOp.endsWithi( pixpath, ".png" ) ) {
+      wxBitmap* imageBitmap = NULL;
+      wxImage img(wxString(pixpath,wxConvUTF8), wxBITMAP_TYPE_PNG);
+      int maxheight = 20;
+      if( img.GetHeight() > maxheight ) {
+        int h = img.GetHeight();
+        int w = img.GetWidth();
+        float scale = (float)h / (float)maxheight;
+        float width = (float)w / scale;
+        imageBitmap = new wxBitmap(img.Scale((int)width, maxheight, wxIMAGE_QUALITY_HIGH));
+      }
+      else {
+        imageBitmap = new wxBitmap(img);
+      }
+
+      if( m_bSmall )
+        symbolLength = 64;
+
+      imageWidth = imageBitmap->GetWidth();
+
+      int x = (symbolLength - imageBitmap->GetWidth()) / 2;
+      if( (m_rotate && StrOp.equals(ori, wItem.west)) || (!m_rotate && StrOp.equals(ori, wItem.east)) ) {
+        x = symbolLength - imageBitmap->GetWidth() - 10;
+        if( m_rotate && StrOp.equals(ori, wItem.west) ) {
+          wxImage img = imageBitmap->ConvertToImage();
+          delete imageBitmap;
+          img = img.Mirror(true);
+          imageBitmap = new wxBitmap(img);
+        }
+      }
+      else {
+        x = 10;
+        labelOffset = imageBitmap->GetWidth();
+        if( !m_rotate && StrOp.equals(ori, wItem.west) ) {
+          wxImage img = imageBitmap->ConvertToImage();
+          delete imageBitmap;
+          img = img.Mirror(true);
+          imageBitmap = new wxBitmap(img);
+        }
+      }
+
+      int y = (32-maxheight)/2;
+      if( x < 10 )
+        x = 10;
+
+      if( (m_rotate && !(StrOp.equals( ori, wItem.north ) || StrOp.equals( ori, wItem.south ))) ||
+          (!m_rotate && (StrOp.equals( ori, wItem.north ) || StrOp.equals( ori, wItem.south ))) )
+      {
+        wxImage img = imageBitmap->ConvertToImage();
+        delete imageBitmap;
+        img = img.Mirror();
+        imageBitmap = new wxBitmap(img);
+      }
+
+      if( StrOp.equals( ori, wItem.north ) || StrOp.equals( ori, wItem.south ) ) {
+        wxImage img = imageBitmap->ConvertToImage();
+        delete imageBitmap;
+        img = img.Rotate90( StrOp.equals( ori, wItem.north ) ? false:true );
+        imageBitmap = new wxBitmap(img);
+        x = (32-maxheight)/2;
+        y = (symbolLength - imageBitmap->GetHeight()) / 2;
+        labelOffset = 0;
+        if( symbolLength - imageBitmap->GetHeight() >= 20 ) {
+          if( (!m_rotate && StrOp.equals(ori, wItem.north)) || (m_rotate && StrOp.equals(ori, wItem.south)) ) {
+            y = symbolLength - imageBitmap->GetHeight() - 10;
+            if( StrOp.equals(ori, wItem.north) )
+              labelOffset = imageBitmap->GetHeight();
+            else
+              labelOffset = 0;
+          }
+          else {
+            y = 10;
+            if( StrOp.equals(ori, wItem.north) )
+              labelOffset = 0;
+            else
+              labelOffset = imageBitmap->GetHeight();
+          }
+        }
+        if( y < 10 )
+          y = 10;
+      }
+
+      if( m_UseGC )
+        m_GC->DrawBitmap(*imageBitmap, x, y, imageBitmap->GetWidth(), imageBitmap->GetHeight());
+      else
+        dc.DrawBitmap(*imageBitmap, x, y);
+
+      delete imageBitmap;
+
+      l_ImageOK = true;
+    }
+  }
+
+
+  if( (!l_ImageOK || !m_bSmall) && StrOp.len(m_Label) > 0 ) {
     int red = 0;
     int green = 0;
     int blue = 0;
@@ -1529,29 +2564,43 @@ void SymbolRenderer::drawBlock( wxPaintDC& dc, bool occupied, const char* ori ) 
       blue = wPlanPanel.getbktext_blue(planpanelIni);
     }
 
-    dc.SetTextForeground(wxColour(red,green,blue));
-
-    /* center the blocktext */
-    wxCoord width;
-    wxCoord height;
-    dc.GetTextExtent(wxString(m_Label,wxConvUTF8).Trim(), &width, &height, 0,0, font);
-
-    if( StrOp.equals( textOri, wItem.south ) )
-      dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 32-5, 3, 270.0 );
-    else if( StrOp.equals( textOri, wItem.north ) )
-      dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 7, (32 * blocklen)-3, 90.0 );
-    else {
-#ifdef __WIN32__
-      dc.DrawRotatedText( wxString(m_Label,wxConvUTF8).Trim(), 9, 8, 0.0 );
-#else
-      dc.DrawRotatedText( wxString(m_Label,wxConvUTF8).Trim(), ((32*blocklen-width)/2), (32-height)/2, 0.0 );
-#endif
+    if( m_bLocoManual ) {
+      red   = 0;
+      green = 0;
+      blue  = 200;
     }
-    // restore previous color
-    dc.SetTextForeground(tfc);
+
+    wxFont* font = setFont(m_iTextps, red, green, blue, m_bLocoManual);
+    /* center the blocktext */
+    double width = 0;
+    double height = 0;
+    double descent = 0;
+    double externalLeading = 0;
+    if( m_UseGC )
+      m_GC->GetTextExtent( wxString(m_Label,wxConvUTF8).Trim(),(wxDouble*)&width,(wxDouble*)&height,(wxDouble*)&descent,(wxDouble*)&externalLeading);
+    else {
+      wxCoord w;
+      wxCoord h;
+      dc.GetTextExtent(wxString(m_Label,wxConvUTF8).Trim(), &w, &h, 0,0, font);
+      width  = w;
+      height = h;
+    }
+
+    if( imageWidth == 0 || (width <= (symbolLength - imageWidth - 20 )) ) {
+      if( StrOp.equals( textOri, wItem.south ) ) {
+        drawString( wxString(m_Label,wxConvUTF8), 32-5, 9 + labelOffset, 270.0, false );
+      }
+      else if( StrOp.equals( textOri, wItem.north ) ) {
+        drawString( wxString(m_Label,wxConvUTF8), 7, (32 * m_cy) - 8 - labelOffset,  90.0, false );
+      }
+      else {
+        drawString( wxString(m_Label,wxConvUTF8), 10 + labelOffset, (32-height)/2, 0.0, false );
+      }
+    }
+
+    delete font;
   }
 
-  delete font;
 }
 
 
@@ -1561,56 +2610,71 @@ void SymbolRenderer::drawBlock( wxPaintDC& dc, bool occupied, const char* ori ) 
 void SymbolRenderer::drawSelTab( wxPaintDC& dc, bool occupied, const char* ori ) {
   m_bRotateable = true;
   int nrtracks = wSelTab.getnrtracks(m_Props);
+  if( nrtracks > 32 ) {
+    nrtracks = 32;
+  }
 
   const wxBrush& b = dc.GetBrush();
   if( m_iOccupied == 1 ) {
-    dc.SetBrush( wxColour(255,200,200) );
+    setBrush( wxColour(255,200,200) );
   }
   else if( m_iOccupied == 2 ) {
-    dc.SetBrush( wxColour(255,255,200) );
+    setBrush( wxColour(255,255,200) );
+  }
+  else {
+    setBrush( *wxWHITE );
   }
 
-  dc.SetPen( wxPen( wxColour(0,0,0), 2));
+  setPen( wxPen( wxColour(0,0,0), 2));
 
-  wxPoint seltab[4];
-  seltab[0].x = 1;
-  seltab[0].y = 3;
-  seltab[1].x = (32 * nrtracks) - 1;
-  seltab[1].y = 3;
-  seltab[2].x = (32 * nrtracks) - 1;
-  seltab[2].y = 28;
-  seltab[3].x = 1;
-  seltab[3].y = 28;
-  //dc.DrawPolygon( 4, rotateShape( seltab, 4, ori ) );
-  if( StrOp.equals( wItem.west, ori ) || StrOp.equals( wItem.east, ori ) )
-    dc.DrawRoundedRectangle( 1, 3, (32 * nrtracks) - 1, 28, 10 );
-  else
-    dc.DrawRoundedRectangle( 3, 1, 28, (32 * nrtracks) - 1, 10 );
+  if( StrOp.equals( wItem.west, ori ) || StrOp.equals( wItem.east, ori ) ) {
+    if( m_UseGC )
+      m_GC->DrawRoundedRectangle( 1, 3, (32 * nrtracks) - 1, 28, 10 );
+    else
+      dc.DrawRoundedRectangle( 1, 3, (32 * nrtracks) - 1, 28, 10 );
+  }
+  else {
+    if( m_UseGC )
+      m_GC->DrawRoundedRectangle( 3, 1, 28, (32 * nrtracks) - 1, 10 );
+    else
+      dc.DrawRoundedRectangle( 3, 1, 28, (32 * nrtracks) - 1, 10 );
+  }
 
-  dc.SetBrush( b );
+  setBrush( b );
 
-  // TODO: Blocktext scaling!!!
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-  //wxFont* font = new wxFont( dc.GetFont() );
-  //font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  //dc.SetFont(*font);
+
+  wxFont* font = setFont(m_iTextps);
+
+  /* center the blocktext */
+  double width = 0;
+  double height = 0;
+  double descent = 0;
+  double externalLeading = 0;
+  if( m_UseGC )
+    m_GC->GetTextExtent( wxString(m_Label,wxConvUTF8).Trim(),(wxDouble*)&width,(wxDouble*)&height,(wxDouble*)&descent,(wxDouble*)&externalLeading);
+  else {
+    wxCoord w;
+    wxCoord h;
+    dc.GetTextExtent(wxString(m_Label,wxConvUTF8).Trim(), &w, &h, 0,0, font);
+    width  = w;
+    height = h;
+  }
+
+  if( StrOp.equals( ori, wItem.south ) ) {
+    drawString( wxString(m_Label,wxConvUTF8), 32-5, 3, 270.0, false );
+  }
+  else if( StrOp.equals( ori, wItem.north ) ) {
+    drawString( wxString(m_Label,wxConvUTF8), 5, (32 * nrtracks)-3, 90.0, false );
+  }
+  else {
+#ifdef __WIN32__
+      drawString( wxString(m_Label,wxConvUTF8), 9, 8, 0.0, false );
 #else
-  wxFont* font = new wxFont( dc.GetFont() );
-  font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  dc.SetFont(*font);
+      drawString( wxString(m_Label,wxConvUTF8), ((32*m_cx-width)/2), (32-height)/2, 0.0, false );
 #endif
+  }
 
-  if( StrOp.equals( ori, wItem.south ) )
-    dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 32-5, 3, 270.0 );
-  else if( StrOp.equals( ori, wItem.north ) )
-    dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 5, (32 * nrtracks)-3, 90.0 );
-  else
-    dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 5, 5, 0.0 );
-
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-#else
   delete font;
-#endif
 }
 
 
@@ -1632,8 +2696,29 @@ void SymbolRenderer::drawText( wxPaintDC& dc, bool occupied, const char* ori ) {
       StrOp.fmtb( pixpath, "%s%c%s", imagepath, SystemOp.getFileSeparator(), FileOp.ripPath( m_Label ) );
 
       if( FileOp.exist(pixpath)) {
-        TraceOp.trc( "renderer", TRCLEVEL_INFO, __LINE__, 9999, "picture [%s]", pixpath );
+        TraceOp.trc( "renderer", TRCLEVEL_DEBUG, __LINE__, 9999, "picture [%s]", pixpath );
         m_Bitmap = new wxBitmap(wxString(pixpath,wxConvUTF8), wxBITMAP_TYPE_PNG);
+
+        float bmpW = m_Bitmap->GetWidth();
+        float bmpH = m_Bitmap->GetHeight();
+        float txtW = wText.getcx(m_Props) * 32;
+        float txtH = wText.getcy(m_Props) * 32;
+        float scaleW = bmpW / txtW;
+        float scaleH = bmpH / txtH;
+        float scale = 0;
+        if( scaleW > scaleH ) {
+          scale = scaleW;
+        }
+        else {
+          scale = scaleH;
+        }
+
+        if( scale > .5 ) {
+          wxImage img = m_Bitmap->ConvertToImage();
+          delete m_Bitmap;
+          img = img.Scale( (bmpW/scale), (bmpH/scale), wxIMAGE_QUALITY_HIGH );
+          m_Bitmap = new wxBitmap(img);
+        }
 
         if( StrOp.equals( ori, wItem.north ) || StrOp.equals( ori, wItem.south ) || StrOp.equals( ori, wItem.east ) ) {
           TraceOp.trc( "renderer", TRCLEVEL_INFO, __LINE__, 9999, "rotate [%s]", pixpath );
@@ -1659,63 +2744,108 @@ void SymbolRenderer::drawText( wxPaintDC& dc, bool occupied, const char* ori ) {
     m_Ori = ori;
 
     if( m_Bitmap != NULL ) {
-      dc.DrawBitmap(*m_Bitmap, 0, 0, true);
+      if( m_UseGC )
+        m_GC->DrawBitmap(*m_Bitmap, 0, 0, m_Bitmap->GetWidth(), m_Bitmap->GetHeight());
+      else
+        dc.DrawBitmap(*m_Bitmap, 0, 0, true);
       return;
     }
   }
 
   int pointsize = wText.getpointsize(m_Props);
+  if( pointsize == 0 )
+    pointsize = m_iTextps;
 
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-  wxFont* font = new wxFont( dc.GetFont() );
-  if( pointsize > 0 ) {
-    font->SetPointSize( pointsize );
-
-    if( wText.isbold(m_Props))
-      font->SetWeight(wxFONTWEIGHT_BOLD);
-
-    if( wText.isitalic(m_Props))
-      font->SetStyle(wxFONTSTYLE_ITALIC);
-
-    font->SetUnderlined( wText.isunderlined(m_Props) ? true:false);
-
-    dc.SetFont(*font);
-  }
-#else
-  wxFont* font = new wxFont( dc.GetFont() );
-  if( pointsize > 0 )
-    font->SetPointSize( pointsize );
-  else
-    font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-
-  if( wText.isbold(m_Props))
-    font->SetWeight(wxFONTWEIGHT_BOLD);
-  if( wText.isitalic(m_Props))
-    font->SetStyle(wxFONTSTYLE_ITALIC);
-  font->SetUnderlined( wText.isunderlined(m_Props) ? true:false);
-
-  dc.SetFont(*font);
-#endif
-
-
-  wxColour color( wText.getred(m_Props), wText.getgreen(m_Props), wText.getblue(m_Props) );
-
-  dc.SetTextForeground(color);
 
   if( !wText.istransparent(m_Props) && wText.getbackred(m_Props) != -1 && wText.getbackgreen(m_Props) != -1 && wText.getbackblue(m_Props) != -1 ){
     wxColour color( wText.getbackred(m_Props), wText.getbackgreen(m_Props), wText.getbackblue(m_Props) );
-    dc.SetTextBackground(color);
-    dc.SetBackgroundMode(wxSOLID);
+    dc.SetBackground(wxBrush(color));
+    dc.Clear();
   }
 
-  if( StrOp.equals( ori, wItem.south ) )
-    dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 32-5, 3, 270.0 );
-  else if( StrOp.equals( ori, wItem.north ) )
-    dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 5, (32 * wText.getcx( m_Props ))-3, 90.0 );
-  else
-    dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 3, 5, 0.0 );
+  wxFont* font = setFont(pointsize,
+      wText.getred(m_Props), wText.getgreen(m_Props), wText.getblue(m_Props),
+      wText.isbold(m_Props), wText.isitalic(m_Props), wText.isunderlined(m_Props));
+  /* center the blocktext */
+  double width = 0;
+  double height = 0;
+  double descent = 0;
+  double externalLeading = 0;
+  if( m_UseGC )
+    m_GC->GetTextExtent( wxString(m_Label,wxConvUTF8).Trim(),(wxDouble*)&width,(wxDouble*)&height,(wxDouble*)&descent,(wxDouble*)&externalLeading);
+  else {
+    wxCoord w;
+    wxCoord h;
+    dc.GetTextExtent(wxString(m_Label,wxConvUTF8).Trim(), &w, &h, 0,0, font);
+    width  = w;
+    height = h;
+  }
+
+
+  double rotation = 0.0;
+  int xoff = 3;
+  int yoff = 5;
+  int xinc = 0;
+  int yinc = height;
+
+  if( StrOp.equals( ori, wItem.south ) ) {
+    xoff = (32 * wText.getcy( m_Props ))-5;
+    yoff = 3;
+    xinc = -height;
+    yinc = 0;
+    rotation = 270.0;
+  }
+  else if( StrOp.equals( ori, wItem.north ) ) {
+    xoff = 5;
+    yoff = (32 * wText.getcx( m_Props ))-3;
+    xinc = height;
+    yinc = 0;
+    rotation = 90.0;
+  }
+
+  if( StrOp.find(m_Label, "|") ) {
+    char s[256] = {'\0'};
+    StrOp.copy( s, m_Label);
+    char* p = s;
+    char* ps = p;
+    while( (p = StrOp.find(p, "|")) ) {
+      p[0] = '\0';
+      p++;
+      //TraceOp.trc( "renderer", TRCLEVEL_INFO, __LINE__, 9999, "text %d,%d [%s] %s", xoff, yoff,  ps, ori );
+      drawString(  wxString(ps,wxConvUTF8), xoff, yoff, rotation, false );
+      yoff += yinc;
+      xoff += xinc;
+      ps = p;
+    }
+    //TraceOp.trc( "renderer", TRCLEVEL_INFO, __LINE__, 9999, "text %d,%d [%s] %s", xoff, yoff,  ps, ori );
+    drawString(  wxString(ps,wxConvUTF8), xoff, yoff, rotation, false );
+  }
+  else {
+    drawString(  wxString(m_Label,wxConvUTF8), xoff, yoff, rotation, false );
+  }
 
   delete font;
+
+  if( wText.isborder(m_Props) ) {
+    wxPen* pen = getPen(NULL);
+    pen->SetWidth(1);
+    setPen( *pen );
+    setBrush( *wxTRANSPARENT_BRUSH );
+    if( m_UseGC ) {
+      if( StrOp.equals( ori, wItem.south ) || StrOp.equals( ori, wItem.north ) )
+        m_GC->DrawRectangle(0,0,(wText.getcy(m_Props) * 32)-1, (wText.getcx(m_Props) * 32)-1);
+      else
+        m_GC->DrawRectangle(0,0,(wText.getcx(m_Props) * 32)-1, (wText.getcy(m_Props) * 32)-1);
+    }
+    else {
+      if( StrOp.equals( ori, wItem.south ) || StrOp.equals( ori, wItem.north ) )
+        dc.DrawRectangle(0,0,(wText.getcy(m_Props) * 32)-1, (wText.getcx(m_Props) * 32)-1);
+      else
+        dc.DrawRectangle(0,0,(wText.getcx(m_Props) * 32)-1, (wText.getcy(m_Props) * 32)-1);
+    }
+  }
+
+
 }
 
 
@@ -1756,26 +2886,31 @@ void SymbolRenderer::drawSensor( wxPaintDC& dc, bool occupied, bool actroute, co
       drawSvgSym(dc, m_SvgSym1, ori);
   }
 
-  if( m_bShowID ) {
-    wxFont* font = new wxFont( dc.GetFont() );
-    font->SetPointSize( m_iItemIDps );
-    dc.SetFont(*font);
+  char lab[128] = {'\0'};
+  if( m_bShowCounters )
+    StrOp.fmtb(lab, "%d,%d,%d", wFeedback.getcounter(m_Props), wFeedback.getcarcount(m_Props), wFeedback.getwheelcount(m_Props));
+  else if( m_bShowID )
+    StrOp.fmtb(lab, "%s", wItem.getid(m_Props));
 
-    if( StrOp.equals( ori, wItem.south ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
-    else if( StrOp.equals( ori, wItem.north ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
-    else
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
-
-    delete font;
+  if( m_bShowCounters || m_bShowID ) {
+    if( StrOp.equals( ori, wItem.south ) ) {
+      drawString( wxString(lab,wxConvUTF8), 32, 1, 270.0 );
+    }
+    else if( StrOp.equals( ori, wItem.north ) ) {
+      drawString( wxString(lab,wxConvUTF8), 1, 32, 90.0 );
+    }
+    else if(StrOp.equals( ori, wItem.east ) && wFeedback.iscurve( m_Props )) {
+      drawString( wxString(lab,wxConvUTF8), 0, 22, 0.0 );
+    }
+    else {
+      drawString( wxString(lab,wxConvUTF8), 0, 1, 0.0 );
+    }
   }
-
 }
 
 
 void SymbolRenderer::drawRoute( wxPaintDC& dc, bool occupied, const char* ori, int status ) {
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "set route %s to %d", wRoute.getid( m_Props ), status );
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "set route %s to %d", wRoute.getid( m_Props ), status );
 
   // SVG Symbol:
   if( status == 0 && m_SvgSym1!=NULL ) {
@@ -1790,20 +2925,45 @@ void SymbolRenderer::drawRoute( wxPaintDC& dc, bool occupied, const char* ori, i
   else if( status == 3 && m_SvgSym4!=NULL ) {
     drawSvgSym(dc, m_SvgSym4, ori);
   }
+  else if( status == 4 && m_SvgSym5!=NULL ) {
+    drawSvgSym(dc, m_SvgSym5, ori);
+  }
+  else if( m_SvgSym1!=NULL ) {
+    drawSvgSym(dc, m_SvgSym1, ori);
+  }
 
   if( m_bShowID ) {
-    wxFont* font = new wxFont( dc.GetFont() );
-    font->SetPointSize( m_iItemIDps );
-    dc.SetFont(*font);
-
     if( StrOp.equals( ori, wItem.south ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 32, 1, 270.0 );
     else if( StrOp.equals( ori, wItem.north ) )
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 1, 32, 90.0 );
     else
-      dc.DrawRotatedText( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
+      drawString( wxString(wItem.getid(m_Props),wxConvUTF8), 0, 1, 0.0 );
+  }
 
-    delete font;
+}
+
+
+void SymbolRenderer::setPen( const wxPen& pen ) {
+  if( m_UseGC )
+    m_GC->SetPen( pen );
+  else
+    m_DC->SetPen( pen );
+}
+
+void SymbolRenderer::setBrush( const wxBrush& brush ) {
+  if( m_UseGC )
+    m_GC->SetBrush( brush );
+  else
+    m_DC->SetBrush( brush );
+}
+
+void SymbolRenderer::drawLine(int x, int y, int cx, int cy) {
+  if( m_UseGC ) {
+    m_GC->StrokeLine( x, y, cx, cy );
+  }
+  else {
+    m_DC->DrawLine( x, y, cx, cy );
   }
 
 }
@@ -1814,52 +2974,134 @@ void SymbolRenderer::drawRoute( wxPaintDC& dc, bool occupied, const char* ori, i
  */
 void SymbolRenderer::drawTurntable( wxPaintDC& dc, bool occupied, double* bridgepos, const char* ori ) {
 
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "turntable with bridge pos=%f", *bridgepos );
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "turntable with bridge pos=%f (%d)", *bridgepos, wTurntable.getbridgepos(m_Props) );
+  
+  // Traverser
+  if( wTurntable.istraverser( m_Props ) ) {
+    m_bRotateable = true;
 
+    if( m_SvgSym1 != NULL && m_SvgSym2 != NULL && m_SvgSym3 != NULL && m_SvgSym5 != NULL ) {
+      // traverser body
+      drawSvgSym(dc, m_SvgSym1, ori);
+
+      // bridge
+      int pos  = wTurntable.getbridgepos( m_Props );
+      int yoff = pos % 24;
+      int xoff = 0;
+
+      if( StrOp.equals( wItem.east, ori )) {
+        yoff = yoff - 7;
+      }
+      else if( StrOp.equals( wItem.north, ori )) {
+        xoff = yoff;
+        yoff = 0;
+      }
+      else if( StrOp.equals( wItem.south, ori )) {
+        xoff = yoff - 7;
+        yoff = 0;
+      }
+
+
+      Boolean sensor1 = wTurntable.isstate1( m_Props );
+      Boolean sensor2 = wTurntable.isstate2( m_Props );
+      TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999,
+          "traverser with bridge pos=%d, yOffset=%d sen1=%d sen2=%d", pos, yoff, sensor1, sensor2 );
+      if( sensor1 && sensor2 )
+        drawSvgSym(dc, m_SvgSym3, ori, xoff, yoff);
+      else if( sensor1 || sensor2 )
+        drawSvgSym(dc, m_SvgSym5, ori, xoff, yoff);
+      else
+        drawSvgSym(dc, m_SvgSym2, ori, xoff, yoff);
+    }
+    return;
+  }
+
+  // Turntable
   wxPen* pen = (wxPen*)wxLIGHT_GREY_PEN;
   pen->SetStyle(wxSHORT_DASH);
   pen->SetWidth(1);
 
-  dc.SetPen( *pen );
+  int ttdiam = wTurntable.getsymbolsize( m_Props );
 
-  dc.DrawCircle( 79, 79, 79 );
+  if (ttdiam < 1)
+    ttdiam = 1;
+
+  if (ttdiam > 13)
+    ttdiam = 13;
+
+  double delta = (32 * ttdiam)/2;  /* 79.0; for the original one */
+
+  if( m_UseGC ) {
+    setPen( *pen );
+    m_GC->DrawEllipse(0, 0, 32 * ttdiam, 32 * ttdiam);
+  }
+  else {
+    setPen( *pen );
+    dc.DrawCircle( delta, delta, delta );
+  }
+
   pen->SetStyle(wxSOLID);
 
+  bool matchingTrack = false;
   iONode track = wTurntable.gettrack( m_Props );
   while( track != NULL ) {
     double degr = 7.5 * wTTTrack.getnr( track );
     double a = (degr*2*PI25DT)/360;
-    double xa = cos(a) * 79.0;
-    double ya = sin(a) * 79.0;
-    int x = 79 + (int)xa;
-    int y = 79 - (int)ya;
+    double xa = cos(a) * delta;
+    double ya = sin(a) * delta;
+    int x = delta + (int)xa;
+    int y = delta - (int)ya;
 
     if( wTTTrack.isstate( track ) || wTurntable.getbridgepos(m_Props) == wTTTrack.getnr(track) ) {
       pen = (wxPen*)wxRED_PEN;
       pen->SetWidth(5);
-      dc.SetPen(*pen);
+      setPen( *pen );
       *bridgepos = degr;
+      matchingTrack = true;
     }
     else {
-      pen = (wxPen*)wxGREY_PEN;
+      if( (wTurntable.getbridgepos(m_Props) +24) % 48 == wTTTrack.getnr(track) )  /* reb added, condition is true for track opposite of current track */
+        pen = (wxPen*)wxGREEN_PEN;  /* reb added the opposite track will be drawn with green*/
+      else  /* reb added others with grey*/
+        pen = (wxPen*)wxGREY_PEN;
       pen->SetWidth(5);
-      dc.SetPen(*pen);
+      setPen( *pen );
     }
 
-    if( wTTTrack.isshow( track ) )
-      dc.DrawLine( 79, 79, x, y );
+    if( wTTTrack.isshow( track ) ) {
+      drawLine( delta, delta, x, y );
+    }
+
 
     track = wTurntable.nexttrack( m_Props, track );
   }
 
+  if( !matchingTrack ) {
+    *bridgepos = 7.5 * (double)wTurntable.getbridgepos(m_Props);
+  }
+
   pen = (wxPen*)wxBLACK_PEN;
   pen->SetWidth(2);
-  dc.SetPen(*pen);
+  setPen( *pen );
 
-  dc.DrawCircle( 79, 79, 36 );
-  dc.DrawCircle( 79, 79, 32 );
-  dc.DrawPolygon( 5, rotateBridge( *bridgepos ) );
-  //dc.DrawPolygon( 5, rotateBridgeNose( *bridgepos ) );
+  setBrush(*wxWHITE_BRUSH);
+  if( m_UseGC ) {
+    m_GC->DrawEllipse(delta - 0.45*delta, delta - 0.45*delta, 0.45*(32*ttdiam), 0.45*(32*ttdiam));
+    m_GC->DrawEllipse(delta - 0.40*delta, delta - 0.40*delta, 0.40*(32*ttdiam), 0.40*(32*ttdiam));
+    wxPoint* p = rotateBridge( *bridgepos, delta );
+    wxGraphicsPath path = m_GC->CreatePath();
+    path.MoveToPoint(p[0].x, p[0].y);
+    path.AddLineToPoint(p[1].x, p[1].y);
+    path.AddLineToPoint(p[2].x, p[2].y);
+    path.AddLineToPoint(p[3].x, p[3].y);
+    path.AddLineToPoint(p[4].x, p[4].y);
+    m_GC->StrokePath(path);
+  }
+  else {
+    dc.DrawCircle( delta, delta, 0.45*delta);
+    dc.DrawCircle( delta, delta, 0.40*delta);
+    dc.DrawPolygon( 5, rotateBridge( *bridgepos, delta ) );
+  }
 
   const wxBrush& b = dc.GetBrush();
   Boolean sensor1 = wTurntable.isstate1( m_Props );
@@ -1867,47 +3109,74 @@ void SymbolRenderer::drawTurntable( wxPaintDC& dc, bool occupied, double* bridge
 
   wxBrush* yellow = NULL;
 
-  if( sensor1 && sensor2 )
-    dc.SetBrush( *wxRED_BRUSH );
+  if( sensor1 && sensor2 ) {
+    setBrush( *wxRED_BRUSH );
+  }
   else if( sensor1 || sensor2 ) {
     yellow = new wxBrush( _T("yellow"), wxSOLID );
-    dc.SetBrush( *yellow );
+    setBrush( *yellow );
   }
-  else
-    dc.SetBrush( *wxGREEN_BRUSH );
+  else {
+    setBrush( *wxGREEN_BRUSH );
+  }
 
-  dc.DrawPolygon( 5, rotateBridgeSensors( *bridgepos ) );
-  dc.SetBrush( b );
+  if( m_UseGC ) {
+    wxPoint* p = rotateBridgeSensors( *bridgepos, delta );
+    wxGraphicsPath path = m_GC->CreatePath();
+    path.MoveToPoint(p[0].x, p[0].y);
+    path.AddLineToPoint(p[1].x, p[1].y);
+    path.AddLineToPoint(p[2].x, p[2].y);
+    path.AddLineToPoint(p[3].x, p[3].y);
+    path.AddLineToPoint(p[4].x, p[4].y);
+    m_GC->FillPath(path);
+
+    p = rotateBridgePlus(*bridgepos, delta);
+    path = m_GC->CreatePath();
+    path.MoveToPoint(p[0].x, p[0].y);
+    path.AddLineToPoint(p[1].x, p[1].y);
+    path.AddLineToPoint(p[2].x, p[2].y);
+    path.AddLineToPoint(p[3].x, p[3].y);
+    path.AddLineToPoint(p[4].x, p[4].y);
+    pen->SetWidth(1);
+    setPen( *pen );
+    m_GC->StrokePath(path);
+  }
+  else {
+    dc.DrawPolygon( 5, rotateBridgeSensors( *bridgepos, delta ) );
+    pen->SetWidth(1);
+    setPen( *pen );
+    dc.DrawPolygon( 5, rotateBridgePlus( *bridgepos, delta ) );
+    dc.SetBrush( b );
+  }
+
   if( yellow != NULL )
     delete yellow;
 
-  // TODO: Blocktext scaling!!!
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-  //wxFont* font = new wxFont( dc.GetFont() );
-  //font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  //dc.SetFont(*font);
-#else
-  wxFont* font = new wxFont( dc.GetFont() );
-  font->SetPointSize( (int)(font->GetPointSize() * m_fText ) );
-  dc.SetFont(*font);
-#endif
-
-  dc.DrawRotatedText( wxString(m_Label,wxConvUTF8), 5, 5, 0.0 );
-
-#ifdef __WIN32__ // no scaling is done when exchanging the font in wx 2.6.3
-#else
-  delete font;
-#endif
-
+  if( m_bShowID ) {
+    if (ttdiam >= 5) {
+      wxFont* font = setFont(m_iTextps);
+      drawString( wxString(m_Label,wxConvUTF8), 5, 5, 0.0, false );
+      delete font;
+    }
+  }
 }
 
 
 /**
  * Draw dispatcher
  */
-void SymbolRenderer::drawShape( wxPaintDC& dc, bool occupied, bool actroute, double* bridgepos, bool showID, const char* ori, int status ) {
+void SymbolRenderer::drawShape( wxPaintDC& dc, wxGraphicsContext* gc, bool occupied, bool actroute,
+    double* bridgepos, bool showID, bool showCounters, const char* ori, int status, bool alt )
+{
   m_bShowID = showID;
+  m_bShowCounters = showCounters;
+  m_bAlt = alt;
+  m_DC = &dc;
   const char* nodeName = NodeOp.getName( m_Props );
+  m_UseGC = false;
+  m_GC = gc;
+  if( m_GC != NULL )
+    m_UseGC = true;
 
   if( ori == NULL || StrOp.len( ori ) == 0 )
     ori = wItem.west;
@@ -1993,8 +3262,8 @@ wxPoint* SymbolRenderer::rotateShape( wxPoint* poly, int cnt, const char* oriStr
 }
 
 
-wxPoint* SymbolRenderer::rotateBridge( double ori ) {
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "rotate bridge pos=%f", ori );
+wxPoint* SymbolRenderer::rotateBridge( double ori, double delta ) {
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "rotate bridge pos=%f", ori );
   static wxPoint p[5];
   double bp[4] = { 10.0, 170.0, 190.0, 350.0 };
 
@@ -2002,11 +3271,11 @@ wxPoint* SymbolRenderer::rotateBridge( double ori ) {
     double angle = ori+bp[i];
     if( angle > 360.0 )
       angle = angle -360.0;
-    double a = (angle*2*PI25DT)/360;
-    double xa = cos(a) * 32.0;
-    double ya = sin(a) * 32.0;
-    p[i].x = 79 + (int)xa;
-    p[i].y = 79 - (int)ya;
+    double a = (angle*2*PI25DT)/360.0;
+    double xa = cos(a) * delta*0.4;
+    double ya = sin(a) * delta*0.4;
+    p[i].x = delta + (int)xa;
+    p[i].y = delta - (int)ya;
     if( i == 0 ) {
       // end point to close the polygon
       p[4].x = p[i].x;
@@ -2017,8 +3286,8 @@ wxPoint* SymbolRenderer::rotateBridge( double ori ) {
 }
 
 
-wxPoint* SymbolRenderer::rotateBridgeSensors( double ori ) {
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "rotate bridge pos=%f", ori );
+wxPoint* SymbolRenderer::rotateBridgeSensors( double ori, double delta ) {
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "rotate bridge pos=%f", ori );
   static wxPoint p[5];
   double bp[4] = { 10.0, 170.0, 190.0, 350.0 };
 
@@ -2026,11 +3295,11 @@ wxPoint* SymbolRenderer::rotateBridgeSensors( double ori ) {
     double angle = ori+bp[i];
     if( angle > 360.0 )
       angle = angle -360.0;
-    double a = (angle*2*PI25DT)/360;
-    double xa = cos(a) * 20.0;
-    double ya = sin(a) * 20.0;
-    p[i].x = 79 + (int)xa;
-    p[i].y = 79 - (int)ya;
+    double a = (angle*2*PI25DT)/360.0;
+    double xa = cos(a) * delta*0.25;//20.0;
+    double ya = sin(a) * delta*0.25;
+    p[i].x = delta + (int)xa;
+    p[i].y = delta - (int)ya;
     if( i == 0 ) {
       // end point to close the polygon
       p[4].x = p[i].x;
@@ -2041,8 +3310,8 @@ wxPoint* SymbolRenderer::rotateBridgeSensors( double ori ) {
 }
 
 
-wxPoint* SymbolRenderer::rotateBridgeNose( double hoek ) {
-  TraceOp.trc( "render", TRCLEVEL_INFO, __LINE__, 9999, "rotate bridge nose ori=%f", hoek );
+wxPoint* SymbolRenderer::rotateBridgePlus( double ori, double delta ) {
+  TraceOp.trc( "render", TRCLEVEL_DEBUG, __LINE__, 9999, "rotate bridge plus ori=%f", ori );
   static wxPoint p[5];
 
   double xa;
@@ -2057,27 +3326,25 @@ wxPoint* SymbolRenderer::rotateBridgeNose( double hoek ) {
   double ye;
   double xf;
   double yf;
-  double rad;
-  double pi= 3.14159265358979;;
   double alfa;
   double sinalfa;
   double cosalfa;
 
-  hoek = 360 - hoek;
+  ori = 360.0 - ori;
 
-  double center = (32 * 5) / 2.0;
-  double straal1 = 22 ;  //binnencirkel van vierkantje
-  double straal2 = straal1 + 6;  //buitencirkel van vierkantje
-  double rib = (straal2 - straal1) / 2.0;
+  double center = delta;
+  double radius1 = 25.0;  //binnencirkel van vierkantje
+  double radius2 = radius1 + 4.0;  //buitencirkel van vierkantje
+  double rib = (radius2 - radius1) / 2.0;
 
-  alfa = hoek * pi / 180.0;
+  alfa = (ori * PI25DT) / 180.0;
   sinalfa = sin(alfa);
   cosalfa = cos(alfa);
 
-  xa = straal1 * cosalfa;
-  ya = straal1 * sinalfa;
-  xb = straal2 * cosalfa;
-  yb = straal2 * sinalfa;
+  xa = radius1 * cosalfa;
+  ya = radius1 * sinalfa;
+  xb = radius2 * cosalfa;
+  yb = radius2 * sinalfa;
 
   xd = xa - rib * sinalfa;
   yd = ya + rib * cosalfa;

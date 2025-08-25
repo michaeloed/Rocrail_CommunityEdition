@@ -1,9 +1,9 @@
-/** ------------------------------------------------------------
-  * $Author: robvrs $
-  * $Date: 2005/12/31 13:24:29 $
-  * $Revision: 1.7 $
-  * $Source: /cvsroot/rojav/rocs/gen/xml2cstr.c,v $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 
 /* ------------------------------------------------------------
@@ -79,7 +79,7 @@ int main( int argc, const char* argv[] ) {
 
         while( readed != infileLen ) {
           long toRead = BUFFERSIZE <= infileLen - readed ? BUFFERSIZE:(infileLen - readed);
-          if( FileOp.read( msgXml, inBuffer, toRead ) ) {
+          if( FileOp.read( msgXml, (char*)inBuffer, toRead ) ) {
             int i = 0;
             int len = 0;
             readed += toRead;

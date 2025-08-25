@@ -1,3 +1,9 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef LNCMDSTN_H_
 #define LNCMDSTN_H_
 

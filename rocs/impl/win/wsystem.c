@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -77,7 +80,9 @@ const char* rocs_system_getProperty( iOSystemData o, const char* name ) {
 
 int rocs_system_getMillis( void ) {
 #ifdef __ROCS_SYSTEM__
-  return GetTickCount() % 1000;
+  SYSTEMTIME st;
+  GetSystemTime(&st);
+  return st.wMilliseconds;
 #endif
 }
 
@@ -110,6 +115,12 @@ Boolean rocs_system_uBusyWait( int us) {
 	return True;
 #endif
 }
+
+Boolean rocs_system_usWait( int us) {
+  return rocs_system_uBusyWait(us);
+}
+
+
 
 int rocs_system_getTime( int* hours, int* minutes, int* seconds ) {
 #ifdef __ROCS_SYSTEM__
@@ -187,7 +198,7 @@ Boolean rocs_system_accessPort( int from, int num ) {
     h = CreateFile("\\\\.\\giveio", GENERIC_READ, 0, NULL,
                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if(h == INVALID_HANDLE_VALUE) {
-        TraceOp.trc( "wunc", TRCLEVEL_DEBUG, __LINE__, 9999, "Couldn't access giveio device\n");
+        TraceOp.trc( "wunc", TRCLEVEL_DEBUG, __LINE__, 9999, "no giveio device available\n");
         return False;
     }
     CloseHandle(h);
@@ -204,11 +215,15 @@ Boolean rocs_system_accessDev( const char* device, Boolean readonly ) {
 }
 
 void rocs_system_writePort( int port, byte val ) {
+#ifndef _WIN64
   _outp(port, val);
+#endif
 }
 
 byte rocs_system_readPort( int port ) {
+#ifndef _WIN64
   return _inp(port);
+#endif
 }
 
 

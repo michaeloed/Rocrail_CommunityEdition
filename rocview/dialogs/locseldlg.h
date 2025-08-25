@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -77,11 +80,12 @@ class LocSelDlg: public wxDialog
   iONode m_MICini;
   bool m_MICmode;
   const char* m_LocID;
+  bool m_AddCars;
 
 public:
     /// Constructors
     LocSelDlg( );
-    LocSelDlg( wxWindow* parent, iONode locprops=NULL, bool mic=false, const char* locid=NULL );
+    LocSelDlg( wxWindow* parent, iONode locprops=NULL, bool mic=false, const char* locid=NULL, bool cars=false );
 
     iONode getProperties(){ return m_Props;}
     void SelectNext();

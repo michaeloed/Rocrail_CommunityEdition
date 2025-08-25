@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -33,10 +36,15 @@
 #endif
 
 #include "rocs/public/trace.h"
+#include "rocs/public/system.h"
 #include "rocview/public/guiapp.h"
 #include "rocview/public/base.h"
 
+
+#define USENEWLOOK
+
 #include "rocview/public/lc.h"
+#include "rocview/public/ledbutton.h"
 
 #include "rocview/wrapper/public/Gui.h"
 
@@ -44,8 +52,9 @@
 #include "rocrail/wrapper/public/FunCmd.h"
 #include "rocrail/wrapper/public/FunDef.h"
 #include "rocrail/wrapper/public/Loc.h"
-#include "rocrail/wrapper/public/RocRail.h"
+#include "rocrail/wrapper/public/FreeRail.h"
 #include "rocrail/wrapper/public/DigInt.h"
+#include "rocrail/wrapper/public/DataReq.h"
 
 /*!
  * Programming type definition
@@ -68,12 +77,28 @@ void LC::init() {
 }
 
 void LC::SyncClock( iONode node ) {
-  m_Clock->SyncClock( node );
+  if(m_Clock != NULL)
+    m_Clock->SyncClock( node );
+  if(m_Meter != NULL)
+    m_Meter->SyncClock( node );
+}
+
+
+int LC::GetHour() {
+  if(m_Clock != NULL)
+    return m_Clock->GetHour();
+  if(m_Meter != NULL)
+    return m_Meter->GetHour();
+
+  return 0;
 }
 
 
 void LC::stopTimer() {
-  m_Clock->stopTimer();
+  if(m_Clock != NULL)
+    m_Clock->stopTimer();
+  if(m_Meter != NULL)
+    m_Meter->stopTimer();
 }
 
 
@@ -88,12 +113,20 @@ void LC::setLocProps( iONode props ) {
 
   m_iFnGroup = 0;
 
-  m_F1->SetToolTip( wxGetApp().getMsg( "unused" ) );
-  m_F2->SetToolTip( wxGetApp().getMsg( "unused" ) );
-  m_F3->SetToolTip( wxGetApp().getMsg( "unused" ) );
-  m_F4->SetToolTip( wxGetApp().getMsg( "unused" ) );
+  if( wxGetApp().getFrame()->isTooltip(true)) {
+    m_F1->SetToolTip( wxGetApp().getMsg( "unused" ) );
+    m_F2->SetToolTip( wxGetApp().getMsg( "unused" ) );
+    m_F3->SetToolTip( wxGetApp().getMsg( "unused" ) );
+    m_F4->SetToolTip( wxGetApp().getMsg( "unused" ) );
+  }
+  else {
+    m_F1->SetToolTip( wxString("",wxConvUTF8) );
+    m_F2->SetToolTip( wxString("",wxConvUTF8) );
+    m_F3->SetToolTip( wxString("",wxConvUTF8) );
+    m_F4->SetToolTip( wxString("",wxConvUTF8) );
+  }
 
-  setFLabels();
+  setFLabels(true);
 
   if( m_LocProps != NULL ) {
 
@@ -101,41 +134,56 @@ void LC::setLocProps( iONode props ) {
     setButtonColor( m_F0, !m_bFn );
 
     m_Vslider->SetRange( 0, wLoc.getV_max(m_LocProps) );
-    m_Vslider->SetValue( wLoc.getV(m_LocProps) );
+    m_Vslider->SetValue( wLoc.getV(m_LocProps), true );
     m_iSpeed = wLoc.getV(m_LocProps);
     wxString value;
     value.Printf( _T("%d"), m_iSpeed );
     m_V->SetValue( value );
+    if( m_Meter != NULL ) {
+      m_Meter->setSpeed(m_iSpeed, wLoc.getV_max(m_LocProps), wLoc.getruntime(m_LocProps) );
+    }
     m_bDir = wLoc.isdir(m_LocProps)?true:false;
+
     m_Dir->SetLabel( m_bDir?_T(">>"):_T("<<") );
-    m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+    if( StrOp.len( wGui.getdirimagefwd(wxGetApp().getIni()) ) > 0 && StrOp.len( wGui.getdirimagerev(wxGetApp().getIni()) )) {
+      m_Dir->SetIcon( m_bDir ? getIcon(wGui.getdirimagefwd(wxGetApp().getIni())):getIcon(wGui.getdirimagerev(wxGetApp().getIni())) );
+    }
+
+    if( wxGetApp().getFrame()->isTooltip(true)) {
+      m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+    }
 
   }
 }
 
 void LC::speedCmd(bool sendCmd)
 {
-  wxString value;
-  value.Printf( _T("%d"), m_iSpeed );
-  m_V->SetValue( value );
-
   if( !sendCmd || m_LocProps == NULL ) {
     return;
   }
 
-  TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "speedCmd" );
+  TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "speedCmd" );
+  m_V->SetValue( wxString::Format(wxT("%d"), m_iSpeed) );
+  if( m_Meter != NULL ) {
+    m_Meter->setSpeed(m_iSpeed, wLoc.getV_max(m_LocProps), wLoc.getruntime(m_LocProps));
+  }
 
   iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
   wLoc.setid( cmd, wLoc.getid( m_LocProps ) );
   wLoc.setV( cmd, m_iSpeed );
   wLoc.setfn( cmd, m_bFn?True:False );
   wLoc.setdir( cmd, m_bDir?True:False );
+
+  char* tid = StrOp.fmt("rv%d", SystemOp.getpid() );
+  wLoc.setthrottleid( cmd, tid );
+  StrOp.free(tid);
+
   wxGetApp().sendToRocrail( cmd );
   cmd->base.del(cmd);
 }
 
 
-void LC::funCmd()
+void LC::funCmd(int fidx)
 {
   if( m_LocProps == NULL )
     return;
@@ -155,6 +203,9 @@ void LC::funCmd()
 
   iONode cmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
   wFunCmd.setgroup ( cmd, m_iFnGroup + 1 );
+  wFunCmd.setfnchanged ( cmd, fidx==-1?0:fidx + 1 );
+  if( fidx != -1 )
+    wFunCmd.setfnchangedstate ( cmd, m_bFx[fidx]?True:False );
   wFunCmd.setfncnt ( cmd, wLoc.getfncnt( m_LocProps ) );
   wFunCmd.setid ( cmd, wLoc.getid( m_LocProps ) );
   wFunCmd.setf0 ( cmd, m_bFn?True:False );
@@ -186,161 +237,261 @@ void LC::funCmd()
   wFunCmd.setf26( cmd, m_bFx[25]?True:False );
   wFunCmd.setf27( cmd, m_bFx[26]?True:False );
   wFunCmd.setf28( cmd, m_bFx[27]?True:False );
+  char* tid = StrOp.fmt("rv%d", SystemOp.getpid() );
+  wLoc.setthrottleid( cmd, tid );
+  StrOp.free(tid);
   wxGetApp().sendToRocrail( cmd );
   cmd->base.del(cmd);
 }
 
 
-bool LC::setButtonColor( wxButton* button, bool state ) {
+#ifdef USENEWLOOK
+bool LC::setButtonColor( LEDButton* button, bool state ) {
+#else
+  bool LC::setButtonColor( wxButton* button, bool state ) {
+#endif
+#ifdef USENEWLOOK
+  button->setLED(!state);
+#endif
   if( state ) {
     button->SetBackgroundColour( Base::getGreen() );
+    //button->SetForegroundColour( Base::getGreen() );
     wxFont f = button->GetFont();
     f.SetUnderlined(false);
+    f.SetWeight(wxFONTWEIGHT_NORMAL);
     button->SetFont(f);
+    button->Refresh();
     return false;
   }
   else {
     button->SetBackgroundColour( Base::getRed() );
+    //button->SetForegroundColour( Base::getRed() );
     wxFont f = button->GetFont();
     f.SetUnderlined(true);
+    f.SetWeight(wxFONTWEIGHT_BOLD);
     button->SetFont(f);
+    button->Refresh();
     return true;
   }
 }
 
-void LC::updateLoc( iONode node ) {
+bool LC::setFX( iONode l_LocProps, iONode node ) {
+  int fx = wLoc.getfx(l_LocProps);
+  int fnchanged = wFunCmd.getfnchanged(node);
+  if( fnchanged != -1 && fnchanged > 0 && fnchanged < 29 ) {
+    char fn[8] = {'\0'};
+    int mask = 1 << (fnchanged-1);
+    StrOp.fmtb( fn, "f%d", fnchanged );
+    fx &= ~mask;
+    TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "fnchanged=%d mask=%X(%X) fx=%X", fnchanged, mask, ~mask, fx );
+    if(NodeOp.getBool(node, fn, False ) )
+      fx |= mask;
+    TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "fnchanged=%d mask=%X fx=%X fn=%s", fnchanged, mask, fx, fn );
+    wLoc.setfx(l_LocProps, fx);
+    return true;
+  }
+  wLoc.setfx(l_LocProps,
+      (NodeOp.getBool(node, "f1",  fx&0x0001?True:False)?0x0001:0x00) |
+      (NodeOp.getBool(node, "f2",  fx&0x0002?True:False)?0x0002:0x00) |
+      (NodeOp.getBool(node, "f3",  fx&0x0004?True:False)?0x0004:0x00) |
+      (NodeOp.getBool(node, "f4",  fx&0x0008?True:False)?0x0008:0x00) |
+      (NodeOp.getBool(node, "f5",  fx&0x0010?True:False)?0x0010:0x00) |
+      (NodeOp.getBool(node, "f6",  fx&0x0020?True:False)?0x0020:0x00) |
+      (NodeOp.getBool(node, "f7",  fx&0x0040?True:False)?0x0040:0x00) |
+      (NodeOp.getBool(node, "f8",  fx&0x0080?True:False)?0x0080:0x00) |
+
+      (NodeOp.getBool(node, "f9" ,  fx&0x0100?True:False)?0x0100:0x00) |
+      (NodeOp.getBool(node, "f10",  fx&0x0200?True:False)?0x0200:0x00) |
+      (NodeOp.getBool(node, "f11",  fx&0x0400?True:False)?0x0400:0x00) |
+      (NodeOp.getBool(node, "f12",  fx&0x0800?True:False)?0x0800:0x00) |
+      (NodeOp.getBool(node, "f13",  fx&0x1000?True:False)?0x1000:0x00) |
+      (NodeOp.getBool(node, "f14",  fx&0x2000?True:False)?0x2000:0x00) |
+      (NodeOp.getBool(node, "f15",  fx&0x4000?True:False)?0x4000:0x00) |
+      (NodeOp.getBool(node, "f16",  fx&0x8000?True:False)?0x8000:0x00) |
+
+      (NodeOp.getBool(node, "f17",  fx&0x010000?True:False)?0x010000:0x00) |
+      (NodeOp.getBool(node, "f18",  fx&0x020000?True:False)?0x020000:0x00) |
+      (NodeOp.getBool(node, "f19",  fx&0x040000?True:False)?0x040000:0x00) |
+      (NodeOp.getBool(node, "f20",  fx&0x080000?True:False)?0x080000:0x00) |
+      (NodeOp.getBool(node, "f21",  fx&0x100000?True:False)?0x100000:0x00) |
+      (NodeOp.getBool(node, "f22",  fx&0x200000?True:False)?0x200000:0x00) |
+      (NodeOp.getBool(node, "f23",  fx&0x400000?True:False)?0x400000:0x00) |
+      (NodeOp.getBool(node, "f24",  fx&0x800000?True:False)?0x800000:0x00) |
+
+      (NodeOp.getBool(node, "f25",  fx&0x01000000?True:False)?0x01000000:0x00) |
+      (NodeOp.getBool(node, "f26",  fx&0x02000000?True:False)?0x02000000:0x00) |
+      (NodeOp.getBool(node, "f27",  fx&0x04000000?True:False)?0x04000000:0x00) |
+      (NodeOp.getBool(node, "f28",  fx&0x08000000?True:False)?0x08000000:0x00)
+
+      );
+
+  return true;
+}
+
+
+bool LC::updateLoc( iONode node ) {
   if( m_LocProps != NULL && node != NULL ) {
     if( StrOp.equals( wLoc.getid( m_LocProps ), wLoc.getid( node ) ) ) {
-      TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "updating %s", wLoc.getid( node ) );
+      TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "updating %s", wLoc.getid( node ) );
 
       if( StrOp.equals( wFunCmd.name(), NodeOp.getName( node ) ) ) {
-        int fx = wLoc.getfx(m_LocProps);
-        TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "function update %s", wLoc.getid( node ) );
+        TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "function update %s", wLoc.getid( node ) );
 
-
-
-        wLoc.setfx(m_LocProps,
-            (NodeOp.getBool(node, "f1",  fx&0x0001?True:False)?0x0001:0x00) |
-            (NodeOp.getBool(node, "f2",  fx&0x0002?True:False)?0x0002:0x00) |
-            (NodeOp.getBool(node, "f3",  fx&0x0004?True:False)?0x0004:0x00) |
-            (NodeOp.getBool(node, "f4",  fx&0x0008?True:False)?0x0008:0x00) |
-            (NodeOp.getBool(node, "f5",  fx&0x0010?True:False)?0x0010:0x00) |
-            (NodeOp.getBool(node, "f6",  fx&0x0020?True:False)?0x0020:0x00) |
-            (NodeOp.getBool(node, "f7",  fx&0x0040?True:False)?0x0040:0x00) |
-            (NodeOp.getBool(node, "f8",  fx&0x0080?True:False)?0x0080:0x00) |
-
-            (NodeOp.getBool(node, "f9" ,  fx&0x0100?True:False)?0x0100:0x00) |
-            (NodeOp.getBool(node, "f10",  fx&0x0200?True:False)?0x0200:0x00) |
-            (NodeOp.getBool(node, "f11",  fx&0x0400?True:False)?0x0400:0x00) |
-            (NodeOp.getBool(node, "f12",  fx&0x0800?True:False)?0x0800:0x00) |
-            (NodeOp.getBool(node, "f13",  fx&0x1000?True:False)?0x1000:0x00) |
-            (NodeOp.getBool(node, "f14",  fx&0x2000?True:False)?0x2000:0x00) |
-            (NodeOp.getBool(node, "f15",  fx&0x4000?True:False)?0x4000:0x00) |
-            (NodeOp.getBool(node, "f16",  fx&0x8000?True:False)?0x8000:0x00) |
-
-            (NodeOp.getBool(node, "f17",  fx&0x010000?True:False)?0x010000:0x00) |
-            (NodeOp.getBool(node, "f18",  fx&0x020000?True:False)?0x020000:0x00) |
-            (NodeOp.getBool(node, "f19",  fx&0x040000?True:False)?0x040000:0x00) |
-            (NodeOp.getBool(node, "f20",  fx&0x080000?True:False)?0x080000:0x00) |
-            (NodeOp.getBool(node, "f21",  fx&0x100000?True:False)?0x100000:0x00) |
-            (NodeOp.getBool(node, "f22",  fx&0x200000?True:False)?0x200000:0x00) |
-            (NodeOp.getBool(node, "f23",  fx&0x400000?True:False)?0x400000:0x00) |
-            (NodeOp.getBool(node, "f24",  fx&0x800000?True:False)?0x800000:0x00) |
-
-            (NodeOp.getBool(node, "f25",  fx&0x01000000?True:False)?0x01000000:0x00) |
-            (NodeOp.getBool(node, "f26",  fx&0x02000000?True:False)?0x02000000:0x00) |
-            (NodeOp.getBool(node, "f27",  fx&0x04000000?True:False)?0x04000000:0x00) |
-            (NodeOp.getBool(node, "f28",  fx&0x08000000?True:False)?0x08000000:0x00)
-
-            );
+        setFX(m_LocProps, node);
 
         setFLabels();
 
-        if( NodeOp.findAttr(node, "f0") ) {
+        if( NodeOp.findAttr(node, "f0") && (wFunCmd.getfnchanged(node) == 0 || wFunCmd.getgroup(node) == 1) ) {
           m_bFn = wFunCmd.isf0( node )?true:false;
           wLoc.setfn( m_LocProps, m_bFn?True:False );
           setButtonColor( m_F0, !m_bFn );
-          TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "function lights=%d", m_bFn );
+          TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "function lights=%d", m_bFn );
         }
 
       }
-      else {
+      else if( wLoc.getsecaddr( m_LocProps) != wLoc.getaddr( node) && !wLoc.isusesecaddr( node)  )  {
         m_iSpeed = wLoc.getV( node );
         wLoc.setV( m_LocProps, m_iSpeed );
         m_Vslider->SetValue( m_iSpeed );
         wxString value;
         value.Printf( _T("%d"), m_iSpeed );
         m_V->SetValue( value );
+        if( m_Meter != NULL ) {
+          m_Meter->setSpeed(m_iSpeed, wLoc.getV_max(m_LocProps), wLoc.getruntime(m_LocProps));
+        }
 
-        TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "velocity update %d", m_iSpeed );
+        TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "velocity update %d", m_iSpeed );
 
         m_bDir = wLoc.isdir( node )?true:false;
         wLoc.setdir( m_LocProps, m_bDir?True:False );
         m_Dir->SetLabel( m_bDir?_T(">>"):_T("<<") );
-        m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+        if( StrOp.len( wGui.getdirimagefwd(wxGetApp().getIni()) ) > 0 && StrOp.len( wGui.getdirimagerev(wxGetApp().getIni()) )) {
+          m_Dir->SetIcon( m_bDir ? getIcon(wGui.getdirimagefwd(wxGetApp().getIni())):getIcon(wGui.getdirimagerev(wxGetApp().getIni())) );
+        }
+        if( wxGetApp().getFrame()->isTooltip(true)) {
+          m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+        }
 
         if( NodeOp.findAttr(node, "fn") ) {
           m_bFn = wLoc.isfn( node )?true:false;
           wLoc.setfn( m_LocProps, m_bFn?True:False );
           setButtonColor( m_F0, !m_bFn );
-          TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "velocity lights=%d", m_bFn );
+          TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "velocity lights=%d", m_bFn );
         }
       }
+      return true;
     }
   }
+  return false;
 }
 
 
 void LC::OnSlider(wxScrollEvent& event)
 {
-  if ( event.GetEventObject() == m_Vslider ) {
-    m_iSpeed = m_Vslider->GetValue();
-    speedCmd( event.GetEventType() != wxEVT_SCROLL_THUMBTRACK );
+  if ( event.GetEventObject() == m_Vslider && event.GetEventType() != wxEVT_SCROLL_THUMBTRACK ) {
+    int speed = m_Vslider->GetValue();
+    TraceOp.trc( "lc", TRCLEVEL_DEBUG, __LINE__, 9999, "slider new=%d old=%d steps=%d", speed, m_iSpeed, wLoc.getspcnt(m_LocProps));
+    if( !wGui.isuseallspeedsteps(wxGetApp().getIni()) && wLoc.getspcnt(m_LocProps) > 28 ) {
+      int step = wLoc.getspcnt(m_LocProps) / 28;
+      if( speed > m_iSpeed ) {
+        if( speed - m_iSpeed >= step ){
+          m_iSpeed = m_Vslider->GetValue();
+          speedCmd( event.GetEventType() != wxEVT_SCROLL_THUMBTRACK );
+        }
+      }
+      else if( speed < m_iSpeed ) {
+        if( m_iSpeed - speed >= step ){
+          m_iSpeed = m_Vslider->GetValue();
+          speedCmd( event.GetEventType() != wxEVT_SCROLL_THUMBTRACK );
+        }
+      }
+    }
+    else {
+      m_iSpeed = m_Vslider->GetValue();
+      speedCmd( event.GetEventType() != wxEVT_SCROLL_THUMBTRACK );
+    }
+  }
+  else if ( event.GetEventObject() == m_Vslider ) {
+    m_V->SetValue( wxString::Format(wxT("%d"), m_Vslider->GetValue()) );
+    if( m_Meter != NULL ) {
+      m_Meter->setSpeed(m_Vslider->GetValue(), wLoc.getV_max(m_LocProps), wLoc.getruntime(m_LocProps));
+    }
   }
 }
 
-void LC::setFLabels() {
-  if( m_iFnGroup == 0 ) {
-    m_F1->SetLabel( _T("F1") );
-    m_F2->SetLabel( _T("F2") );
-    m_F3->SetLabel( _T("F3") );
-    m_F4->SetLabel( _T("F4") );
+wxBitmap* LC::getIcon(const char* icon) {
+  wxBitmap* bitmap = NULL;
+
+  wxBitmapType bmptype = wxBITMAP_TYPE_XPM;
+  if( StrOp.endsWithi( icon, ".gif" ) )
+    bmptype = wxBITMAP_TYPE_GIF;
+  else if( StrOp.endsWithi( icon, ".png" ) )
+    bmptype = wxBITMAP_TYPE_PNG;
+
+  TraceOp.trc( "frame", TRCLEVEL_DEBUG, __LINE__, 9999, "get icon %s", icon );
+
+  const char* imagepath = wGui.getimagepath(wxGetApp().m_Ini);
+  static char pixpath[256];
+  StrOp.fmtb( pixpath, "%s%c%s", imagepath, SystemOp.getFileSeparator(), FileOp.ripPath( icon ) );
+
+  if( FileOp.exist(pixpath))
+    bitmap = new wxBitmap(wxString(pixpath,wxConvUTF8), bmptype);
+  else {
+    // request the image from server:
+    iONode node = NodeOp.inst( wDataReq.name(), NULL, ELEMENT_NODE );
+    wDataReq.setid( node, wLoc.getid(this->m_LocProps) );
+    wDataReq.setcmd( node, wDataReq.get );
+    wDataReq.settype( node, wDataReq.image );
+    wDataReq.setfilename( node, icon );
+    wxGetApp().sendToRocrail( node );
   }
-  else if( m_iFnGroup == 1 ) {
-    m_F1->SetLabel( _T("F5") );
-    m_F2->SetLabel( _T("F6") );
-    m_F3->SetLabel( _T("F7") );
-    m_F4->SetLabel( _T("F8") );
-  }
-  else if( m_iFnGroup == 2 ) {
-    m_F1->SetLabel( _T("F9") );
-    m_F2->SetLabel( _T("F10") );
-    m_F3->SetLabel( _T("F11") );
-    m_F4->SetLabel( _T("F12") );
-  }
-  else if( m_iFnGroup == 3 ) {
-    m_F1->SetLabel( _T("F13") );
-    m_F2->SetLabel( _T("F14") );
-    m_F3->SetLabel( _T("F15") );
-    m_F4->SetLabel( _T("F16") );
-  }
-  else if( m_iFnGroup == 4 ) {
-    m_F1->SetLabel( _T("F17") );
-    m_F2->SetLabel( _T("F18") );
-    m_F3->SetLabel( _T("F19") );
-    m_F4->SetLabel( _T("F20") );
-  }
-  else if( m_iFnGroup == 5 ) {
-    m_F1->SetLabel( _T("F21") );
-    m_F2->SetLabel( _T("F22") );
-    m_F3->SetLabel( _T("F23") );
-    m_F4->SetLabel( _T("F24") );
-  }
-  else if( m_iFnGroup == 6 ) {
-    m_F1->SetLabel( _T("F25") );
-    m_F2->SetLabel( _T("F26") );
-    m_F3->SetLabel( _T("F27") );
-    m_F4->SetLabel( _T("F28") );
+  return bitmap;
+}
+
+void LC::setFLabels(bool init) {
+  if( init ) {
+    if( m_iFnGroup == 0 ) {
+      m_F1->SetLabel( _T("F1") );
+      m_F2->SetLabel( _T("F2") );
+      m_F3->SetLabel( _T("F3") );
+      m_F4->SetLabel( _T("F4") );
+    }
+    else if( m_iFnGroup == 1 ) {
+      m_F1->SetLabel( _T("F5") );
+      m_F2->SetLabel( _T("F6") );
+      m_F3->SetLabel( _T("F7") );
+      m_F4->SetLabel( _T("F8") );
+    }
+    else if( m_iFnGroup == 2 ) {
+      m_F1->SetLabel( _T("F9") );
+      m_F2->SetLabel( _T("F10") );
+      m_F3->SetLabel( _T("F11") );
+      m_F4->SetLabel( _T("F12") );
+    }
+    else if( m_iFnGroup == 3 ) {
+      m_F1->SetLabel( _T("F13") );
+      m_F2->SetLabel( _T("F14") );
+      m_F3->SetLabel( _T("F15") );
+      m_F4->SetLabel( _T("F16") );
+    }
+    else if( m_iFnGroup == 4 ) {
+      m_F1->SetLabel( _T("F17") );
+      m_F2->SetLabel( _T("F18") );
+      m_F3->SetLabel( _T("F19") );
+      m_F4->SetLabel( _T("F20") );
+    }
+    else if( m_iFnGroup == 5 ) {
+      m_F1->SetLabel( _T("F21") );
+      m_F2->SetLabel( _T("F22") );
+      m_F3->SetLabel( _T("F23") );
+      m_F4->SetLabel( _T("F24") );
+    }
+    else if( m_iFnGroup == 6 ) {
+      m_F1->SetLabel( _T("F25") );
+      m_F2->SetLabel( _T("F26") );
+      m_F3->SetLabel( _T("F27") );
+      m_F4->SetLabel( _T("F28") );
+    }
   }
 
   if( m_LocProps != NULL ) {
@@ -351,27 +502,88 @@ void LC::setFLabels() {
     m_bFx[2+m_iFnGroup * 4] = setButtonColor( m_F3, (fx & 0x04)?false:true );
     m_bFx[3+m_iFnGroup * 4] = setButtonColor( m_F4, (fx & 0x08)?false:true );
 
-    m_F1->SetToolTip( wxString::Format(_T("F%d"), 1 + (m_iFnGroup * 4 ) ));
-    m_F2->SetToolTip( wxString::Format(_T("F%d"), 2 + (m_iFnGroup * 4 ) ));
-    m_F3->SetToolTip( wxString::Format(_T("F%d"), 3 + (m_iFnGroup * 4 ) ));
-    m_F4->SetToolTip( wxString::Format(_T("F%d"), 4 + (m_iFnGroup * 4 ) ));
+    if( init ) {
+      if( wxGetApp().getFrame()->isTooltip(true)) {
+        m_F0->SetToolTip( wxString::Format(_T("F%d"), 0 ));
+        m_F1->SetToolTip( wxString::Format(_T("F%d"), 1 + (m_iFnGroup * 4 ) ));
+        m_F2->SetToolTip( wxString::Format(_T("F%d"), 2 + (m_iFnGroup * 4 ) ));
+        m_F3->SetToolTip( wxString::Format(_T("F%d"), 3 + (m_iFnGroup * 4 ) ));
+        m_F4->SetToolTip( wxString::Format(_T("F%d"), 4 + (m_iFnGroup * 4 ) ));
+      }
+      else {
+        m_F0->SetToolTip( wxString("",wxConvUTF8) );
+        m_F1->SetToolTip( wxString("",wxConvUTF8) );
+        m_F2->SetToolTip( wxString("",wxConvUTF8) );
+        m_F3->SetToolTip( wxString("",wxConvUTF8) );
+        m_F4->SetToolTip( wxString("",wxConvUTF8) );
+      }
 
-    iONode fundef = wLoc.getfundef( m_LocProps );
-    while( fundef != NULL ) {
-      wxString fntxt = wxString(wFunDef.gettext( fundef ),wxConvUTF8);
-      if( wFunDef.getfn( fundef ) == 1 + (m_iFnGroup * 4 )) {
-        m_F1->SetToolTip( fntxt );
+      m_F0->SetIcon(NULL);
+      m_F1->SetIcon(NULL);
+      m_F2->SetIcon(NULL);
+      m_F3->SetIcon(NULL);
+      m_F4->SetIcon(NULL);
+
+      iONode fundef = wLoc.getfundef( m_LocProps );
+      while( fundef != NULL ) {
+        wxString fntxt = wxString(wFunDef.gettext( fundef ),wxConvUTF8);
+        if( wFunDef.getfn( fundef ) == 0 ) {
+          if( wxGetApp().getFrame()->isTooltip(true))
+            m_F0->SetToolTip( fntxt );
+          if( wFunDef.geticon(fundef) != NULL && StrOp.len( wFunDef.geticon(fundef) ) > 0 ) {
+            m_F0->SetIcon(getIcon(wFunDef.geticon(fundef)));
+          }
+          else {
+            m_F0->SetLabel(fntxt);
+            m_F0->SetIcon(NULL);
+          }
+        }
+        else if( wFunDef.getfn( fundef ) == 1 + (m_iFnGroup * 4 )) {
+          if( wxGetApp().getFrame()->isTooltip(true))
+            m_F1->SetToolTip( fntxt );
+          if( wFunDef.geticon(fundef) != NULL && StrOp.len( wFunDef.geticon(fundef) ) > 0 ) {
+            m_F1->SetIcon(getIcon(wFunDef.geticon(fundef)));
+          }
+          else {
+            m_F1->SetLabel(fntxt);
+            m_F1->SetIcon(NULL);
+          }
+        }
+        else if( wFunDef.getfn( fundef ) == 2 + (m_iFnGroup * 4 ) ) {
+          if( wxGetApp().getFrame()->isTooltip(true))
+            m_F2->SetToolTip( fntxt );
+          if( wFunDef.geticon(fundef) != NULL && StrOp.len( wFunDef.geticon(fundef) ) > 0 ) {
+            m_F2->SetIcon(getIcon(wFunDef.geticon(fundef)));
+          }
+          else {
+            m_F2->SetLabel(fntxt);
+            m_F2->SetIcon(NULL);
+          }
+        }
+        else if( wFunDef.getfn( fundef ) == 3 + (m_iFnGroup * 4 ) ) {
+          if( wxGetApp().getFrame()->isTooltip(true))
+            m_F3->SetToolTip( fntxt );
+          if( wFunDef.geticon(fundef) != NULL && StrOp.len( wFunDef.geticon(fundef) ) > 0 ) {
+            m_F3->SetIcon(getIcon(wFunDef.geticon(fundef)));
+          }
+          else {
+            m_F3->SetLabel(fntxt);
+            m_F3->SetIcon(NULL);
+          }
+        }
+        else if( wFunDef.getfn( fundef ) == 4 + (m_iFnGroup * 4 ) ) {
+          if( wxGetApp().getFrame()->isTooltip(true))
+            m_F4->SetToolTip( fntxt );
+          if( wFunDef.geticon(fundef) != NULL && StrOp.len( wFunDef.geticon(fundef) ) > 0 ) {
+            m_F4->SetIcon(getIcon(wFunDef.geticon(fundef)));
+          }
+          else {
+            m_F4->SetLabel(fntxt);
+            m_F4->SetIcon(NULL);
+          }
+        }
+        fundef = wLoc.nextfundef( m_LocProps, fundef );
       }
-      else if( wFunDef.getfn( fundef ) == 2 + (m_iFnGroup * 4 ) ) {
-        m_F2->SetToolTip( fntxt );
-      }
-      else if( wFunDef.getfn( fundef ) == 3 + (m_iFnGroup * 4 ) ) {
-        m_F3->SetToolTip( fntxt );
-      }
-      else if( wFunDef.getfn( fundef ) == 4 + (m_iFnGroup * 4 ) ) {
-        m_F4->SetToolTip( fntxt );
-      }
-      fundef = wLoc.nextfundef( m_LocProps, fundef );
     }
   }
 }
@@ -382,7 +594,7 @@ void LC::OnButton(wxCommandEvent& event)
 
   if ( event.GetEventObject() == m_Stop ) {
     m_iSpeed = 0;
-    m_Vslider->SetValue( m_iSpeed );
+    m_Vslider->SetValue( m_iSpeed, true );
     speedCmd(true);
   }
   else if ( event.GetEventObject() == m_FG ) {
@@ -397,206 +609,218 @@ void LC::OnButton(wxCommandEvent& event)
     m_iFnGroup++;
     if( m_iFnGroup > maxgroups )
       m_iFnGroup = 0;
-    setFLabels();
+    setFLabels(true);
   }
   else if ( event.GetEventObject() == m_F0 ) {
     m_bFn = setButtonColor( m_F0, m_bFn );
     speedCmd(true);
-    funCmd();
+    funCmd(-1);
   }
   else if ( event.GetEventObject() == m_F1 ) {
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetEventObject() == m_F2 ) {
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetEventObject() == m_F3 ) {
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetEventObject() == m_F4 ) {
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
   else if ( event.GetEventObject() == m_Dir ) {
     m_bDir = ! m_bDir;
+
     m_Dir->SetLabel( m_bDir?_T(">>"):_T("<<") );
-    m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+    if( StrOp.len( wGui.getdirimagefwd(wxGetApp().getIni()) ) > 0 && StrOp.len( wGui.getdirimagerev(wxGetApp().getIni()) )) {
+      m_Dir->SetIcon( m_bDir ? getIcon(wGui.getdirimagefwd(wxGetApp().getIni())):getIcon(wGui.getdirimagerev(wxGetApp().getIni())) );
+    }
+
+    if( wxGetApp().getFrame()->isTooltip(true)) {
+      m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+    }
+
+    if( wGui.isresetspeeddir(wxGetApp().getIni()) ) {
+      m_iSpeed = 0;
+      m_Vslider->SetValue( m_iSpeed, true );
+    }
     speedCmd(true);
   }
   else if ( event.GetId() == ME_F1 ) {
     m_iFnGroup = 0;
     setFLabels();
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F2 ) {
     m_iFnGroup = 0;
     setFLabels();
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F3 ) {
     m_iFnGroup = 0;
     setFLabels();
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F4 ) {
     m_iFnGroup = 0;
     setFLabels();
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F5 ) {
     m_iFnGroup = 1;
     setFLabels();
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F6 ) {
     m_iFnGroup = 1;
     setFLabels();
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F7 ) {
     m_iFnGroup = 1;
     setFLabels();
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F8 ) {
     m_iFnGroup = 1;
     setFLabels();
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F9 ) {
     m_iFnGroup = 2;
     setFLabels();
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F10 ) {
     m_iFnGroup = 2;
     setFLabels();
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F11 ) {
     m_iFnGroup = 2;
     setFLabels();
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F12 ) {
     m_iFnGroup = 2;
     setFLabels();
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
 
   else if ( event.GetId() == ME_F13 ) {
     m_iFnGroup = 3;
     setFLabels();
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F14 ) {
     m_iFnGroup = 3;
     setFLabels();
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F15 ) {
     m_iFnGroup = 3;
     setFLabels();
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F16 ) {
     m_iFnGroup = 3;
     setFLabels();
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
 
   else if ( event.GetId() == ME_F17 ) {
     m_iFnGroup = 4;
     setFLabels();
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F18 ) {
     m_iFnGroup = 4;
     setFLabels();
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F19 ) {
     m_iFnGroup = 4;
     setFLabels();
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F20 ) {
     m_iFnGroup = 4;
     setFLabels();
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
 
   else if ( event.GetId() == ME_F21 ) {
     m_iFnGroup = 5;
     setFLabels();
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F22 ) {
     m_iFnGroup = 5;
     setFLabels();
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F23 ) {
     m_iFnGroup = 5;
     setFLabels();
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F24 ) {
     m_iFnGroup = 5;
     setFLabels();
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
 
   else if ( event.GetId() == ME_F25 ) {
     m_iFnGroup = 6;
     setFLabels();
     m_bFx[0+m_iFnGroup*4] = setButtonColor( m_F1, m_bFx[0+m_iFnGroup*4] );
-    funCmd();
+    funCmd(0+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F26 ) {
     m_iFnGroup = 6;
     setFLabels();
     m_bFx[1+m_iFnGroup*4] = setButtonColor( m_F2, m_bFx[1+m_iFnGroup*4] );
-    funCmd();
+    funCmd(1+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F27 ) {
     m_iFnGroup = 6;
     setFLabels();
     m_bFx[2+m_iFnGroup*4] = setButtonColor( m_F3, m_bFx[2+m_iFnGroup*4] );
-    funCmd();
+    funCmd(2+m_iFnGroup*4);
   }
   else if ( event.GetId() == ME_F28 ) {
     m_iFnGroup = 6;
     setFLabels();
     m_bFx[3+m_iFnGroup*4] = setButtonColor( m_F4, m_bFx[3+m_iFnGroup*4] );
-    funCmd();
+    funCmd(3+m_iFnGroup*4);
   }
 }
 
@@ -665,14 +889,21 @@ bool LC::Create()
   m_F4->SetBackgroundColour( Base::getGreen() );
 
   //m_Stop->SetBackgroundColour( Base::getRed() );
-  m_Stop->SetLabel( wxGetApp().getMsg( "stop" ) );
-  m_F0->SetToolTip( wxGetApp().getMsg( "lights" ) );
-  m_Dir->SetToolTip( wxGetApp().getMsg( "forwards" ) );
-  m_Stop->SetToolTip( wxGetApp().getTip( "stop" ) );
-  m_V->SetToolTip( wxGetApp().getMsg( "speed" ) );
-  m_Vslider->SetToolTip( wxGetApp().getMsg( "speedcontroller" ) );
+  if( wxGetApp().getFrame()->isTooltip(true))
+    m_Stop->SetLabel( wxGetApp().getMsg( "stop" ) );
+  if( wxGetApp().getFrame()->isTooltip(true))
+    m_F0->SetToolTip( wxGetApp().getMsg( "lights" ) );
+  if( wxGetApp().getFrame()->isTooltip(true))
+    m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+  if( wxGetApp().getFrame()->isTooltip(true))
+    m_Stop->SetToolTip( wxGetApp().getTip( "stop" ) );
+  if( wxGetApp().getFrame()->isTooltip(true))
+    m_V->SetToolTip( wxGetApp().getMsg( "speed" ) );
+  if( wxGetApp().getFrame()->isTooltip(true))
+    m_Vslider->SetToolTip( wxGetApp().getMsg( "speedcontroller" ) );
 
-  m_FG->SetToolTip( wxGetApp().getMsg( "functiongroup" ) );
+  if( wxGetApp().getFrame()->isTooltip(true))
+    m_FG->SetToolTip( wxGetApp().getMsg( "functiongroup" ) );
 
   return true;
 }
@@ -688,58 +919,155 @@ void LC::CreateControls() {
 
 
   m_ButtonSizer = new wxBoxSizer(wxVERTICAL);
-  m_MainSizer->Add(m_ButtonSizer, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5);
+  m_MainSizer->Add(m_ButtonSizer, 0, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
   wxBoxSizer* l_sizer0 = new wxBoxSizer(wxHORIZONTAL);
   m_ButtonSizer->Add(l_sizer0, 0, wxGROW|wxALIGN_CENTER_HORIZONTAL|wxALL, 0);
 
+#ifdef USENEWLOOK
+  m_FG = new LEDButton( m_Parent, _("FG"), 50, 25, false );
+#else
   m_FG = new wxButton( m_Parent, -1, _("FG"), wxDefaultPosition, wxSize(50, -1), wxBU_EXACTFIT );
+#endif
   l_sizer0->Add(m_FG, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_LEFT|wxALL, 1);
 
-  m_V = new wxTextCtrl( m_Parent, -1, _("0"), wxDefaultPosition, wxSize(92, -1), wxTE_READONLY|wxTE_CENTRE );
+#ifdef USENEWLOOK
+  m_V = new LEDButton( m_Parent, _("0"), 102, 25, false, true );
+#else
+  m_V = new wxTextCtrl( m_Parent, -1, _("0"), wxDefaultPosition, wxSize(103, 25), wxTE_READONLY|wxTE_CENTRE );
+  wxFont f = m_V->GetFont();
+  f.SetWeight(wxFONTWEIGHT_BOLD);
+  f.SetPointSize(f.GetPointSize()+2);
+  m_V->SetFont(f);
+
+#endif
   l_sizer0->Add(m_V, 0, wxALIGN_CENTER_VERTICAL|wxGROW|wxALL, 1);
 
   m_Button1Sizer = new wxBoxSizer(wxHORIZONTAL);
-  m_ButtonSizer->Add(m_Button1Sizer, 0, wxALIGN_CENTER_HORIZONTAL|wxALL, 0);
+  m_ButtonSizer->Add(m_Button1Sizer, 0, wxGROW|wxALIGN_CENTER_HORIZONTAL|wxALL, 0);
 
+#ifdef USENEWLOOK
+  m_F1 = new LEDButton( m_Parent, _("F1"), 50, 25 );
+#else
   m_F1 = new wxButton( m_Parent, -1, _("F1"), wxDefaultPosition, wxSize(50, -1), wxBU_EXACTFIT );
+#endif
   m_Button1Sizer->Add(m_F1, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
 
+#ifdef USENEWLOOK
+  m_F2 = new LEDButton( m_Parent, _("F2"), 50, 25 );
+#else
   m_F2 = new wxButton( m_Parent, -1, _("F2"), wxDefaultPosition, wxSize(50, -1), wxBU_EXACTFIT );
+#endif
   m_Button1Sizer->Add(m_F2, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
 
+#ifdef USENEWLOOK
+  m_F0 = new LEDButton( m_Parent, _("F0"), 50, 25 );
+#else
   m_F0 = new wxButton( m_Parent, -1, _("F0"), wxDefaultPosition, wxSize(50, -1), wxBU_EXACTFIT );
+#endif
   m_Button1Sizer->Add(m_F0, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
 
   m_Button2Sizer = new wxBoxSizer(wxHORIZONTAL);
   m_ButtonSizer->Add(m_Button2Sizer, 0, wxALIGN_CENTER_HORIZONTAL|wxALL, 0);
 
+#ifdef USENEWLOOK
+  m_F3 = new LEDButton( m_Parent, _("F3"), 50, 25 );
+#else
   m_F3 = new wxButton( m_Parent, -1, _("F3"), wxDefaultPosition, wxSize(50, -1), wxBU_EXACTFIT );
+#endif
   m_Button2Sizer->Add(m_F3, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
 
+#ifdef USENEWLOOK
+  m_F4 = new LEDButton( m_Parent, _("F4"), 50, 25 );
+#else
   m_F4 = new wxButton( m_Parent, -1, _("F4"), wxDefaultPosition, wxSize(50, -1), wxBU_EXACTFIT );
+#endif
   m_Button2Sizer->Add(m_F4, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
 
+#ifdef USENEWLOOK
+  m_Dir = new LEDButton( m_Parent, _(">>"), 50, 25, false );
+  if( StrOp.len( wGui.getdirimagefwd(wxGetApp().getIni()) ) > 0 ) {
+    m_Dir->SetIcon(getIcon(wGui.getdirimagefwd(wxGetApp().getIni())));
+  }
+#else
   m_Dir = new wxButton( m_Parent, -1, _(">>"), wxDefaultPosition, wxSize(50, -1), wxBU_EXACTFIT );
+#endif
   m_Button2Sizer->Add(m_Dir, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
 
   m_SliderSizer = new wxBoxSizer(wxHORIZONTAL);
-  m_MainSizer->Add(m_SliderSizer, 0, wxGROW|wxALL, 0);
+  m_MainSizer->Add(m_SliderSizer, 0, wxGROW|wxALL, 5);
 
-  m_Vslider = new wxSlider( m_Parent, -1, 0, 0, 100, wxDefaultPosition, wxSize(-1, 80), wxSL_VERTICAL|wxSL_INVERSE );
-  m_SliderSizer->Add(m_Vslider, 1, wxGROW|wxALL, 4);
+#ifdef USENEWLOOK
+  m_Vslider = new Slider( m_Parent, 35, 106 );
+  if(wGui.isgrayicons(wxGetApp().getIni()))
+    m_Vslider->SetBackgroundColour(Base::getGrey());
+#else
+  m_Vslider = new wxSlider( m_Parent, -1, 0, 0, 100, wxDefaultPosition, wxSize(-1, -1), wxSL_VERTICAL|wxSL_INVERSE );
+#endif
+  m_SliderSizer->Add(m_Vslider, 1, wxGROW|wxALL, 1);
 
-  m_Stop = new wxButton( m_Parent, -1, _("Stop"), wxDefaultPosition, wxSize(130, -1), 0 );
+#ifdef USENEWLOOK
+  m_Stop = new LEDButton( m_Parent, wxGetApp().getMsg( "stop" ), 154, 25, false );
+#else
+  m_Stop = new wxButton( m_Parent, -1, wxGetApp().getMsg( "stop" ), wxDefaultPosition, wxSize(130, -1), 0 );
+#endif
   m_ButtonSizer->Add(m_Stop, 0, wxGROW|wxALL, 1);
 
   const char* clocktype = wGui.getclocktype( wxGetApp().getIni() );
   int type = 0;
-  if( StrOp.equals( wGui.clock_ampm, clocktype ) ) type = 1;
-  else if( StrOp.equals( wGui.clock_24h, clocktype ) ) type = 2;
+  if( StrOp.equals( wGui.clock_ampm, clocktype ) )
+    type = 1;
+  else if( StrOp.equals( wGui.clock_24h, clocktype ) )
+    type = 2;
+  else if( StrOp.equals( wGui.clock_digital, clocktype ) )
+    type = 3;
 
-  TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "creating clock...");
-  m_Clock = new Clock(m_Parent, -1, 0, 0, 2, 1, type);
-  m_SliderSizer->Add(m_Clock, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_CENTER_HORIZONTAL|wxALL, 2);
+  if( wGui.isshowspeedometer( wxGetApp().getIni() ) ) {
+    TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "creating meter...");
+    m_Meter = new Meter(m_Parent, -1, 0, 0, 1);
+    if(wGui.isgrayicons(wxGetApp().getIni()))
+      m_Meter->SetBackgroundColour(Base::getGrey());
+    m_MainSizer->Add(m_Meter, 0, wxALIGN_TOP|wxALL|wxFIXED_MINSIZE, 2);
+  }
+  else {
+    m_Meter = NULL;
+  }
+
+  if( !StrOp.equals( wGui.clock_none, clocktype ) ) {
+    TraceOp.trc( "lc", TRCLEVEL_INFO, __LINE__, 9999, "creating clock...");
+    m_Clock = new Clock(m_Parent, -1, 0, 0, 2, 1, type, wGui.isshowsecondhand( wxGetApp().getIni() ));
+    if(wGui.isgrayicons(wxGetApp().getIni()))
+      m_Clock->SetBackgroundColour(Base::getGrey());
+    m_MainSizer->Add(m_Clock, 0, wxALIGN_TOP|wxALL|wxFIXED_MINSIZE, 2);
+  }
+  else {
+    m_Clock = NULL;
+  }
+
 
 }
 
+void LC::showTooltip(bool p_bTooltip) {
+  p_bTooltip = wxGetApp().getFrame()->isTooltip(true);
+  if( !p_bTooltip ) {
+    m_F0->SetToolTip( wxString("",wxConvUTF8) );
+    m_F1->SetToolTip( wxString("",wxConvUTF8) );
+    m_F2->SetToolTip( wxString("",wxConvUTF8) );
+    m_F3->SetToolTip( wxString("",wxConvUTF8) );
+    m_F4->SetToolTip( wxString("",wxConvUTF8) );
+    m_Dir->SetToolTip( wxString("",wxConvUTF8) );
+    m_FG->SetToolTip( wxString("",wxConvUTF8) );
+    m_Stop->SetToolTip( wxString("",wxConvUTF8) );
+    m_Vslider->SetToolTip( wxString("",wxConvUTF8) );
+    m_V->SetToolTip( wxString("",wxConvUTF8) );
+  }
+  else {
+    setFLabels(true);
+    m_Stop->SetLabel( wxGetApp().getMsg( "stop" ) );
+    m_Dir->SetToolTip( m_bDir?wxGetApp().getMsg( "forwards" ):wxGetApp().getMsg( "reverse" ) );
+    m_Stop->SetToolTip( wxGetApp().getTip( "stop" ) );
+    m_V->SetToolTip( wxGetApp().getMsg( "speed" ) );
+    m_Vslider->SetToolTip( wxGetApp().getMsg( "speedcontroller" ) );
+    m_FG->SetToolTip( wxGetApp().getMsg( "functiongroup" ) );
+  }
+}

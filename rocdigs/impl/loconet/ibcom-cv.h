@@ -1,8 +1,8 @@
 /*
- * ibcom-cv.h
- *
- *  Created on: Sep 12, 2009
- *      Author: rob
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
  */
 
 #ifndef IBCOMCV_H_
@@ -12,5 +12,6 @@
 int makeIBComCVPacket(int cv, int value, byte* buffer, Boolean write);
 int startIBComPT(byte* buffer);
 int stopIBComPT(byte* buffer);
+void initIBCom(iOLocoNet loconet);
 
 #endif /* IBCOMCV_H_ */

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -46,6 +49,8 @@
 
 #include "rocrail/wrapper/public/Plan.h"
 #include "rocrail/wrapper/public/Switch.h"
+#include "rocview/wrapper/public/Gui.h"
+#include "rocview/wrapper/public/SwCtrl.h"
 
 BEGIN_EVENT_TABLE(SwCtrlDlg, wxDialog)
     EVT_BUTTON(-1, SwCtrlDlg::OnButton)
@@ -89,34 +94,50 @@ SwCtrlDlg::SwCtrlDlg(wxWindow *parent)
   m_labIID = new wxStaticText( this, -1, _("IID"), wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT );
   m_IID = new wxTextCtrl( this, -1, _T(""), wxDefaultPosition, wxDefaultSize, 0 );
 
+  iONode swctrl = wGui.getswctrl( wxGetApp().getIni() );
+  if( swctrl == NULL ) {
+    swctrl = NodeOp.inst(wSwCtrl.name(), wxGetApp().getIni(), ELEMENT_NODE);
+    NodeOp.addChild(wxGetApp().getIni(), swctrl);
+  }
+
+  m_IID->SetValue(wxString(wSwCtrl.getiid(swctrl),wxConvUTF8));
+  m_Unit = wSwCtrl.getmodule(swctrl);
+  m_Bus  = wSwCtrl.getbus(swctrl);
+
+  m_labBus = new wxStaticText( this, -1, wxGetApp().getMsg("bus"), wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT );
+  m_BusSpin = new wxTextCtrl( this, -1, _T("0"), wxDefaultPosition, wxDefaultSize, 0 );
+  m_BusSpin->SetToolTip( wxGetApp().getTip("bus") );
+  m_BusSpin->SetValue( wxString::Format(wxT("%d"), m_Bus) );
 
   m_UnitSpin = new wxSpinCtrl( this, wxID_ANY, _T("0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, 256, 0 );
   m_UnitSpin->SetToolTip( wxGetApp().getTip("decoder") );
   m_Quit = new wxButton( this, -1, wxGetApp().getMsg("cancel") );
   m_Quit->SetToolTip( wxGetApp().getTip("cancel") );
 
-  m_Unit = 1;
   m_UnitSpin->SetValue( m_Unit );
 
-  sizer2->Add( m_Pin1Green, 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_Pin1Red  , 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_Pin2Green, 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_Pin2Red  , 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_Pin3Green, 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_Pin3Red  , 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_Pin4Green, 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_Pin4Red  , 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin1Green, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin1Red  , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin2Green, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin2Red  , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin3Green, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin3Red  , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin4Green, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_Pin4Red  , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
 
-  sizer2->Add( m_labIID , 0, wxALIGN_BOTTOM | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_IID, 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_labIID, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_IID   , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+
+  sizer2->Add( m_labBus , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_BusSpin, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
 
   wxStaticText* unitlabel = new wxStaticText( this, -1, wxGetApp().getMsg("decoder"), wxPoint(0,0), wxDefaultSize, wxALIGN_RIGHT );
-  sizer2->Add( unitlabel , 0, wxALIGN_BOTTOM | wxEXPAND | wxALL, 2);
-  sizer2->Add( m_UnitSpin, 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2);
+  sizer2->Add( unitlabel , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
+  sizer2->Add( m_UnitSpin, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 2);
 
-  sizer1->Add( sizer2 , 0, wxALIGN_CENTER | wxEXPAND | wxALL, 0 );
+  sizer1->Add( sizer2 , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 3 );
   //sizer1->Add( m_UnitSpin , 0, wxALIGN_CENTER | wxEXPAND | wxALL, 5 );
-  sizer1->Add( m_Quit , 0, wxALIGN_CENTER | wxEXPAND | wxALL, 2 );
+  sizer1->Add( m_Quit , 0, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxALL, 5 );
 
   SetAutoLayout(TRUE);
   SetSizer(sizer1);
@@ -156,9 +177,15 @@ void SwCtrlDlg::OnButton(wxCommandEvent& event)
   int pin = 0;
   const char* cmd = wSwitch.straight;
 
+  m_Bus  = atoi( m_BusSpin->GetValue().mb_str(wxConvUTF8) );
   m_Unit = m_UnitSpin->GetValue();
   
   if ( event.GetEventObject() == m_Quit ) {
+    iONode swctrl = wGui.getswctrl( wxGetApp().getIni() );
+
+    wSwCtrl.setiid(swctrl, m_IID->GetValue().mb_str(wxConvUTF8));
+    wSwCtrl.setbus(swctrl, m_Bus);
+    wSwCtrl.setmodule(swctrl, m_Unit);
     Destroy();
     //EndModal(0);
   }
@@ -201,6 +228,7 @@ void SwCtrlDlg::OnButton(wxCommandEvent& event)
 
   if( pin != 0 ) {
     iONode swcmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+    wSwitch.setbus( swcmd, m_Bus );
     wSwitch.setaddr1( swcmd, m_Unit );
     wSwitch.setport1( swcmd, pin );
     wSwitch.setiid( swcmd, m_IID->GetValue().mb_str(wxConvUTF8) );
@@ -220,6 +248,10 @@ void SwCtrlDlg::OnButton(wxCommandEvent& event)
 
 
 void SwCtrlDlg::OnClose(wxCloseEvent& event) {
+  iONode swctrl = wGui.getswctrl( wxGetApp().getIni() );
+
+  wSwCtrl.setiid(swctrl, m_IID->GetValue().mb_str(wxConvUTF8));
+  wSwCtrl.setmodule(swctrl, m_UnitSpin->GetValue());
   Destroy();
 }
 

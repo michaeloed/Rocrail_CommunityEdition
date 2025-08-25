@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -54,18 +57,18 @@ void eventExit( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Boo
     newExitEvent = True;
   }
   else {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                    "Ignoring exit_block event from %s; it came within %d ticks!", blockId, data->ignevt );
   }
 
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                  "exit_block event for \"%s\" from \"%s\"...",
                  data->loc->getId( data->loc ), blockId );
 
   if( newExitEvent && curBlockEvent && ( data->state == LC_GO || data->state == LC_GO || data->state == LC_CHECKROUTE ) ) {
     data->state = LC_EXITBLOCK;
-    data->loc->setMode(data->loc, wLoc.mode_auto);
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    data->loc->setMode(data->loc, wLoc.mode_auto, "");
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "Setting state for \"%s\" to LC_EXITBLOCK.",
                    data->loc->getId( data->loc ) );
   }
@@ -79,7 +82,7 @@ void eventExit( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Boo
       /* Exception! */
       /* Train too long??? */
       /* Leaving train has dirty wheels! */
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                      "Unexpected exit_block event for \"%s\" from \"%s\"!",
                      data->loc->getId( data->loc ), blockId );
       /* Break: */
@@ -88,15 +91,18 @@ void eventExit( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Boo
       data->loc->stop( data->loc, False );
 
       data->state = LC_IDLE;
-      data->loc->setMode(data->loc, wLoc.mode_idle);
+      data->loc->setMode(data->loc, wLoc.mode_idle, wLoc.modereason_unexpectedexit);
       data->run = False;
+      if( data->curBlock != NULL ) {
+        data->curBlock->exitBlock(data->curBlock, data->loc->getId( data->loc ), True);
+      }
 
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                      "Loc set back in manual mode for \"%s\" in \"%s\"! (correct position of loc)",
                      data->loc->getId( data->loc ), blockId );
 
 
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                    "*** Train too long or block too short!!!" );
     }
     /*AppOp.stop(  );*/

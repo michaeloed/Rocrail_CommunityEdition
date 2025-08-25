@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -31,6 +34,7 @@
 ////@begin includes
 #include "wx/notebook.h"
 #include "wx/spinctrl.h"
+#include "wx/statline.h"
 ////@end includes
 
 #include "rocs/public/node.h"
@@ -56,6 +60,7 @@ class wxSpinCtrl;
 #define ID_IMAGEPATH_BUTTON 10341
 #define ID_UPDATESPATH_BUTTON 10000
 #define ID_XSLPATH_BUTTON 10354
+#define ID_DECPATH_BUTTON 10415
 #define ID_TEXTCTRL_RG_TRACEFILE 10188
 #define ID_SVGPATH_BUTTON 10339
 #define ID_SVGPATH2_BUTTON 10001
@@ -117,6 +122,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_XSLPATH_BUTTON
     void OnXslpathButtonClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_DECPATH_BUTTON
+    void OnDecpathButtonClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_SVGPATH_BUTTON
     void OnSvgPath1Click( wxCommandEvent& event );
 
@@ -138,6 +146,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCANCELClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end RocguiIniDialog event handler declarations
 
 ////@begin RocguiIniDialog member function declarations
@@ -157,14 +168,45 @@ public:
     wxPanel* m_GeneralTab;
     wxRadioBox* m_ClockType;
     wxRadioBox* m_TabAlignType;
+    wxStaticText* m_labWidgetWidth;
+    wxSpinCtrl* m_WidgetWidth;
+    wxStaticText* m_labMonitorSize;
+    wxSpinCtrl* m_MonitorSize;
+    wxStaticText* m_labGridFontSizeAdjust;
+    wxSpinCtrl* m_GridFontSizeAdjust;
+    wxStaticBox* m_labPanelSize;
+    wxStaticText* m_labCX;
+    wxSpinCtrl* m_CX;
+    wxStaticText* m_labCY;
+    wxSpinCtrl* m_CY;
+    wxStaticBox* m_labModPlanSize;
+    wxStaticText* m_labCXMod;
+    wxSpinCtrl* m_CXMod;
+    wxStaticText* m_labCYMod;
+    wxSpinCtrl* m_CYMod;
     wxCheckBox* m_RestrictEdit4Auto;
-    wxCheckBox* m_Check4Updates;
     wxCheckBox* m_JsSupport;
     wxCheckBox* m_DispatchMode;
     wxCheckBox* m_RestoreLcCtrl;
     wxCheckBox* m_Monitoring;
     wxCheckBox* m_ShowOnlyStartSchedules;
     wxCheckBox* m_ShowBlockID;
+    wxCheckBox* m_ShowSecondhand;
+    wxCheckBox* m_ReconnectAfterServerShutdown;
+    wxCheckBox* m_ResetSpeedDir;
+    wxCheckBox* m_UseAllSpeedSteps;
+    wxCheckBox* m_RenderGC;
+    wxCheckBox* m_FSUTF8;
+    wxCheckBox* m_Toolbar;
+    wxCheckBox* m_VerticalToolbar;
+    wxCheckBox* m_LocoImage;
+    wxCheckBox* m_MonitorDontWrap;
+    wxCheckBox* m_ShowSpeedOMeter;
+    wxCheckBox* m_LocoImageColumn;
+    wxCheckBox* m_ShowLocoImageInBlock;
+    wxCheckBox* m_ShowTrainIdInBlock;
+    wxCheckBox* m_GrayIcons;
+    wxCheckBox* m_SensorMonitorAuto;
     wxStaticBox* m_labWorkspace;
     wxTextCtrl* m_Workspace;
     wxButton* m_WorkspaceDlg;
@@ -178,26 +220,29 @@ public:
     wxStaticBox* m_labXSLPath;
     wxTextCtrl* m_XSLPath;
     wxButton* m_XSLPathDlg;
-    wxStaticBox* m_labPanelSize;
-    wxStaticText* m_labCX;
-    wxSpinCtrl* m_CX;
-    wxStaticText* m_labCY;
-    wxSpinCtrl* m_CY;
-    wxStaticBox* m_labModPlanSize;
-    wxStaticText* m_labCXMod;
-    wxSpinCtrl* m_CXMod;
-    wxStaticText* m_labCYMod;
-    wxSpinCtrl* m_CYMod;
+    wxStaticBox* m_labDecPath;
+    wxTextCtrl* m_DecPath;
+    wxButton* m_DecPathDlg;
     wxStaticText* m_labSpeak4Block;
     wxTextCtrl* m_Speak4Block;
     wxStaticText* m_labSpeakCmd;
     wxTextCtrl* m_SpeakCmd;
+    wxStaticText* m_labDirImage;
+    wxTextCtrl* m_DirImageFwd;
+    wxTextCtrl* m_DirImageRev;
+    wxStaticText* m_labBoosterUID;
+    wxTextCtrl* m_BoosterUID;
     wxPanel* m_TracePanel;
     wxStaticBoxSizer* m_TraceLevel;
     wxCheckBox* m_Debug;
     wxCheckBox* m_Info;
     wxStaticBoxSizer* m_TraceFileBox;
+    wxStaticText* m_labTraceFile;
     wxTextCtrl* m_TraceFile;
+    wxStaticText* m_labProtPath;
+    wxTextCtrl* m_ProtPath;
+    wxStaticBox* m_HelpBox;
+    wxTextCtrl* m_HelpURL;
     wxPanel* m_PTpanel;
     wxStaticText* m_labCVnrs;
     wxTextCtrl* m_CVnrs;
@@ -205,24 +250,30 @@ public:
     wxTextCtrl* m_Timeout;
     wxCheckBox* m_Lissy;
     wxCheckBox* m_SVtab;
+    wxCheckBox* m_UseDecSpec4All;
     wxPanel* m_SVGpanel;
-    wxStaticBox* m_SVGPathBox;
+    wxStaticText* m_labTheme1;
     wxTextCtrl* m_SVGPath;
     wxButton* m_SvgPathDlg;
-    wxStaticBox* m_SVGPath2Box;
+    wxStaticText* m_labTheme2;
     wxTextCtrl* m_SVGPath2;
     wxButton* m_SvgPath2Dlg;
-    wxStaticBox* m_SVGPath3Box;
+    wxStaticText* m_labTheme3;
     wxTextCtrl* m_SVGPath3;
     wxButton* m_SvgPath3Dlg;
-    wxStaticBox* m_SVGPath4Box;
+    wxStaticText* m_labTheme4;
     wxTextCtrl* m_SVGPath4;
     wxButton* m_SvgPath4Dlg;
-    wxStaticBox* m_SVGPath5Box;
+    wxStaticText* m_labTheme5;
     wxTextCtrl* m_SVGPath5;
     wxButton* m_SvgPath5Dlg;
     wxStaticText* m_labItemIDpointsize;
     wxSpinCtrl* m_ItemIDpointsize;
+    wxStaticText* m_labTextPS;
+    wxSpinCtrl* m_TextPS;
+    wxCheckBox* m_ProcessRouteEvents;
+    wxCheckBox* m_ProcessBlockEvents;
+    wxCheckBox* m_ShowRoute4Switch;
     wxPanel* m_RICpanel;
     wxStaticBoxSizer* m_labVelocity;
     wxStaticText* m_labY;
@@ -271,8 +322,16 @@ public:
     wxStaticText* m_labMICStep;
     wxSpinCtrl* m_MICStep;
     wxCheckBox* m_MICStopOnExit;
+    wxPanel* m_AcceleratorPanel;
+    wxStaticText* m_labAccelFunction;
+    wxStaticText* m_labAccelKeyCode;
+    wxStaticText* m_labAccelModifier;
+    wxStaticText* m_labEmergencyBreak;
+    wxComboBox* m_EmergencyBreakList;
+    wxRadioBox* m_EmergencyBreakModifier;
     wxButton* m_OK;
     wxButton* m_Cancel;
+    wxButton* m_Help;
 ////@end RocguiIniDialog member variables
 };
 

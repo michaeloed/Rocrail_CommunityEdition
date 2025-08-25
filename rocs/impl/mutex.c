@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -90,7 +93,7 @@ static Boolean _trywait( iOMutex inst, int t ) {
   iOMutexData data = Data(inst);
   Boolean ok = rocs_mutex_wait( data, t );
   if( !ok )
-    TraceOp.terrno( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, data->rc, "Error on mutex trywait." );
+    TraceOp.terrno( name, TRCLEVEL_WARNING, __LINE__, 9999, data->rc, "Timeout on mutex trywait." );
   return ok;
 }
 

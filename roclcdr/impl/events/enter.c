@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -22,6 +25,7 @@
 #include "roclcdr/impl/lcdriver_impl.h"
 
 #include "roclcdr/impl/tools/tools.h"
+#include "roclcdr/impl/events/events.h"
 #include "rocs/public/strtok.h"
 #include "rocs/public/system.h"
 
@@ -39,7 +43,7 @@
 #include "rocrail/wrapper/public/Link.h"
 
 
-void eventEnter( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Boolean dstBlockEvent ) {
+void eventEnter( iOLcDriver inst, const char* blockId, iIBlockBase block, Boolean curBlockEvent, Boolean dstBlockEvent ) {
   iOLcDriverData data = Data(inst);
 
   Boolean newEnterEvent = False;
@@ -54,57 +58,82 @@ void eventEnter( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Bo
     newEnterEvent = True;
   }
   else {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4101,
                    "Ignoring enter_block event from %s; it came within %d ticks!", blockId, data->ignevt );
   }
 
   /* Train could have contacted both feedbacks. */
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                  "enter_block event for \"%s\" from \"%s\"...",
                  data->loc->getId( data->loc ), blockId );
 
   if( newEnterEvent ) {/* check if the exitblock or outblock state are able to get active: */
     Boolean dontcare = False;
-    if( data->state == LC_GO || data->state == LC_PRE2GO || data->state == LC_CHECKROUTE )
+    if( data->state == LC_GO || data->state == LC_PRE2GO ) /* || data->state == LC_CHECKROUTE ) */
       dontcare = True;
 
-    if( dstBlockEvent && data->state == LC_EXITBLOCK ||
-        dstBlockEvent && data->state == LC_OUTBLOCK ||
-        dstBlockEvent && dontcare )
+    if( (dstBlockEvent && data->state == LC_EXITBLOCK) ||
+        (dstBlockEvent && data->state == LC_OUTBLOCK) ||
+        (dstBlockEvent && dontcare) )
     {
       data->state = LC_ENTERBLOCK;
-      data->loc->setMode(data->loc, wLoc.mode_auto);
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+      data->loc->setMode(data->loc, wLoc.mode_auto, "");
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                      "Setting state for \"%s\" to LC_ENTERBLOCK.",
                      data->loc->getId( data->loc ) );
     }
     else if( dstBlockEvent && data->state != LC_IDLE ) {
       /* Could be dirty wheels or a big gap between wheels. */
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                      "Unexpected enter_block event for [%s] in [%s] with state [%d]...",
                      data->loc->getId( data->loc ), blockId, data->state );
     }
+
+    /**********************************************/
+    /* inserted to free previous block on enter   */
+    if (data->state == LC_ENTERBLOCK && wLoc.isfreeblockonenter(data->loc->base.properties(data->loc)) &&
+        data->next1Block->isFreeBlockOnEnter(data->next1Block) )
+    {
+      data->useCurBlock4Signals = True;
+      data->curBlock4Signals = data->curBlock;
+      if( !data->didFree ) {
+        TraceOp.trc(name, TRCLEVEL_USER1, __LINE__, 4201,
+            "Free previous block on enter for [%s] in [%s] with state [%d]", data->loc->getId(data->loc), blockId, data->state);
+
+        freePrevBlock(inst, block);
+      }
+      else {
+        /* Reset trigger */
+        data->didFree = False;
+      }
+    }
+    else {
+      data->useCurBlock4Signals = False;
+    }
+
+    /* end insert to free previous block          */
+    /**********************************************/
   }
   else {
     /* Exception! */
     /* ToDo: Could also happen when wagon wheels are dirty. */
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                    "Unexpected (state=%d) enter_block event for \"%s\" from \"%s\"...",
                    data->state, data->loc->getId( data->loc ), blockId );
 
     if( curBlockEvent ) {
       /* An unknown loc is comming in!!! (Or train too long??!!)*/
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                      "Unexpected enter_block event for \"%s\" from \"%s\"...",
                      data->loc->getId( data->loc ), blockId );
       if( newEnterEvent ) {
-        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 4001,
                        "Stopping because a new enter_block event came after more than a second! loc=\"%s\" block=\"%s\"...",
                        data->loc->getId( data->loc ), blockId );
         data->model->stop( data->model );
       }
       else {
-        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                        "Not Stopping because a new enter_block event came within a second! loc=\"%s\" block=\"%s\"...",
                        data->loc->getId( data->loc ), blockId );
       }

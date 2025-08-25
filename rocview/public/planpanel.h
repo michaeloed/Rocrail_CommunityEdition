@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -24,14 +27,17 @@
 #include "rocs/public/node.h"
 #include "rocs/public/map.h"
 #include "rocview/public/basepanel.h"
+#include <wx/dnd.h>
 
 class PlanPanel : public BasePanel
 {
 public:
   PlanPanel(wxWindow *parent, int itemsize, double scale, double bktext, int z, iONode zlevel=NULL, bool showBorder=true );
+  ~PlanPanel();
   void OnPaint(wxPaintEvent& event);
   void init(bool modview=false);
   void clean();
+  void showTooltip(bool show);
   char* itemKey( iONode node, char* key, char* prevkey );
   char* itemKey( const char* nodename, const char* id, char* key );
   void addItems( iONode node );
@@ -39,7 +45,7 @@ public:
   void updateItemCmd(wxCommandEvent& event);
   void update4Route(wxCommandEvent& event);
   void updateTTItemCmd(wxCommandEvent& event);
-  void addItem(iONode child, bool add2list=true);
+  void addItem(iONode child, bool add2list=true, bool focus=true);
   void addItem(const char* nodename, const char* id, wxWindow* item);
   void addMultipleItem(wxCommandEvent& event);
   void addTrackStraight(wxCommandEvent& event);
@@ -48,11 +54,18 @@ public:
   void addTrackDirAll(wxCommandEvent& event);
   void addTrackBuffer(wxCommandEvent& event);
   void addTrackConnector(wxCommandEvent& event);
+  void addTrackConnectorCurveRight(wxCommandEvent& event);
+  void addTrackConnectorCurveLeft(wxCommandEvent& event);
   void addSwitchLeft(wxCommandEvent& event);
   void addSwitchRight(wxCommandEvent& event);
   void addSwitchCrossing(wxCommandEvent& event);
   void addSwitchDCrossing(wxCommandEvent& event);
+  void addSwitchCenterCrossing(wxCommandEvent& event);
+  void addSwitchRectCrossing(wxCommandEvent& event);
+  void addSwitchLeftCrossing(wxCommandEvent& event);
+  void addSwitchLeftDCrossing(wxCommandEvent& event);
   void addSwitchThreeway(wxCommandEvent& event);
+  void addSwitchTwoway(wxCommandEvent& event);
   void addSwitchDecoupler(wxCommandEvent& event);
   void addSwitchAccessory(wxCommandEvent& event);
   void addSignal(wxCommandEvent& event);
@@ -64,7 +77,9 @@ public:
   void addTT(wxCommandEvent& event);
   void addSelTab(wxCommandEvent& event);
   void addText(wxCommandEvent& event);
+  void* GetItem( const char* key );
 
+  void OnBackColor( wxCommandEvent& event );
   void addItemAttr( iONode node );
   void modelEvent( iONode node );
   void reScale( double scale );
@@ -78,14 +93,18 @@ public:
   void OnRotate(wxCommandEvent& event);
   void removeItemFromList( iONode item );
   void OnPanelProps(wxCommandEvent& event);
+  void OnPanelHelp(wxCommandEvent& event);
   void OnModProps(wxCommandEvent& event);
   BasePanel* updateZLevel(iONode zlevel);
   void OnAddPanel(wxCommandEvent& event);
   void OnSelect(wxCommandEvent& event);
+  void OnPaste(wxCommandEvent& event);
   void processSelection(iONode sel);
   void moveSelection(iONode sel);
   void copySelection(iONode sel);
   void deleteSelection(iONode sel);
+  void routeidSelection(iONode sel);
+  void blockidSelection(iONode sel);
   void OnRemovePanel(wxCommandEvent& event);
   const char* getZLevelTitle();
   bool isBlockOccupied( const char* id );
@@ -100,15 +119,28 @@ public:
   void refresh(bool eraseBackground = true);
   void setPosition();
   bool isRouteLocked(const char* id);
+  bool isAlt() {return m_bAlt;}
   void putChild(void* item);
+  iONode GetClipboardNode(bool clear=false);
   iONode m_zLevel;
   int m_Z;
   const char* m_Ori;
+  bool m_OK2Clear;
+  void OnTimer(wxTimerEvent& event);
+  void ChangeItemKey( const char* key, const char* prev_key);
+  double m_Scale;
+  int m_ItemSize;
+  int m_X;
+  int m_Y;
+
 
 private:
   iOMap m_LockedRoutes;
   int m_dragX;
   int m_dragY;
+  int m_selX;
+  int m_selY;
+  bool m_Selecting;
   bool m_hasMouse;
   bool m_isDragged;
   wxStaticText* m_ModViewLabel;
@@ -117,14 +149,11 @@ private:
   iONode addItemInList( iONode item );
   iOThread  m_InitThread;
 	wxWindow* m_Parent;
+  wxTimer* m_Timer;
   wxHashTable* m_ChildTable;
-  double m_Scale;
   double m_Bktext;
-  int m_ItemSize;
   int m_mouseX;
   int m_mouseY;
-  int m_X;
-  int m_Y;
   bool m_Initialized;
   bool m_MultiAdd;
   bool m_ProcessingSelect;
@@ -137,6 +166,7 @@ private:
   int m_ScGreen;
   int m_ScBlue;
   bool m_ShowSc;
+  bool m_bAlt;
 
   DECLARE_EVENT_TABLE()
 };
@@ -154,11 +184,18 @@ enum {
   ME_AddTrackDirAll,
   ME_AddTrackBuffer,
   ME_AddTrackConnector,
+  ME_AddTrackConnectorCurveRight,
+  ME_AddTrackConnectorCurveLeft,
   ME_AddSwitchLeft,
   ME_AddSwitchRight,
   ME_AddSwitchCrossing,
   ME_AddSwitchDCrossing,
+  ME_AddSwitchCenterCrossing,
+  ME_AddSwitchRectCrossing,
+  ME_AddSwitchLeftCrossing,
+  ME_AddSwitchLeftDCrossing,
   ME_AddSwitchThreeway,
+  ME_AddSwitchTwoway,
   ME_AddSwitchDecoupler,
   ME_AddSwitchAccessory,
   ME_AddSignal,
@@ -171,9 +208,11 @@ enum {
   ME_AddSelTab,
   ME_AddText,
   ME_PlanProps,
+  ME_PanelHelp,
   ME_ModProps,
   ME_AddPlan,
   ME_PanelSelect,
+  ME_Paste,
   ME_RemovePlan,
   ME_AddRoadStraight,
   ME_AddRoadCurve,
@@ -188,7 +227,20 @@ enum {
   ME_ModuleEast,
   ME_ModuleSouth,
   ME_ModuleWest,
+  ME_PlanColor,
+  ME_TimerAlt
 };
+
+
+class PlanPanelDrop : public wxTextDropTarget
+{
+public:
+  PlanPanelDrop( PlanPanel* plan ){m_PlanPanel = plan;};
+  virtual bool OnDropText(wxCoord x, wxCoord y, const wxString& data);
+private:
+  PlanPanel* m_PlanPanel;
+};
+
 
 
 #endif

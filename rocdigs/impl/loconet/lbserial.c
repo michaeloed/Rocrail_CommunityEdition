@@ -1,7 +1,7 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -54,7 +54,7 @@ Boolean lbserialConnect( obj inst ) {
   data->serial = SerialOp.inst( data->device );
   if( native ) {
     /* MS100 bps=16457 */
-    SerialOp.setFlow( data->serial, none );
+    SerialOp.setFlow( data->serial, 0 );
     if( SystemOp.isWindows() ) {
       SerialOp.setLine( data->serial, 16457, 8, 1, none, wDigInt.isrtsdisabled( data->ini ) );
     }
@@ -68,7 +68,7 @@ Boolean lbserialConnect( obj inst ) {
   }
   else if( pr3 ) {
     /* PR3 bps=57600 Always use flow control. */
-    SerialOp.setFlow( data->serial, data->cts? cts:none );
+    SerialOp.setFlow( data->serial, data->cts? cts:0 );
     SerialOp.setLine( data->serial, data->bps, 8, 1, none, wDigInt.isrtsdisabled( data->ini ) );
     SerialOp.setRTS(data->serial, True);    // not connected in some serial ports and adapters
     SerialOp.setDTR(data->serial, True);   // pin 1 in DIN8; on main connector, this is DTR
@@ -84,7 +84,7 @@ Boolean lbserialConnect( obj inst ) {
     data->initPacket[6] = LocoNetOp.checksum( data->initPacket+1, 5 );
   }
   else {
-    SerialOp.setFlow( data->serial, data->cts? cts:none );
+    SerialOp.setFlow( data->serial, data->cts? cts:0 );
     SerialOp.setLine( data->serial, data->bps, 8, 1, none, wDigInt.isrtsdisabled( data->ini ) );
   }
   SerialOp.setTimeout( data->serial, wDigInt.gettimeout( data->ini ), wDigInt.gettimeout( data->ini ) );
@@ -138,7 +138,7 @@ int lbserialRead ( obj inst, unsigned char *msg ) {
     if( !SerialOp.available(data->serial) )
       return 0;
 
-    ok = SerialOp.read(data->serial, &c, 1);
+    ok = SerialOp.read(data->serial, (char*)&c, 1);
     if(c < 0x80) {
       ThreadOp.sleep(10);
       bucket[garbage] = c;
@@ -166,6 +166,12 @@ int lbserialRead ( obj inst, unsigned char *msg ) {
 
   msg[0] = c;
 
+  if( c == 0xE0 ) {
+	  /* Uhli exceptions */
+    TraceOp.trc( "lbserial", TRCLEVEL_WARNING, __LINE__, 9999, "undocumented message: start=0x%02X", msg[0] );
+    return -1;
+  }
+
   switch (c & 0xf0) {
   case 0x80:
       msglen = 2;
@@ -182,10 +188,10 @@ int lbserialRead ( obj inst, unsigned char *msg ) {
       index = 1;
       break;
   case 0xe0:
-      SerialOp.read(data->serial, &c, 1);
-      msg[1] = c;
+      SerialOp.read(data->serial, (char*)&c, 1);
+      msg[1] = c & 0x7F;
       index = 2;
-      msglen = c;
+      msglen = c & 0x7F;
       break;
   default:
     TraceOp.trc( "lbserial", TRCLEVEL_WARNING, __LINE__, 9999, "undocumented message: start=0x%02X", msg[0] );
@@ -193,7 +199,10 @@ int lbserialRead ( obj inst, unsigned char *msg ) {
   }
   TraceOp.trc( "lbserial", TRCLEVEL_DEBUG, __LINE__, 9999, "message 0x%02X length=%d", msg[0], msglen );
 
-  ok = SerialOp.read(data->serial, &msg[index], msglen - index);
+  ok = False;
+  if( msglen > 0 && msglen <= 0x7F && msglen >= index ) {
+		ok = SerialOp.read(data->serial, (char*)&msg[index], msglen - index);
+  }
 
   if( ok ) {
     return msglen;
@@ -213,6 +222,9 @@ static Boolean __isCTS( iOSerial ser, int retries, Boolean handshake ) {
   if( !handshake ) {
     return True;
   }
+
+  if( ser == NULL )
+    return False;
 
   while( wait4cts < retries ) {
     if( SerialOp.isCTS( ser ) ) {

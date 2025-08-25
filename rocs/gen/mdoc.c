@@ -1,9 +1,9 @@
-/** ------------------------------------------------------------
-  * $Author: rob $
-  * $Date: 2007/01/19 13:58:16 $
-  * $Revision: 1.3 $
-  * $Source: /home/cvs/xspooler/rocs/gen/mdoc.c,v $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 
 /** ------------------------------------------------------------
@@ -46,6 +46,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <string.h>
 
 /* ------------------------------------------------------------
  * platform dependent interfaces.

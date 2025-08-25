@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -35,6 +38,7 @@ public:
 
 private:
   void setTooltips(void);
+  int m_Bus;
   int m_Unit;
 
   wxButton*   m_Pin1Red;
@@ -48,6 +52,9 @@ private:
 
   wxStaticText* m_labIID;
   wxTextCtrl* m_IID;
+
+  wxStaticText* m_labBus;
+  wxTextCtrl* m_BusSpin;
 
   wxSpinCtrl* m_UnitSpin;
   wxButton*   m_Quit;

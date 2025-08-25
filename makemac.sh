@@ -1,29 +1,29 @@
 #!/bin/sh
 #
-# makemac.sh -- Copyright 2010 Rocrail.net.  See www.rocrail.net for license details
+#    Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+#
+#    Without an official permission commercial use is not permitted.
+#    Forking this project is not permitted.  
 #
 echo ""
 echo "*** Rocrail makemac.sh starting (see www.rocrail.net)..."
 echo ""
 
 # Check params
-# rocrail-setup-[version].[patch]-rev[revno]-[type]-[dist].exe  (md5)
+# rocrail-[revno]-[dist]  (md5)
 
-VERSION=$1
-PATCH=$2
-TYPE=$3
-DIST=$4
+DIST=$1
 
 echo "Checking Parameters..."
 
-if [ !  $1 ] || [ ! $2 ] || [ ! $3 ] || [ ! $4 ]; then
+if [ !  $1 ]; then
   echo "Error: Missing parameters:"
   echo ""
-  echo "    Usage: makemac.sh <version> <patch> <type> <dist>"
+  echo "    Usage: makemac.sh <dist>"
   echo ""
-  echo "    Example: \"makemac.sh 1.2 999 snapshot x64\" will build "
-  echo "    \"rocrail-1.2.999-revXXX-snapshot-x64.dmg\" where \"XXX\" is "
-  echo "    the Bazaar revision number or \"user\" if Bazaar is not installed."
+  echo "    Example: \"makemac.sh lion\" will build "
+  echo "    \"rocrail-XXXX-osx-lion.dmg\" where \"XXXX\" is "
+  echo "    the revision number or \"user\" if the version control program is not installed."
   echo ""
   exit $?
 else
@@ -31,12 +31,10 @@ else
   echo ""
 fi
 
-cd rocview; make macapp; cd ..;
-
-echo "Getting Bazaar revision number..."
-if which bzr > /dev/null
+echo "Getting revision number..."
+if which git > /dev/null
 then
-	BAZAARREV=`bzr revno`
+	BAZAARREV=`git rev-list --count HEAD`
 	echo "    Revision number is $BAZAARREV"
 	echo ""
 else
@@ -45,8 +43,16 @@ else
 	echo ""
 fi
 
-echo "Building rocrail-$VERSION.$PATCH-rev$BAZAARREV-$TYPE-$DIST.dmg"
+echo "Building rocrail-$BAZAARREV-osx-$DIST.dmg"
 echo ""
+
+cd rocview
+pwd
+sed s/\<BZR\>/$BAZAARREV/ < Info.plist.template > Info.plist
+cd ..
+
+cd rocview; make macapp; cd ..;
+
 
 TMP=tmp 
 DMG_FILE=rocrail.dmg
@@ -57,20 +63,24 @@ mkdir -p $TMP
 # copy the files
 mkdir -p $TMP/Rocrail/rocdata/
 mkdir -p $TMP/Rocrail/rocdata/trace/
+mkdir -p $TMP/Rocrail/rocdata/web/
 
 cp -r rocrail/package/images $TMP/Rocrail/rocdata/
+cp -r decspecs $TMP/Rocrail/rocdata/
+cp -r stylesheets $TMP/Rocrail/rocdata/
 cp -r unxbin/Rocrail.app $TMP/Rocrail
 cp rocrail/package/plan.xml $TMP/Rocrail/rocdata/
 cp -r rocview/svg/themes $TMP/Rocrail/rocdata/
+cp -r rocrail/impl/web/html/* $TMP/Rocrail/rocdata/web
 cp rocview/mac_default_rocview.ini $TMP/Rocrail/rocdata/rocview.ini
 
 # pimp the dmg
 cp doc/rocrail-logo-dmg.png $TMP/background.png
-setFile -a V $TMP/background.png
+SetFile -a V $TMP/background.png
 cp rocview/xpm/VolumeIcon.icns $TMP/.VolumeIcon.icns
 SetFile -c icnC $TMP/.VolumeIcon.icns
 cp rocview/_DS_Store $TMP/.DS_Store
-setFile -a V $TMP/.DS_Store
+SetFile -a V $TMP/.DS_Store
 
 # Create an initial disk image
 hdiutil create -srcfolder $TMP -volname Rocrail -format UDRW -ov raw-$DMG_FILE
@@ -91,4 +101,4 @@ if [ ! -e package ] ; then
 	mkdir package
 fi
 
-mv $DMG_FILE package/rocrail-$VERSION.$PATCH-rev$BAZAARREV-$TYPE-$DIST.dmg
+mv $DMG_FILE package/rocrail-$BAZAARREV-osx-$DIST.dmg

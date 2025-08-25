@@ -1,15 +1,17 @@
-/** ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocs/public/rocs.h,v $
-  * $Author: robvrs $
-  * $Date: 2004/02/27 08:12:39 $
-  * $Revision: 1.10 $
-  * $Name:  $
-  * ------------------------------------------------------------ */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef __ROCS_H
 #define __ROCS_H
 
+#if defined _WIN64
+  /*#pragma message("--- [WIN64] ---")*/
+#endif
 #if defined _WIN32
-  #pragma message("--- [WIN32] ---")
+  /*#pragma message("--- [WIN32] ---")*/
 #elif defined _AIX
   #ifndef __unix__
     #define __unix__
@@ -21,9 +23,9 @@
 #elif defined __OS2__
   #pragma message("--- [OS/2] ---")
 #elif defined __linux__
-  #pragma message("--- [LINUX] ---")
+  /*#pragma message("--- [LINUX] ---")*/
 #elif defined __APPLE__
-  #pragma message("--- [APPLE] ---")
+  /*#pragma message("--- [APPLE] ---")*/
   #define __apple__
   #define __linux__
   #define __unix__

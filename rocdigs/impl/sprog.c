@@ -1,8 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
- http://www.rocrail.net
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -304,16 +306,18 @@ static Boolean __transact( iOSprog sprog, char* out, int outsize, char* in, int 
   iOSprogData data = Data(sprog);
   Boolean     rc = False;
 
-  if( MutexOp.wait( data->mux ) ) {
+  if( data->commOK && MutexOp.wait( data->mux ) ) {
     int i = 0;
     ThreadOp.sleep(5);
 
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "_transact outsize=%d insize=%d", outsize, insize );
 
     for( i = 0; i < repeat; i++ ) {
-      if( rc = SerialOp.write( data->serial, out, outsize ) ) {
+      TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "SPROG write: %s", out );
+      if( (rc = SerialOp.write( data->serial, out, outsize )) ) {
         if( insize > 0 ) {
           rc = SerialOp.read( data->serial, in, insize );
+          TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "SPROG read: %s", in );
         }
       }
     }
@@ -413,6 +417,45 @@ static int __translate( iOSprog sprog, iONode node, char* outa, int* insize ) {
     *insize = 3;
     repeat = 2;
   }
+
+  else if( StrOp.equals( NodeOp.getName( node ), wSignal.name() ) ) {
+    int addr = wSignal.getaddr(node);
+    int port = wSignal.getport1(node);
+    int gate = wSignal.getgate1(node);
+    int aspect = wSignal.getaspect(node);
+    int fada = 0;
+    int pada = 0;
+    int cmdsize = 0;
+    byte dcc[12];
+    char cmd[32] = {0};
+
+    if( port == 0 ) {
+      fada = addr;
+      AddrOp.fromFADA( addr, &addr, &port, &gate );
+    }
+    else if( addr == 0 && port > 0 ) {
+      pada = port;
+      AddrOp.fromPADA( port, &addr, &port );
+    }
+
+    if( fada == 0 )
+      fada = AddrOp.toFADA( addr, port, gate );
+    if( pada == 0 )
+      pada = AddrOp.toPADA( addr, port );
+
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "signal %04d %d %d fada=%04d pada=%04d aspect=%d",
+        addr, port, gate, fada, pada, aspect );
+
+
+    cmdsize = accSignalDecoderPkt(dcc, addr, aspect);
+    /*cmdsize = accDecoderPkt(dcc, fada, action);*/
+    __byteToStr( cmd, dcc, cmdsize );
+    StrOp.fmtb( outa, "O %s\r", cmd );
+    TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "DCC out: %s", outa );
+    *insize = 3;
+    repeat = 2;
+  }
+
   /* Output command. */
   else if( StrOp.equals( NodeOp.getName( node ), wOutput.name() ) ) {
 
@@ -458,15 +501,16 @@ static int __translate( iOSprog sprog, iONode node, char* outa, int* insize ) {
     Boolean pom = wProgram.ispom( node );
 
     if( !pom && !data->power ) {
+      Boolean direct = wProgram.getmode(node) == wProgram.mode_direct;
       if( wProgram.getcmd( node ) == wProgram.get ) {
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "CV %d get", wProgram.getcv(node) );
-        StrOp.fmtb( outa, "%c %d\r", wProgram.isdirect(node)?'C':'V', wProgram.getcv(node) );
+        StrOp.fmtb( outa, "%c %d\r", direct?'C':'V', wProgram.getcv(node) );
         data->lastcmd = CV_READ;
         data->lastvalue = 0;
       }
       else if( wProgram.getcmd( node ) == wProgram.set ) {
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "CV %d set %d", wProgram.getcv(node), wProgram.getvalue(node) );
-        StrOp.fmtb( outa, "%c %d %d\r", wProgram.isdirect(node)?'C':'V', wProgram.getcv(node), wProgram.getvalue(node) );
+        StrOp.fmtb( outa, "%c %d %d\r", direct?'C':'V', wProgram.getcv(node), wProgram.getvalue(node) );
         data->lastcmd = CV_WRITE;
         data->lastvalue = wProgram.getvalue(node);
       }
@@ -511,9 +555,10 @@ static int __translate( iOSprog sprog, iONode node, char* outa, int* insize ) {
 
       /* keep this value for the ping thread */
       data->slots[slot].dir = wLoc.isdir( node );
-      data->slots[slot].V = V;
+      data->slots[slot].V = (V > 127 ? 127:V);
       data->slots[slot].steps = steps;
       data->slots[slot].addr = wLoc.getaddr( node );
+      data->slots[slot].longaddr = (wLoc.getaddr( node ) > 127) ? True:False;
       data->slots[slot].lights = wLoc.isfn( node );
       data->slots[slot].fn[0]  = wLoc.isfn( node );
       data->slots[slot].changedfgrp = wLoc.isfn( node ) ? 1:-1;
@@ -538,6 +583,7 @@ static int __translate( iOSprog sprog, iONode node, char* outa, int* insize ) {
       if( data->slots[slot].addr == 0 ) {
         /* first use of this slot */
         data->slots[slot].addr = addr;
+        data->slots[slot].longaddr = (addr > 127) ? True:False;
       }
       data->slots[slot].changedfgrp = group;
       data->slots[slot].lights = wFunCmd.isf0 ( node );
@@ -605,10 +651,18 @@ static iONode _cmd( obj inst ,const iONode nodeA ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOSprogData data = Data(inst);
   data->run = False;
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down [%s]...", data->iid );
+  if( poweroff ) {
+    char outa[32];
+    StrOp.fmtb( outa, "-\r" );
+    data->power = False;
+    __transact( (iOSprog)inst, outa, StrOp.len(outa), NULL, 0, 1 );
+  }
+  ThreadOp.sleep(1000);
+  data->commOK = False;
   SerialOp.close( data->serial );
   return;
 }
@@ -752,14 +806,14 @@ static void __sprogWriter( void* threadinst ) {
           }
         }
         else {
-          data->slots[slotidx].V_prev == data->slots[slotidx].V;
+          data->slots[slotidx].V_prev = data->slots[slotidx].V;
           data->slots[slotidx].fgrp = data->slots[slotidx].changedfgrp;
           data->slots[slotidx].changedfgrp = 0;
           data->slots[slotidx].idle = SystemOp.getTick();
         }
 
 
-        if( data->slots[slotidx].steps == 128 )  {
+        if( data->slots[slotidx].steps > 28 )  {
           int size = speedStep128Packet(dcc, data->slots[slotidx].addr,
               data->slots[slotidx].longaddr, data->slots[slotidx].V, data->slots[slotidx].dir );
           __byteToStr( cmd, dcc, size );
@@ -856,6 +910,7 @@ static void __sprogWriter( void* threadinst ) {
   };
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "SPROG writer ended." );
+  ThreadOp.base.del(th);
 }
 
 
@@ -866,20 +921,21 @@ static void __sprogReader( void* threadinst ) {
 
   char in[256] = {0};
   int idx = 0;
+  int retry = 0;
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "SPROG reader started." );
   ThreadOp.sleep( 1000 );
 
   StrOp.fmtb( in, "?\r" );
-  SerialOp.write(data->serial, in, StrOp.len(in));
+  __transact( sprog, in, StrOp.len(in), NULL, 0, 1 );
 
   do {
 
     ThreadOp.sleep( 10 );
 
-    if( MutexOp.wait( data->mux ) ) {
-
-      if( SerialOp.available(data->serial) ) {
+    if( data->run && data->commOK && MutexOp.wait( data->mux ) ) {
+      int available = SerialOp.available(data->serial);
+      if( available > 0 ) {
         if( SerialOp.read(data->serial, &in[idx], 1) ) {
           TraceOp.dump( NULL, TRCLEVEL_DEBUG, (char*)in, StrOp.len(in) );
           if( idx > 254 ) {
@@ -889,11 +945,13 @@ static void __sprogReader( void* threadinst ) {
           }
           else if( in[idx] == '\r' || in[idx] == '\n' ) {
             in[idx+1] = '\0';
+            StrOp.replaceAll( in, '\n', '\0' );
+            StrOp.replaceAll( in, '\r', '\0' );
+            if( StrOp.len(in) > 0 ) {
+              TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "SPROG read: [%s]", in );
+              __handleResponse(sprog, in);
+            }
             idx = 0;
-            StrOp.replaceAll( in, '\n', ' ' );
-            StrOp.replaceAll( in, '\r', ' ' );
-            TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "SPROG read: [%s]", in );
-            __handleResponse(sprog, in);
             in[idx] = '\0';
           }
           else if( StrOp.equals( in, "P> ") || StrOp.equals( in, " P>") || StrOp.equals( in, " P> ") ) {
@@ -905,14 +963,32 @@ static void __sprogReader( void* threadinst ) {
           }
         }
       }
+      else if( available == -1 || SerialOp.getRc(data->serial) > 0 ) {
+        /* device error */
+        data->commOK = False;
+        SerialOp.close(data->serial);
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "device error" );
+      }
 
       /* Release the mutex. */
       MutexOp.post( data->mux );
+    }
+    else if(!data->commOK) {
+      retry++;
+      if( retry >= 500 ) {
+        retry = 0;
+        data->commOK = SerialOp.open( data->serial );
+        if(data->commOK) {
+          SerialOp.setDTR(data->serial, True);
+          SerialOp.setRTS(data->serial, True);
+        }
+      }
     }
 
   } while(data->run);
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "SPROG reader ended." );
+  ThreadOp.base.del(th);
 }
 
 
@@ -948,10 +1024,15 @@ static struct OSprog* _inst( const iONode ini ,const iOTrace trc ) {
   SerialOp.setFlow( data->serial, cts );
   SerialOp.setLine( data->serial, 9600, 8, 1, 0, wDigInt.isrtsdisabled( ini ) );
   SerialOp.setTimeout( data->serial, wDigInt.gettimeout( ini ), wDigInt.gettimeout( ini ) );
-  SerialOp.open( data->serial );
 
-  SerialOp.setDTR(data->serial, True);
-  SerialOp.setRTS(data->serial, True);
+  data->commOK = SerialOp.open( data->serial );
+  if( data->commOK ) {
+    SerialOp.setDTR(data->serial, True);
+    SerialOp.setRTS(data->serial, True);
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "device = [%s] not ready", data->device );
+  }
 
   data->reader = ThreadOp.inst( "sprogrx", &__sprogReader, __Sprog );
   ThreadOp.start( data->reader );

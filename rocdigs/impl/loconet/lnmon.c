@@ -213,7 +213,7 @@ static const char* __convertToMixed( int addressLow, int addressHigh)
  * @param l Message to parse
  * @return String representation
  */
-void traceLocoNet(byte* msg) {
+void traceLocoNet(byte* msg, Boolean GBM16xn) {
 
     Boolean showStatus = False;   /* show track status in this message? */
 
@@ -371,6 +371,7 @@ void traceLocoNet(byte* msg) {
         } else {                                            /* general move */
             TraceOp.trc( "lnmon", TRCLEVEL_MONITOR, __LINE__, 9999, "Move data in slot %d to slot %d", src, dest );
         }
+        break;
     }
 
         /********************************************************************************
@@ -652,8 +653,8 @@ void traceLocoNet(byte* msg) {
         if ( ((sw2 & 0xCF) == 0x0F)  && ((sw1 & 0xFC) == 0x78) ) { // broadcast address LPU V1.0 page 12
             TraceOp.trc( "lnmon", TRCLEVEL_MONITOR, __LINE__, 9999, "Request Switch to broadcast address with bits a=%s c=%d b=%d Output %s",
                 ((sw2&0x20)>>5)+((sw2 & OPC_SW_REQ_DIR)!=0 ? " (Closed)" : " (Thrown)"),
-                " c="+ ((sw1 & 0x02)>>1),
-                " b="+ ((sw1 & 0x01)),
+                ((sw1 & 0x02)>>1),
+                ((sw1 & 0x01)),
                 ((sw2 & OPC_SW_REQ_OUT)!=0 ? "On"     : "Off"));
 
         } else if ( ((sw2 & 0xCF) == 0x07)  && ((sw1 & 0xFC) == 0x78) ) { // broadcast address LPU V1.0 page 13
@@ -764,6 +765,9 @@ void traceLocoNet(byte* msg) {
           addr=msg[4];
         else
           addr=msg[3]*128+msg[4];
+				
+				if( GBM16xn )
+          addr=addr&0x00ff;
 
         switch (type) {
         case OPC_MULTI_SENSE_POWER:
@@ -1475,16 +1479,16 @@ void traceLocoNet(byte* msg) {
         switch (msg[1]) {
         case 0x08 : {  // Format LISSY message
           int unit = (msg[4]&0x7F);
-          if( msg[2] == 0 ) {
-            int address = (msg[6]&0x7F)+128*(msg[5]&0x7F);
-            TraceOp.trc( "lnmon", TRCLEVEL_MONITOR, __LINE__, 9999,
-                "Lissy %d: Loco %d moving %s", unit, address, ((msg[3]&0x20)==0 ? "north":"south") );
-          }
-          else if( msg[2] == 0x01 ) {
+          if( msg[2] == 0x40 ) {
             int wc = (msg[6]&0x7F)+128*(msg[5]&0x7F);
             unit = (msg[4] & 0x7F) + (128 * ( msg[3] & 0x7F ));
             TraceOp.trc( "lnmon", TRCLEVEL_MONITOR, __LINE__, 9999,
                 "Wheel counter %d = [%d] ", unit, wc );
+          }
+          else {
+            int address = (msg[6]&0x7F)+128*(msg[5]&0x7F);
+            TraceOp.trc( "lnmon", TRCLEVEL_MONITOR, __LINE__, 9999,
+                "Lissy %d: Loco %d moving %s", unit, address, ((msg[3]&0x20)==0 ? "north":"south") );
           }
           break;
         }
@@ -1591,6 +1595,7 @@ void traceLocoNet(byte* msg) {
 
     default:
         TraceOp.trc( "lnmon", TRCLEVEL_DEBUG, __LINE__, 9999, "Command 0x%02X is not defined in Loconet Personal Use Edition 1.0", msg[0] );
+        break;
 
     }  // end switch over opcode type - default handles unrecognized cases, so can't reach here
 }  // end of format() member function

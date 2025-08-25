@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -43,6 +46,7 @@
 
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocrail/wrapper/public/DDX.h"
+#include "rocs/public/strtok.h"
 
 ////@begin XPM images
 ////@end XPM images
@@ -61,9 +65,8 @@ BEGIN_EVENT_TABLE( DDXCtrlDlg, wxDialog )
 
 ////@begin DDXCtrlDlg event table entries
     EVT_BUTTON( wxID_OK, DDXCtrlDlg::OnOkClick )
-
     EVT_BUTTON( wxID_CANCEL, DDXCtrlDlg::OnCancelClick )
-
+    EVT_BUTTON( wxID_HELP, DDXCtrlDlg::OnHelpClick )
 ////@end DDXCtrlDlg event table entries
 
 END_EVENT_TABLE()
@@ -76,10 +79,11 @@ DDXCtrlDlg::DDXCtrlDlg( )
 {
 }
 
-DDXCtrlDlg::DDXCtrlDlg( wxWindow* parent, iONode props )
+DDXCtrlDlg::DDXCtrlDlg( wxWindow* parent, iONode props, const char* devices )
 {
   m_TabAlign = wxGetApp().getTabAlign();
   m_Props = props;
+  m_Devices = devices;
 
   // check if subnode ddl exist:
   m_SubProps = wDigInt.getddx( m_Props );
@@ -89,7 +93,7 @@ DDXCtrlDlg::DDXCtrlDlg( wxWindow* parent, iONode props )
     NodeOp.addChild( m_Props, m_SubProps );
   }
 
-  Create(parent, -1, wxGetApp().getMsg( NodeOp.getName(m_SubProps) ));
+  Create(parent, -1, wxString::From8BitData(NodeOp.getName(m_SubProps)).Upper() );
 
   initLabels();
   initValues();
@@ -136,6 +140,14 @@ void DDXCtrlDlg::initValues() {
   m_IID->SetValue( wxString( wDigInt.getiid( m_Props ), wxConvUTF8 ) );
 
   m_Device->SetValue( wxString( wDDX.getport( m_SubProps ), wxConvUTF8 ) );
+  if( m_Devices != NULL ) {
+    iOStrTok tok = StrTokOp.inst(m_Devices, ',');
+    while( StrTokOp.hasMoreTokens(tok) ) {
+      m_Device->Append( wxString( StrTokOp.nextToken(tok), wxConvUTF8 ) );
+    }
+    StrTokOp.base.del(tok);
+  }
+
   m_PortBase->SetValue( wxString( wDDX.getportbase( m_SubProps ), wxConvUTF8 ) );
 
   m_Port->SetValue( wxString( wDDX.gets88port( m_SubProps ), wxConvUTF8 ) );
@@ -273,7 +285,6 @@ void DDXCtrlDlg::CreateControls()
     m_GenerelPanel->SetSizer(itemBoxSizer5);
 
     wxFlexGridSizer* itemFlexGridSizer6 = new wxFlexGridSizer(0, 2, 0, 0);
-    itemFlexGridSizer6->AddGrowableCol(1);
     itemBoxSizer5->Add(itemFlexGridSizer6, 0, wxGROW|wxALL, 5);
     m_labIID = new wxStaticText( m_GenerelPanel, ID_STATICTEXT_DDL_IID, _("iid"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer6->Add(m_labIID, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
@@ -284,7 +295,8 @@ void DDXCtrlDlg::CreateControls()
     m_labDevice = new wxStaticText( m_GenerelPanel, ID_STATICTEXT_DDL_DEVICE, _("device"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer6->Add(m_labDevice, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_Device = new wxTextCtrl( m_GenerelPanel, ID_TEXTCTRL_DDL_DEVICE, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
+    wxArrayString m_DeviceStrings;
+    m_Device = new wxComboBox( m_GenerelPanel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, m_DeviceStrings, wxCB_DROPDOWN );
     itemFlexGridSizer6->Add(m_Device, 0, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
     m_labPortBase = new wxStaticText( m_GenerelPanel, wxID_ANY, _("portbase"), wxDefaultPosition, wxDefaultSize, 0 );
@@ -293,6 +305,8 @@ void DDXCtrlDlg::CreateControls()
     m_PortBase = new wxTextCtrl( m_GenerelPanel, wxID_ANY, _("0"), wxDefaultPosition, wxDefaultSize, wxTE_CENTRE );
     itemFlexGridSizer6->Add(m_PortBase, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
+    itemFlexGridSizer6->AddGrowableCol(1);
+
     m_Notebook->AddPage(m_GenerelPanel, _("Generel"));
 
     m_S88Panel = new wxPanel( m_Notebook, ID_PANEL_DDL_S88, wxDefaultPosition, wxDefaultSize, wxSUNKEN_BORDER|wxTAB_TRAVERSAL );
@@ -300,7 +314,6 @@ void DDXCtrlDlg::CreateControls()
     m_S88Panel->SetSizer(itemBoxSizer14);
 
     wxFlexGridSizer* itemFlexGridSizer15 = new wxFlexGridSizer(0, 2, 0, 0);
-    itemFlexGridSizer15->AddGrowableCol(1);
     itemBoxSizer14->Add(itemFlexGridSizer15, 0, wxGROW, 5);
     m_labPort = new wxStaticText( m_S88Panel, ID_STATICTEXT_DDL_PORT, _("port"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer15->Add(m_labPort, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
@@ -338,6 +351,8 @@ void DDXCtrlDlg::CreateControls()
     m_Bus3 = new wxSpinCtrl( m_S88Panel, wxID_ANY, _T("0"), wxDefaultPosition, wxSize(60, -1), wxSP_ARROW_KEYS, 0, 62, 0 );
     itemFlexGridSizer15->Add(m_Bus3, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
+    itemFlexGridSizer15->AddGrowableCol(1);
+
     m_Notebook->AddPage(m_S88Panel, _("S88"));
 
     m_DetailsPanel = new wxPanel( m_Notebook, ID_PANEL_DDL_DETAIL, wxDefaultPosition, wxDefaultSize, wxSUNKEN_BORDER|wxTAB_TRAVERSAL );
@@ -348,7 +363,6 @@ void DDXCtrlDlg::CreateControls()
     m_SCDBox = new wxStaticBoxSizer(itemStaticBoxSizer30Static, wxVERTICAL);
     itemBoxSizer29->Add(m_SCDBox, 0, wxGROW|wxALL, 5);
     m_SCDbox = new wxFlexGridSizer(2, 2, 0, 0);
-    m_SCDbox->AddGrowableCol(1);
     m_SCDBox->Add(m_SCDbox, 0, wxGROW, 5);
     m_SCD = new wxCheckBox( m_DetailsPanel, ID_CHECKBOX_DDL_ENABLE_SCD, _("enable"), wxDefaultPosition, wxDefaultSize, wxCHK_2STATE );
     m_SCD->SetValue(false);
@@ -363,6 +377,8 @@ void DDXCtrlDlg::CreateControls()
 
     m_Delay = new wxTextCtrl( m_DetailsPanel, ID_TEXTCTRL_DDL_DELAY, _("1000"), wxDefaultPosition, wxDefaultSize, wxTE_CENTRE );
     m_SCDbox->Add(m_Delay, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+
+    m_SCDbox->AddGrowableCol(1);
 
     m_LocoRefreshBox = new wxStaticBox(m_DetailsPanel, wxID_ANY, _("Options"));
     wxStaticBoxSizer* itemStaticBoxSizer36 = new wxStaticBoxSizer(m_LocoRefreshBox, wxHORIZONTAL);
@@ -400,13 +416,16 @@ void DDXCtrlDlg::CreateControls()
 
     wxStdDialogButtonSizer* itemStdDialogButtonSizer44 = new wxStdDialogButtonSizer;
 
-    itemBoxSizer2->Add(itemStdDialogButtonSizer44, 0, wxALIGN_RIGHT|wxALL, 5);
+    itemBoxSizer2->Add(itemStdDialogButtonSizer44, 0, wxGROW|wxALL, 5);
     m_OK = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
     m_OK->SetDefault();
     itemStdDialogButtonSizer44->AddButton(m_OK);
 
     m_Cancel = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
     itemStdDialogButtonSizer44->AddButton(m_Cancel);
+
+    wxButton* itemButton47 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer44->AddButton(itemButton47);
 
     itemStdDialogButtonSizer44->Realize();
 
@@ -466,4 +485,14 @@ void DDXCtrlDlg::OnCancelClick( wxCommandEvent& event )
   EndModal( 0 );
 }
 
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void DDXCtrlDlg::OnHelpClick( wxCommandEvent& event )
+{
+  wxGetApp().openLink( "ddx" );
+}
 

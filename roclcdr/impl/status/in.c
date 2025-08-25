@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -44,25 +47,24 @@ void statusIn( iILcDriverInt inst ) {
 
   /* Signal of destination block. (_event) */
   if( data->next2Block == NULL ) {
-    if( !data->gomanual ) {
-      if( data->next1Block->hasExtStop(data->next1Block) ) {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-            "block %s has a stop module; not sending velocity 0 to loco %s",
-            data->next1Block->base.id(data->next1Block), data->loc->getId(data->loc));
-      }
-      else {
-        iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-        wLoc.setV( cmd, 0 );
-        wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
-        data->loc->cmd( data->loc, cmd );
-      }
+    /* lp:786421 Also the gomanual trains must halt if no destination is available. */
+    if( data->next1Block->hasExtStop(data->next1Block, data->loc->getId(data->loc)) ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201,
+          "block %s has a stop module; not sending velocity 0 to loco %s",
+          data->next1Block->base.id(data->next1Block), data->loc->getId(data->loc));
+    }
+    else if( !data->gomanual || ( data->gomanual && data->stopatin4gomanual ) ) {
+      iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      wLoc.setV( cmd, 0 );
+      wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
+      data->loc->cmd( data->loc, cmd );
     }
 
     data->state = LC_WAITBLOCK;
     data->prevState = LC_INBLOCK;
 
-    data->loc->setMode(data->loc, wLoc.mode_wait);
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    data->loc->setMode(data->loc, wLoc.mode_wait, "");
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "Setting state for \"%s\" from LC_INBLOCK to LC_WAITBLOCK.",
                    data->loc->getId( data->loc ) );
 
@@ -81,13 +83,14 @@ void statusIn( iILcDriverInt inst ) {
     data->next2Block = data->next3Block;
     data->next3Block = NULL;
     data->next1Block->link( data->next1Block, data->curBlock );
+    data->next1Route->link(data->next1Route, data->curBlock->getTDport(data->curBlock));
     data->next1RouteFromTo = data->next2RouteFromTo;
     data->next2RouteFromTo = data->next3RouteFromTo;
 
     data->state = LC_CHECKROUTE;
 
-    data->loc->setMode(data->loc, wLoc.mode_auto);
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+    data->loc->setMode(data->loc, wLoc.mode_auto, wLoc.modereason_checkroute);
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201,
                    "Waiting for route, setting state for [%s] from LC_INBLOCK to LC_CHECKROUTE.",
                    data->loc->getId( data->loc ) );
 
@@ -95,7 +98,7 @@ void statusIn( iILcDriverInt inst ) {
   }
   else {
     /* set the block departure velocity: */
-    if( !data->gomanual ) {
+    if( !data->gomanual && !data->didReduceSpeedAtEnter) {
       iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
       int maxkmh = 0;
       wLoc.setV_hint( cmd, getBlockV_hint(inst, data->next1Block, True, data->next1Route, !data->next1RouteFromTo, &maxkmh ) );
@@ -110,18 +113,20 @@ void statusIn( iILcDriverInt inst ) {
       wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
       data->loc->cmd( data->loc, cmd );
     }
+    data->didReduceSpeedAtEnter = False;
 
     data->next1Block = data->next2Block;
     data->next2Block = data->next3Block;
     data->next3Block = NULL;
     data->next1Block->link( data->next1Block, data->curBlock );
+    data->next1Route->link(data->next1Route, data->curBlock->getTDport(data->curBlock));
     data->next1RouteFromTo = data->next2RouteFromTo;
     data->next2RouteFromTo = data->next3RouteFromTo;
 
     data->state = LC_PRE2GO;
 
-    data->loc->setMode(data->loc, wLoc.mode_auto);
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    data->loc->setMode(data->loc, wLoc.mode_auto, "");
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "Setting state for \"%s\" from LC_INBLOCK to LC_PRE2GO.",
                    data->loc->getId( data->loc ) );
   }

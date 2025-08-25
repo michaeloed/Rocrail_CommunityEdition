@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -36,6 +39,7 @@ public:
     void OnSize(wxSizeEvent& event);
     void Update(int flags);
     void Health(bool health);
+    void Automode(bool automode);
 
 private:
 
@@ -44,6 +48,7 @@ private:
     wxStaticBitmap *m_statbmpT;
     wxStaticBitmap *m_statbmpS;
     wxStaticBitmap *m_statbmpA;
+    wxStaticBitmap *m_statbmpR;
 
     DECLARE_EVENT_TABLE()
 };

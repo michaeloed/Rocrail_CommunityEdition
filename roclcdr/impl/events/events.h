@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -19,7 +22,9 @@
 */
 
 
-void eventEnter( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Boolean dstBlockEvent );
+void eventFree( iOLcDriver inst, const char* blockId, iIBlockBase block, Boolean curBlockEvent, Boolean dstBlockEvent );
+void eventEnter( iOLcDriver inst, const char* blockId, iIBlockBase block, Boolean curBlockEvent, Boolean dstBlockEvent );
 void eventPre2In( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Boolean dstBlockEvent );
 void eventIn( iOLcDriver inst, const char* blockId, iIBlockBase block, Boolean curBlockEvent, Boolean dstBlockEvent, Boolean shortIn );
 void eventExit( iOLcDriver inst, const char* blockId, Boolean curBlockEvent, Boolean dstBlockEvent );
+void freePrevBlock(iOLcDriver inst, iIBlockBase block);

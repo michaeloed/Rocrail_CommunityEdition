@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -177,7 +180,7 @@ static void __checkFilesize( iOTraceData t ) {
       char* newfileName = NULL;
       newfileName = __createNumberedFileName( __nextTraceFile(t), t->file );
       fclose( t->trcfile );
-      t->trcfile = fopen( newfileName, "wba" );
+      t->trcfile = fopen( newfileName, "ab" );
       StrOp.free( t->currentfilename );
       t->currentfilename = newfileName;
     }
@@ -275,6 +278,8 @@ static char __level( int level ) {
     clevel = 'd';
   else if( level == TRCLEVEL_CALC )
     clevel = 'v';
+  else if( level == TRCLEVEL_STATUS )
+    clevel = 's';
 
   return clevel;
 }
@@ -346,7 +351,7 @@ static void _setFilename( iOTrace inst, const char* file ) {
 
     data->file            = StrOp.dup( file );
     data->currentfilename = __createNumberedFileName( __nextTraceFile(data), data->file );
-    data->trcfile         = fopen( data->currentfilename, "wba" );
+    data->trcfile         = fopen( data->currentfilename, "ab" );
   }
 }
 
@@ -486,10 +491,11 @@ static char* __getThreadName( void ) {
   char* nameStr;
   unsigned long ti     = ThreadOp.id();
   iOThread      thread = ThreadOp.findById( ti );
-  const char*   tname  = ThreadOp.getName( thread );
 
-  if( thread != NULL )
+  if( thread != NULL ) {
+    const char* tname = ThreadOp.getName( thread );
     nameStr = StrOp.fmtID( RocsTraceID, "%s", tname );
+  }
   else if( ti == mainThreadId )
     nameStr = StrOp.fmtID( RocsTraceID, "%s", "main" );
   else
@@ -515,15 +521,12 @@ static void _trc( const char* objectname, tracelevel level, int line, int id, co
     char* fmtMsg = NULL;
 
     va_start(args, fmt);
-#if defined vsnprintf
     vsnprintf(msg, TRACELEN, fmt, args);
-#else
-    vsprintf(msg, fmt, args);
-#endif
     va_end(args);
 /*
     if( t->level & TRCLEVEL_DEBUG && objectname != NULL )
 */
+    msg[TRACELEN-1] = '\0';
     fmtMsg = StrOp.fmtID( RocsTraceID, "%s %-1.1s%04d%c %-8.8s %-8.8s %04d %s",
                           __stamp( stmp ), t->appID, id, __level( level ),
                           tname, objectname, line, msg );
@@ -535,7 +538,7 @@ static void _trc( const char* objectname, tracelevel level, int line, int id, co
     }
 
     if( t->excListener != NULL ) {
-      if( t->excAll || level == TRCLEVEL_EXCEPTION || level == TRCLEVEL_WARNING || level == TRCLEVEL_MONITOR || level == TRCLEVEL_CALC )
+      if( t->excAll || level == TRCLEVEL_EXCEPTION || level == TRCLEVEL_WARNING || level == TRCLEVEL_MONITOR || level == TRCLEVEL_CALC || level == TRCLEVEL_STATUS )
         t->excListener(level, t->excTimestamp?fmtMsg:msg);
     }
     StrOp.freeID( tname, RocsTraceID );
@@ -569,15 +572,12 @@ static void _trace( const void* cargo, tracelevel level, int id, const char* fmt
     char* fmtMsg = NULL;
 
     va_start(args, fmt);
-#if defined vsnprintf
-    vsnprintf(msg, TRACELEN, fmt, args);
-#else
-    vsprintf(msg, fmt, args);
-#endif
+    vsnprintf(msg, TRACELEN-1, fmt, args);
     va_end(args);
 /*
     if( t->level & TRCLEVEL_DEBUG && objectname != NULL )
 */
+    msg[TRACELEN-1] = '\0';
     if( objectname != NULL )
       fmtMsg = StrOp.fmtID( RocsTraceID, "%s %-1.1s%04d%c %-8.8s %-8.8s %s",
                             __stamp( stmp ), t->appID, id, __level( level ), tname, objectname, msg );
@@ -637,14 +637,11 @@ static void _terrno( const char* objectname, tracelevel level, int line, int id,
     char* fmtMsg = NULL;
 
     va_start(args, fmt);
-#if defined vsnprintf
-    vsnprintf(msg, TRACELEN, fmt, args);
-#else
-    vsprintf(msg, fmt, args);
-#endif
+    vsnprintf(msg, TRACELEN-1, fmt, args);
     va_end(args);
 
 /*    if( t->level & TRCLEVEL_DEBUG && objectname != NULL )*/
+    msg[TRACELEN-1] = '\0';
     fmtMsg = StrOp.fmtID( RocsTraceID, "%s %-1.1s%04d%c %-8.8s %-8.8s %04d %s [%d] [%s]",
                           __stamp( stmp ), t->appID, id, __level( level ),
                           tname, objectname, line, msg, error, SystemOp.getErrStr( error ) );
@@ -675,13 +672,10 @@ static void _println( const char* fmt, ... ) {
     t = Data(l_trc);
 
     va_start(args, fmt);
-#if defined vsnprintf
     vsnprintf(msg, TRACELEN, fmt, args);
-#else
-    vsprintf(msg, fmt, args);
-#endif
     va_end(args);
 
+    msg[TRACELEN-1] = '\0';
     __writeFile( t, msg, False );
     /*__writeFile( t, "\n" );*/
 

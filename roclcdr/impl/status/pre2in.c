@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -44,19 +47,20 @@ void statusPre2In( iILcDriverInt inst ) {
 
   /* set velocitiy to V_min if the train has to wait */
   if( data->next2Block == NULL ) {
-    if( !data->gomanual ) {
+    Boolean bbt = wLoc.isusebbt(data->loc->base.properties( data->loc )) && data->next1Block->allowBBT(data->next1Block);
+    if( !data->gomanual && !bbt ) {
       iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
       wLoc.setV_hint( cmd, wLoc.min );
       wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
       data->loc->cmd( data->loc, cmd );
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                      "Setting velocity for \"%s\" to V_Min",
                      data->loc->getId( data->loc ) );
     }
   }
   data->state = LC_WAIT4EVENT;
   data->eventTimeout = 0;
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                  "Setting state for \"%s\" from LC_PRE2INBLOCK to LC_WAIT4EVENT.",
                  data->loc->getId( data->loc ) );
 }

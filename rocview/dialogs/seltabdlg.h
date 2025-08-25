@@ -1,13 +1,9 @@
-/** ------------------------------------------------------------
-  * Module:
-  * Object:
-  * ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocgui/dialogs/rocgui-dialogs.pjd,v $
-  * $Author: robvrs $
-  * $Date: 2006/02/22 14:10:57 $
-  * $Revision: 1.63 $
-  * $Name:  $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef _SELTABDLG_H_
 #define _SELTABDLG_H_
 
@@ -141,6 +137,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end SelTabDialog event handler declarations
 
 ////@begin SelTabDialog member function declarations
@@ -170,6 +169,8 @@ public:
     wxSpinCtrl* m_MoveDelay;
     wxStaticText* m_labOffPos;
     wxSpinCtrl* m_OffPos;
+    wxStaticText* m_labRandomRate;
+    wxSpinCtrl* m_RandomRate;
     wxCheckBox* m_SharedFB;
     wxCheckBox* m_Manager;
     wxCheckBox* m_FiFo;
@@ -184,9 +185,12 @@ public:
     wxPanel* m_Interface;
     wxStaticText* m_Labeliid;
     wxTextCtrl* m_IID;
+    wxStaticText* m_labBus;
+    wxTextCtrl* m_Bus;
+    wxStaticText* m_labUIDName;
+    wxTextCtrl* m_UIDName;
     wxStaticText* m_LabelType;
     wxComboBox* m_Type;
-    wxCheckBox* m_Invert;
     wxStaticText* m_LabelAddress0;
     wxTextCtrl* m_Address0;
     wxStaticText* m_labPort0;
@@ -203,6 +207,20 @@ public:
     wxTextCtrl* m_Address3;
     wxStaticText* m_labPort3;
     wxTextCtrl* m_Port3;
+    wxStaticText* m_LabelAddress5;
+    wxTextCtrl* m_Address5;
+    wxStaticText* m_labPort5;
+    wxTextCtrl* m_Port5;
+    wxStaticText* m_LabelAddress6;
+    wxTextCtrl* m_Address6;
+    wxStaticText* m_labPort6;
+    wxTextCtrl* m_Port6;
+    wxStaticText* m_LabelAddress7;
+    wxTextCtrl* m_Address7;
+    wxStaticText* m_labPort7;
+    wxTextCtrl* m_Port7;
+    wxCheckBox* m_Invert;
+    wxCheckBox* m_SingleGate;
     wxStaticText* m_labPosSen;
     wxComboBox* m_PosSen;
     wxStaticText* m_labb0Sen;
@@ -213,6 +231,12 @@ public:
     wxComboBox* m_b2Sen;
     wxStaticText* m_labb3Sen;
     wxComboBox* m_b3Sen;
+    wxStaticText* m_labb4Sen;
+    wxComboBox* m_b4Sen;
+    wxStaticText* m_labb5Sen;
+    wxComboBox* m_b5Sen;
+    wxStaticText* m_labb6Sen;
+    wxComboBox* m_b6Sen;
     wxStaticBox* m_NewPosBox;
     wxStaticText* m_LabelAddress4;
     wxTextCtrl* m_Address4;
@@ -244,5 +268,7 @@ public:
     const char* m_FromBlockID;
 };
 
+#define ROUTE_ALL "all enter +"
+#define ROUTE_ALL_REVERSE "all enter -"
 #endif
     // _SELTABDLG_H_

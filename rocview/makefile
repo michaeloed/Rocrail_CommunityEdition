@@ -1,7 +1,10 @@
 # ------------------------------------------------------------
 # Rocrail - Model Railroad Software
 #
-# Copyright (C) 2002-2010 - Rob Versluis <r.j.versluis@rocrail.net>
+# Copyright (C) 2002-2012 Rob Versluis, Rocrail.net
+#
+# Without an official permission commercial use is not permitted.
+# Forking this project is not permitted.  
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,11 +24,14 @@
 #   make DEBUG=... MOUNTPOINT=... OUTDIR=...
 #
 # commandline for mingw cross compiling:
-#   make PLATFORM=WIN32 clean
+#   make PLATFORM=WIN32 clean??
 #   make TOOLPREFIX=i586-mingw32msvc- LIBSUFFIX=-i586-mingw32msvc PLATFORM=WIN32 MINGWINSTALL=/usr/i586-mingw32msvc all
 #
-# commandline for mingw cross compiling:
-#   make PLATFORM=WIN32 NATIVE=WIN32 clean
+# commandline for mingw i686-w64 cross compiling:
+#   make all PLATFORM=WIN32 TOOLPREFIX=i686-w64-mingw32- LIBSUFFIX=-i686-w64-mingw32 MINGWINSTALL=/usr/i686-w64-mingw32
+#
+# commandline for mingw compiling under windows:
+#   make PLATFORM=WIN32 NATIVE=WIN32 clean??
 #   make TOOLPREFIX=i586-mingw32msvc- LIBSUFFIX=-i586-mingw32msvc PLATFORM=WIN32 NATIVE=WIN32 MINGWINSTALL=/usr/i586-mingw32msvc all
 #
 # commandline for osx compiling:
@@ -37,10 +43,11 @@ COPY=cp
 REMOVE=rm -f
 GENSUFFIX=
 MKDIR=mkdir -p
-WXSUBINCL=/wx-2.8
+WXSUBINCL=/wx-3.0
 WXMSVCINCL=
-wxversion=2.8
-LINKTOOL=c++
+WXCONFIG=wx-config
+wxversion=3.0
+LINKTOOL=g++
 
 ifeq ($(NATIVE),WIN32)
 	FS=$\\
@@ -52,7 +59,7 @@ ifeq ($(NATIVE),WIN32)
 	WXSUBINCL=
 	WXMSVCINCL=-I$(MINGWINSTALL)$(FS)include$(FS)msvc
 	LINKTOOL=g++
-	WINLIBS=-liphlpapi -lmpr -lwsock32 -ladvapi32 -lkernel32 -luser32 -lgdi32 -lwinspool -lcomdlg32 -ladvapi32 -lshell32 -lole32 -loleaut32 -luuid -lodbc32 -lodbccp32 -lcomctl32 -lrpcrt4 -lwsock32 -lwinmm
+	WINLIBS=-lgdiplus -liphlpapi -lmpr -lws2_32 -ladvapi32 -lkernel32 -luser32 -lgdi32 -lwinspool -lcomdlg32 -ladvapi32 -lshell32 -lole32 -loleaut32 -luuid -lodbc32 -lodbccp32 -lcomctl32 -lrpcrt4 -lwinmm
 endif
 
 
@@ -63,37 +70,60 @@ PLATFORM=LINUX
 ARCH=
 LIBRARY=unicode
 LIBEXT=u
-MINGWINSTALL=$(FS)usr$(FS)i586-mingw32msvc
+ifeq ($(TOOLPREFIX),i686-w64-mingw32-)
+  MINGWINSTALL=$(FS)usr$(FS)i686-w64-mingw32
+else
+  MINGWINSTALL=$(FS)usr$(FS)i586-mingw32msvc
+endif
 
 
-ifeq ($(PLATFORM),WIN32)
-	LIBS=-liphlpapi -lmpr
-	LNK_FLAGS=`$(FS)usr$(FS)i586-mingw32msvc$(FS)bin$(FS)wx-config --libs`
-	WX_FLAGS=`$(MINGWINSTALL)$(FS)bin$(FS)wx-config --cflags`
-	ifeq ($(NATIVE),WIN32)
-		LNK_FLAGS=-L$(MINGWINSTALL)\lib-$(LIBRARY) -mthreads -Wl,--subsystem,windows -mwindows -lwx_msw$(LIBEXT)_html-$(wxversion) -lwx_msw$(LIBEXT)_core-$(wxversion) -lwx_base$(LIBEXT)-$(wxversion) -lwxtiff-$(wxversion) -lwxjpeg-$(wxversion) -lwxpng-$(wxversion) -lwxzlib-$(wxversion) -lwxregex$(LIBEXT)-$(wxversion) -lwxexpat-$(wxversion) -lwx_msw$(LIBEXT)_adv-$(wxversion) -lwx_msw$(LIBEXT)_qa-$(wxversion) -lwx_base$(LIBEXT)_xml-$(wxversion) -lwx_base$(LIBEXT)_net-$(wxversion)
-		WX_FLAGS=-c $(DEBUG) -D__WXMSW__ -O2 -fno-strict-aliasing -mthreads -mwindows -DWX_PRECOMP -DNO_GCC_PRAGMA
-	endif
+ifeq ($(PLATFORM),WIN64)
+  MINGWINSTALL=$(FS)usr$(FS)x86_64-w64-mingw32
+	LIBS=-liphlpapi -lmpr -lmswsock -lws2_32 -ladvapi32
+	LNK_FLAGS=`$(FS)usr$(FS)x86_64-w64-mingw32$(FS)bin$(FS)wx-config --libs core,base` -static-libgcc -static
+	WX_FLAGS=`$(FS)usr$(FS)x86_64-w64-mingw32$(FS)bin$(FS)wx-config --cflags`
 	DIRPREFIX=win
 	CC_EXTRA_FLAGS=
 	BINSUFFIX=.exe
-	LIBSUFFIX=-i586-mingw32msvc
-	WINRESOURCE=$(TMPOUTDIR)\rocview_rc.o
+	LIBSUFFIX=-x86_64-w64-mingw32
+	WINRESOURCE=$(TMPOUTDIR)$(FS)rocview_rc.o
+	WX_INCL=-I$(MINGWINSTALL)$(FS)include$(WXSUBINCL)
+else ifeq ($(PLATFORM),WIN32)
+	LIBS=-lgdiplus -liphlpapi -lmpr
+	ifeq ($(TOOLPREFIX),i686-w64-mingw32-)
+	  LNK_FLAGS=`$(FS)usr$(FS)i686-w64-mingw32$(FS)bin$(FS)wx-config --libs` -mthreads -static
+	else
+	  LNK_FLAGS=`$(FS)usr$(FS)i586-mingw32msvc$(FS)bin$(FS)wx-config --libs` -mthreads -static
+	endif
+	WX_FLAGS=`$(MINGWINSTALL)$(FS)bin$(FS)wx-config --cflags`
+	ifeq ($(NATIVE),WIN32)
+		LNK_FLAGS=-L$(MINGWINSTALL)\lib-$(LIBRARY) -mthreads -static -Wl,--subsystem,windows -mwindows -lwx_msw$(LIBEXT)-$(wxversion) -lwxpng-$(wxversion) -lwxjpeg-$(wxversion) -lwxtiff-$(wxversion) -lwxzlib-$(wxversion)
+		WX_FLAGS=-c $(DEBUG) -D__WXMSW__ -O2 -fno-strict-aliasing -mthreads -mwindows -DWX_PRECOMP -DNO_GCC_PRAGMA
+	endif
+	DIRPREFIX=win
+	CC_EXTRA_FLAGS=-mthreads
+	BINSUFFIX=.exe
+  ifeq ($(TOOLPREFIX),i686-w64-mingw32-)
+    LIBSUFFIX=-i686-w64-mingw32
+	else
+	  LIBSUFFIX=-i586-mingw32msvc
+	endif
+	WINRESOURCE=$(TMPOUTDIR)$(FS)rocview_rc.o
 	WX_INCL=-I$(MINGWINSTALL)$(FS)include$(WXSUBINCL)
 else ifeq ($(PLATFORM),OPENBSD)
 	LIBS=-pthread
 	DIRPREFIX=unx
-	CC_EXTRA_FLAGS=-fPIC
+	CC_EXTRA_FLAGS=
 	BINSUFFIX=
-	LNK_FLAGS=`wx-config --libs`
-	WX_FLAGS=`wx-config --cflags`
+	LNK_FLAGS=`$(WXCONFIG) --libs`
+	WX_FLAGS=`$(WXCONFIG) --cflags`
 else
 	LIBS=-lpthread -ldl
 	DIRPREFIX=unx
-	CC_EXTRA_FLAGS=-fPIC
+	CC_EXTRA_FLAGS=-fno-common
 	BINSUFFIX=
-	LNK_FLAGS=`wx-config --libs`
-	WX_FLAGS=`wx-config --cflags`
+	LNK_FLAGS=`$(WXCONFIG) --libs`
+	WX_FLAGS=`$(WXCONFIG) --cflags`
 endif
 
 MOUNTPOINT=..
@@ -104,14 +134,21 @@ DEBUG=-g
 DESTDIR=$(FS)opt$(FS)rocrail
 BINDIR=..$(FS)rocs$(FS)bin
 
-CPP=$(TOOLPREFIX)c++
+CPP=$(TOOLPREFIX)g++
 CC=$(TOOLPREFIX)gcc
 LNK=$(TOOLPREFIX)$(LINKTOOL)
+
+ifeq ($(PLATFORM),MACOSX)
+	CPP=`$(WXCONFIG) --cxx`
+	LNK=`$(WXCONFIG) --cxx`
+endif
+
+
 INCL_PATH=$(MOUNTPOINT)
 CC_FLAGS=-c $(CC_EXTRA_FLAGS) $(DEBUG) -I$(INCL_PATH) -I$(GENDIR)
 
 CC_WXFLAGS=-c $(CC_EXTRA_FLAGS) $(DEBUG) $(WX_FLAGS) $(WX_INCL) -I$(INCL_PATH) -I$(GENDIR)
-RRLIBS=$(OUTDIR)$(FS)librocrail.a $(OUTDIR)$(FS)libwrapper.a $(OUTDIR)$(FS)librocs.a
+RRLIBS=$(OUTDIR)$(FS)librocrail.a $(OUTDIR)$(FS)libwrapper.a $(OUTDIR)$(FS)librocs.a $(OUTDIR)$(FS)librocutils.a
 
 SRCS=impl$(FS)guiapp.cpp impl$(FS)item.cpp impl$(FS)locdlg.cpp impl$(FS)planpanel.cpp impl$(FS)propdlg.cpp impl$(FS)swdlg.cpp impl$(FS)streetdlg.cpp impl$(FS)bktext.cpp
 
@@ -123,17 +160,21 @@ SOBJS=$(patsubst symbols/%.cpp,$(TMPOUTDIR)/%.o,$(wildcard symbols/*.cpp))
 WOBJS=$(patsubst $(GENDIR)/rocview/wrapper/impl/%.c,$(GENDIR)/rocview/wrapper/bin/%.o,$(wildcard $(GENDIR)/rocview/wrapper/impl/*.c))
 ROBJS=$(patsubst $(GENDIR)/rocview/res/%.c,$(TMPOUTDIR)/%.o,$(wildcard $(GENDIR)/rocview/res/*.c))
 IOBJS=$(patsubst $(GENDIR)/rocview/res/%.cpp,$(TMPOUTDIR)/%.o,$(wildcard $(GENDIR)/rocview/res/*.cpp))
+UTILOBJS=$(GENDIR)$(FS)rocdigs$(FS)bin$(FS)bidib$(FS)bidibutils.o
 
 TARGET=$(OUTDIR)$(FS)rocview$(BINSUFFIX)
 
 all: $(TARGET)
 
-$(TARGET): $(ROBJS) $(IOBJS) $(WOBJS) $(DOBJS) $(CDOBJS) $(DECOBJS) $(SOBJS) $(OBJS) $(RRLIBS) $(WINRESOURCE)
-	$(LNK) -o $(TARGET) $(ROBJS) $(IOBJS) $(WOBJS) $(DOBJS) $(CDOBJS) $(DECOBJS) $(SOBJS) $(OBJS) $(WINRESOURCE) $(RRLIBS) $(LNK_FLAGS) $(WX_LIBS) $(LIBS) $(WINLIBS)
+$(TARGET): $(ROBJS) $(IOBJS) $(UTILOBJS) $(WOBJS) $(DOBJS) $(CDOBJS) $(DECOBJS) $(SOBJS) $(OBJS) $(RRLIBS) $(WINRESOURCE)
+	$(LNK) -o $(TARGET) $(ROBJS) $(IOBJS) $(WOBJS) $(DOBJS) $(CDOBJS) $(DECOBJS) $(SOBJS) $(OBJS) $(UTILOBJS) $(WINRESOURCE) $(RRLIBS) $(LNK_FLAGS) $(WX_LIBS) $(LIBS) $(WINLIBS)
 
 $(WINRESOURCE): rocview.rc
-	$(TOOLPREFIX)windres -irocview.rc -o$(WINRESOURCE)
-
+ifeq ($(NATIVE),WIN32)
+	windres --include-dir $(MINGWINSTALL)$(FS)include --define __WIN32__ --define __GNUWIN32__ -irocview.rc -o$(WINRESOURCE)
+else
+	`$(MINGWINSTALL)$(FS)bin$(FS)wx-config --rescomp` -irocview.rc -o$(WINRESOURCE)
+endif
 
 $(TMPOUTDIR)/%.o: impl/%.cpp
 	$(CPP) $(CC_WXFLAGS) $< -o $@
@@ -203,7 +244,9 @@ macapp:
 	cp ../unxbin/rocrail Rocrail.app/Contents/MacOS/rocrail
 	cp ../unxbin/*.dylib Rocrail.app/Contents/MacOS
 	cp Run Rocrail.app/Contents/MacOS/
-	cp /usr/lib/libwx* Rocrail.app/Contents/MacOS/
+	-cp /usr/lib/libwx* Rocrail.app/Contents/MacOS/
+	-cp /usr/local/lib/libwx* Rocrail.app/Contents/MacOS/
+	-cp /usr/local/lib/libusb-1.0.0.dylib Rocrail.app/Contents/MacOS/
 	rm -rf ../unxbin/Rocrail.app
 	mv -f Rocrail.app ../unxbin
 	

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -31,6 +34,7 @@
 
 ////@begin includes
 #include "wx/notebook.h"
+#include "wx/spinctrl.h"
 ////@end includes
 
 #include "rocs/public/node.h"
@@ -40,6 +44,7 @@
  */
 
 ////@begin forward declarations
+class wxSpinCtrl;
 ////@end forward declarations
 
 /*!
@@ -85,7 +90,7 @@ class LocoNetCtrlDlg: public wxDialog
 public:
     /// Constructors
     LocoNetCtrlDlg();
-    LocoNetCtrlDlg( wxWindow* parent, iONode props );
+    LocoNetCtrlDlg( wxWindow* parent, iONode props, const char* devices=NULL );
 
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_LOCONETCTRLDLG_IDNAME, const wxString& caption = SYMBOL_LOCONETCTRLDLG_TITLE, const wxPoint& pos = SYMBOL_LOCONETCTRLDLG_POSITION, const wxSize& size = SYMBOL_LOCONETCTRLDLG_SIZE, long style = SYMBOL_LOCONETCTRLDLG_STYLE );
@@ -110,6 +115,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end LocoNetCtrlDlg event handler declarations
 
 ////@begin LocoNetCtrlDlg member function declarations
@@ -129,7 +137,7 @@ public:
     wxStaticText* m_labIID;
     wxTextCtrl* m_IID;
     wxStaticText* m_labDevice;
-    wxTextCtrl* m_Device;
+    wxComboBox* m_Device;
     wxStaticText* m_labHost;
     wxTextCtrl* m_Host;
     wxStaticText* m_labPort;
@@ -140,8 +148,8 @@ public:
     wxRadioBox* m_SubLib;
     wxCheckBox* m_Flow;
     wxCheckBox* m_IgnorePowerCmds;
-    wxCheckBox* m_UseSeq;
-    wxCheckBox* m_UseDouble;
+    wxCheckBox* m_GBM16xn;
+    wxCheckBox* m_Monitor;
     wxPanel* m_OptionsPanel;
     wxComboBox* m_CmdStn;
     wxCheckListBox* m_OptionsList;
@@ -151,7 +159,19 @@ public:
     wxTextCtrl* m_SWTime;
     wxStaticText* m_labPurgeTime;
     wxTextCtrl* m_PurgeTime;
+    wxStaticText* m_labQueryAddr;
+    wxTextCtrl* m_QueryAddr;
+    wxStaticText* m_labFBMod;
+    wxSpinCtrl* m_FBMod;
     wxCheckBox* m_SlotPing;
+    wxCheckBox* m_ResetLissy;
+    wxCheckBox* m_SwAck;
+    wxStaticText* m_labSwRetries;
+    wxSpinCtrl* m_SwRetries;
+    wxStaticText* m_labSwRetriesSuffix;
+    wxStaticText* m_labSwSleep;
+    wxSpinCtrl* m_SwSleep;
+    wxStaticText* m_SwSleepUnit;
     wxStaticBox* m_FastClockBox;
     wxCheckBox* m_UseFC;
     wxCheckBox* m_SyncFC;
@@ -167,6 +187,8 @@ public:
 ////@end LocoNetCtrlDlg member variables
     iONode m_Props;
     int optidx[256];
+    const char* m_Devices;
+
 };
 
 #endif

@@ -1,18 +1,9 @@
-/** ------------------------------------------------------------
-  * A U T O   G E N E R A T E D  (First time only!)
-  * Generator: Rocs ogen (build Nov  9 2006 08:04:42)
-  * Module: RocDigs
-  * XML: $Source: /cvsroot/rojav/rocdigs/rocdigs.xml,v $
-  * XML: $Revision: 1.14 $
-  * Object: OpenDCC
-  * Date: Mon Mar  3 17:05:53 2008
-  * ------------------------------------------------------------
-  * $Source$
-  * $Author$
-  * $Date$
-  * $Revision$
-  * $Name$
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 #include "rocdigs/impl/opendcc_impl.h"
 
@@ -27,6 +18,7 @@
 #include "rocrail/wrapper/public/Signal.h"
 #include "rocrail/wrapper/public/Loc.h"
 #include "rocrail/wrapper/public/SysCmd.h"
+#include "rocrail/wrapper/public/FunCmd.h"
 #include "rocrail/wrapper/public/Clock.h"
 
 #include "rocs/public/mem.h"
@@ -111,6 +103,8 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
   iOOpenDCCData data = Data(inst);
   iONode response = NULL;
 
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "command: %s", NodeOp.getName( cmd ) );
+
   /* TODO: check for OpenDCC specific commands like programming the CS
    * and make bincmd's for the p50x
    * wProgram.getlntype == wProgram.lntype_cs
@@ -172,10 +166,56 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
     }
 
   }
+  else if( StrOp.equals( NodeOp.getName( cmd ), wFunCmd.name() ) && wFunCmd.getgroup(cmd)  > 4 ) {
+    /*
+    *** XFunc34 (0x8A) - L‰nge = 1+4 bytes
+       Command:
+      0: 0x8A XFunc34
+      1: LSB der Lokadresse
+      2: MSB der Lokadresse (Adresse im Bereich 1 .. 10239)
+      3: Status der Funktionen F17 (Bit #0) bis F24 (Bit #7)
+      4: Status der Funktionen F25 (Bit #0) bis F28 (Bit #3), die Bits #4 bis
+         #7 sind reserviert
+
+       Antwort: 1 Byte
+      0: Error-Code
+
+       Mˆgliche Error-Codes:
+      OK  - OK, Befehl ausgef¸hrt
+      XBADPRM - Lokadresse auﬂerhalb des Bereichs (1 .. 10239)
+      XNOSLOT - Kein Platz in Refresh-Queue
+    */
+    int   addr = wFunCmd.getaddr( cmd );
+    if( StrOp.equals( wDigInt.p50x, data->sublibname ) ) {
+      iONode fxcmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
+      char* byteStr = NULL;
+      byte outBytes[6];
+      outBytes[0] = (byte)'x';
+      outBytes[1] = 0x8A;
+      outBytes[2] = addr % 256;
+      outBytes[3] = addr / 256;
+      outBytes[4] = (wFunCmd.isf17(cmd)?0x01:0x00) + (wFunCmd.isf18(cmd)?0x02:0x00) + (wFunCmd.isf19(cmd)?0x04:0x00) + (wFunCmd.isf20(cmd)?0x08:0x00) +
+                    (wFunCmd.isf21(cmd)?0x10:0x00) + (wFunCmd.isf22(cmd)?0x20:0x00) + (wFunCmd.isf23(cmd)?0x40:0x00) + (wFunCmd.isf24(cmd)?0x80:0x00);
+      outBytes[5] = (wFunCmd.isf25(cmd)?0x01:0x00) + (wFunCmd.isf26(cmd)?0x02:0x00) + (wFunCmd.isf27(cmd)?0x04:0x00) + (wFunCmd.isf28(cmd)?0x08:0x00);
+
+      byteStr = StrOp.byteToStr( outBytes, 6 );
+      wBinCmd.setoutlen( fxcmd, 6 );
+      wBinCmd.setinlen( fxcmd, 1 );
+      wBinCmd.setout( fxcmd, byteStr );
+      StrOp.free( byteStr );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "XFunc34" );
+      response = data->sublib->cmd((obj)data->sublib, fxcmd);
+    }
+    else {
+      /* the lenz protocol can set the functions */
+      response = data->sublib->cmd((obj)data->sublib, cmd);
+    }
+
+  }
 
   /* Program command. */
   else if( StrOp.equals( NodeOp.getName( cmd ), wProgram.name() ) &&
-      wProgram.getlntype( cmd ) == wProgram.lntype_cs )
+      wProgram.getlntype( cmd ) == wProgram.lntype_cs && !wProgram.ispom( cmd ) )
   {
     iONode ptcmd = NULL;
     Boolean getCV = False;
@@ -304,7 +344,98 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
     }
 
     /* Cleanup command node */
-    NodeOp.base.del(cmd);
+    cmd->base.del(cmd);
+  }
+
+
+  /* Program command. */
+  else if( StrOp.equals( NodeOp.getName( cmd ), wProgram.name() ) &&
+      wProgram.ispom( cmd ) && wProgram.isacc( cmd ) && wProgram.getcmd( cmd ) == wProgram.set )
+  {
+    iONode ptcmd = NULL;
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "POM set for ACC %d %d=%d",
+        wProgram.getaddr(cmd), wProgram.getcv(cmd), wProgram.getvalue(cmd) );
+
+    if( StrOp.equals( wDigInt.p50x, data->sublibname ) ) {
+      /*
+      XDCC_PA (0xDF)- Länge = 1+5 Bytes
+      0: 0xDF XDCC_PA (= Accessory-Programmieren auf dem Hauptgleis = POM)
+      1: LSB der Zubehöradresse
+      2: MSB der Zubehöradresse (1-510)
+      3: Low Byte der CV-Adresse, welche zu schreiben ist.
+      4: High Byte der CV-Adresse, welche zu schreiben ist. (1..1024)
+      5: Wert
+      Antwort: 0 = Ok, accepted
+      0x80 = busy, command ignored
+      */
+      ptcmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
+      char* byteStr = NULL;
+      byte outBytes[7];
+      outBytes[0] = (byte)'x';
+      outBytes[1] = 0xDF;
+      outBytes[2] = wProgram.getaddr(cmd) % 256;
+      outBytes[3] = wProgram.getaddr(cmd) / 256;
+      outBytes[4] = wProgram.getcv(cmd) % 256;
+      outBytes[5] = wProgram.getcv(cmd) / 256;
+      outBytes[6] = wProgram.getvalue(cmd);
+
+      byteStr = StrOp.byteToStr( outBytes, 7 );
+      wBinCmd.setoutlen( ptcmd, 7 );
+      wBinCmd.setinlen( ptcmd, 1 );
+      wBinCmd.setout( ptcmd, byteStr );
+      StrOp.free( byteStr );
+    }
+    else {
+      /* lenz sublib
+         0xE6 0x30 AddrH AddrL 0xF0+C CV DAT [XOR]
+         Operations Mode Programming write request for accessory decoder;
+         CV is given as 0..1023; C are the two upper bits.
+         Address is coded like with locomotives: if value is >= 100, then the high part is OR'ed with 0xC0.
+       */
+      ptcmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
+      char* byteStr = NULL;
+      byte outBytes[8];
+      outBytes[0] = 0xE6;
+      outBytes[1] = 0x30;
+      outBytes[2] = wProgram.getaddr(cmd) / 256;
+      outBytes[3] = wProgram.getaddr(cmd) % 256;
+      outBytes[4] = wProgram.getcv(cmd) / 256;
+      outBytes[5] = wProgram.getcv(cmd) % 256;
+      outBytes[6] = wProgram.getvalue(cmd);
+
+      byte bXor = 0;
+      int i = 0;
+      for( i = 0; i < 7; i++ ) {
+        bXor ^= outBytes[ i ];
+      }
+      outBytes[7] = bXor;
+
+      byteStr = StrOp.byteToStr( outBytes, 8 );
+      wBinCmd.setoutlen( ptcmd, 8 );
+      wBinCmd.setinlen( ptcmd, 6 );
+      wBinCmd.setout( ptcmd, byteStr );
+      StrOp.free( byteStr );
+    }
+
+    if( ptcmd != NULL ) {
+      byte* inData = NULL;
+      response = data->sublib->cmd((obj)data->sublib, ptcmd);
+      /* TODO: convert response incase of a bincmd */
+      if( response != NULL ) {
+        inData = StrOp.strToByte( wResponse.getdata( response ) );
+        NodeOp.base.del(response);
+        response = (iONode)NodeOp.base.clone(cmd);
+        if( inData[0] != 0 ) {
+          /* Error PT command */
+          TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+              "Error AccSet [%d] err[%d]", wProgram.getcv(response), inData[0] );
+        }
+        freeMem(inData);
+      }
+    }
+
+    /* Cleanup command node */
+    cmd->base.del(cmd);
   }
 
   /*
@@ -466,10 +597,10 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
         iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
         char* str = StrOp.fmt( "XLOCADD %d,%d,DCC,%s\r", wLoc.getaddr(cmd),
             __normalizeSteps(wLoc.getspcnt(cmd)), wLoc.getshortid(cmd) );
-        char* byteStr = StrOp.byteToStr( str, StrOp.len(str) );
+        char* byteStr = StrOp.byteToStr( (byte*)str, StrOp.len(str) );
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, str );
         wBinCmd.setoutlen( lccmd, StrOp.len(str) );
-        wBinCmd.setinlen( lccmd, 256 );
+        wBinCmd.setinlen( lccmd, 0 );
         wBinCmd.setinendbyte( lccmd, '\r' );
         wBinCmd.setout( lccmd, byteStr );
         StrOp.free( byteStr );
@@ -491,13 +622,18 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
         /* dump the loco data base in the throttle */
         iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
         char* cmd = "XLOCXMT\r";
-        char* byteStr = StrOp.byteToStr( cmd, StrOp.len(cmd) );
+        char* byteStr = StrOp.byteToStr( (byte*)cmd, StrOp.len(cmd) );
         wBinCmd.setoutlen( lccmd, StrOp.len(cmd) );
-        wBinCmd.setinlen( lccmd, 256 );
+        wBinCmd.setinlen( lccmd, 0 );
         wBinCmd.setinendbyte( lccmd, '\r' );
         wBinCmd.setout( lccmd, byteStr );
         StrOp.free( byteStr );
         response = data->sublib->cmd((obj)data->sublib, lccmd);
+
+        lccmd = NodeOp.inst(wSysCmd.name(), NULL, ELEMENT_NODE);
+        wSysCmd.setcmd( lccmd, "startio");
+        response = data->sublib->cmd((obj)data->sublib, lccmd);
+
       }
       else {
         /* lenz sublib */
@@ -506,12 +642,16 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
     else if( StrOp.equals( wSysCmd.clearshortids, wSysCmd.getcmd(cmd) ) ) {
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "clear short IDs" );
       if( StrOp.equals( wDigInt.p50x, data->sublibname ) ) {
+        iONode lccmd = NodeOp.inst(wSysCmd.name(), NULL, ELEMENT_NODE);
+        wSysCmd.setcmd( lccmd, "stopio");
+        response = data->sublib->cmd((obj)data->sublib, lccmd);
+
         /* dump the loco data base in the throttle */
-        iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
+        lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
         char* cmd = "XLOCCLEAR\r";
-        char* byteStr = StrOp.byteToStr( cmd, StrOp.len(cmd) );
+        char* byteStr = StrOp.byteToStr( (byte*)cmd, StrOp.len(cmd) );
         wBinCmd.setoutlen( lccmd, StrOp.len(cmd) );
-        wBinCmd.setinlen( lccmd, 256 );
+        wBinCmd.setinlen( lccmd, 0 );
         wBinCmd.setinendbyte( lccmd, '\r' );
         wBinCmd.setout( lccmd, byteStr );
         StrOp.free( byteStr );
@@ -526,7 +666,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
       if( StrOp.equals( wDigInt.p50x, data->sublibname ) ) {
         iONode lccmd = NodeOp.inst( wBinCmd.name(), NULL, ELEMENT_NODE );
         char* cmd = "XHALT\r";
-        char* byteStr = StrOp.byteToStr( cmd, StrOp.len(cmd) );
+        char* byteStr = StrOp.byteToStr( (byte*)cmd, StrOp.len(cmd) );
         wBinCmd.setoutlen( lccmd, StrOp.len(cmd) );
         wBinCmd.setinlen( lccmd, 256 );
         wBinCmd.setinendbyte( lccmd, '\r' );
@@ -554,10 +694,10 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOOpenDCCData data = Data(inst);
   data->run = False;
-  data->sublib->halt((obj)data->sublib, poweroff);
+  data->sublib->halt((obj)data->sublib, poweroff, shutdown);
   return;
 }
 
@@ -665,8 +805,9 @@ static struct OOpenDCC* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "opendcc %d.%d.%d", vmajor, vminor, patch );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "http://www.opendcc.de/" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid    = %s", data->iid );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sublib = %s", data->sublibname );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid      = %s", data->iid );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sublib   = %s", data->sublibname );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "power on = %s", wDigInt.ispoweratstartup(data->ini)?"yes":"no" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
   /* load sub library */
@@ -688,6 +829,7 @@ static struct OOpenDCC* _inst( const iONode ini ,const iOTrace trc ) {
           /* inform the xpressnet library to adde opendcc support */
           wDigInt.setsublib( data->ini, wDigInt.opendcc );
         }
+        wDigInt.setreadbidi( data->ini, wOpenDCC.isbidi( data->opendccini ) );
         data->sublib = pInitFun( data->ini, trc );
       }
     }
@@ -705,6 +847,11 @@ static struct OOpenDCC* _inst( const iONode ini ,const iOTrace trc ) {
   data->swdelay = ThreadOp.inst( "swdelay", &__swdelayThread, __OpenDCC );
   ThreadOp.start( data->swdelay );
 
+  if( wDigInt.ispoweratstartup(data->ini) ) {
+    iONode cmd = NodeOp.inst( wSysCmd.name(), NULL, ELEMENT_NODE );
+    wSysCmd.setcmd(cmd, wSysCmd.go);
+    data->sublib->cmd((obj)data->sublib, cmd);
+  }
 
   instCnt++;
   return __OpenDCC;

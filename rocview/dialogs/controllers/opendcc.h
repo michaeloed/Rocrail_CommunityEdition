@@ -1,14 +1,9 @@
-/////////////////////////////////////////////////////////////////////////////
-// Name:        opendcc.h
-// Purpose:
-// Author:
-// Modified by:
-// Created:     Sun 02 Mar 2008 11:51:45 CET
-// RCS-ID:
-// Copyright:
-// Licence:
-/////////////////////////////////////////////////////////////////////////////
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
+ 
+
+ */
 #ifndef _OPENDCC_H_
 #define _OPENDCC_H_
 
@@ -92,6 +87,7 @@ enum {
   so_sw_sensor_offset = 16,
   so_sw_sensor_mode = 17,
   so_xpn_feedback_mapping = 29,
+  so_xpn_sensors = 32,
 };
 
 #define ME_SOTimer 10003
@@ -131,7 +127,7 @@ class OpenDCCCtrlDlg: public wxDialog
 public:
     /// Constructors
     OpenDCCCtrlDlg();
-    OpenDCCCtrlDlg( wxWindow* parent, iONode props );
+    OpenDCCCtrlDlg( wxWindow* parent, iONode props, const char* devices=NULL );
     OpenDCCCtrlDlg( wxWindow* parent, wxWindowID id = SYMBOL_OPENDCCCTRLDLG_IDNAME, const wxString& caption = SYMBOL_OPENDCCCTRLDLG_TITLE, const wxPoint& pos = SYMBOL_OPENDCCCTRLDLG_POSITION, const wxSize& size = SYMBOL_OPENDCCCTRLDLG_SIZE, long style = SYMBOL_OPENDCCCTRLDLG_STYLE );
 
     /// Creation
@@ -163,6 +159,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_APPLY
     void OnApplyClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end OpenDCCCtrlDlg event handler declarations
 
 ////@begin OpenDCCCtrlDlg member function declarations
@@ -183,7 +182,7 @@ public:
     wxStaticText* m_labIID;
     wxTextCtrl* m_IID;
     wxStaticText* m_labDevice;
-    wxTextCtrl* m_Device;
+    wxComboBox* m_Device;
     wxStaticText* m_labVersion;
     wxTextCtrl* m_Version;
     wxTextCtrl* m_Mode;
@@ -193,6 +192,8 @@ public:
     wxRadioBox* m_Baudrate;
     wxStaticBox* m_labSpecials;
     wxCheckBox* m_Clock;
+    wxCheckBox* m_Bidi;
+    wxCheckBox* m_PowerAtStartup;
     wxStaticBox* m_BiDiBox;
     wxCheckBox* m_BiDiCutOut;
     wxCheckBox* m_BiDiIdNotify;
@@ -213,6 +214,8 @@ public:
     wxSpinCtrl* m_S88Bus2;
     wxStaticText* m_labS88Bus3;
     wxSpinCtrl* m_S88Bus3;
+    wxStaticText* m_labXpressNetSensors;
+    wxSpinCtrl* m_XpressNetSensors;
     wxStaticBox* m_S88SettingsBox;
     wxCheckBox* m_S88Active;
     wxCheckBox* m_S88TurnoutSensors;
@@ -243,6 +246,7 @@ public:
     wxButton* m_Apply;
 ////@end OpenDCCCtrlDlg member variables
     iONode m_Props;
+    const char* m_Devices;
     int m_TabAlign;
     void OnPTEvent(wxCommandEvent& event);
 };

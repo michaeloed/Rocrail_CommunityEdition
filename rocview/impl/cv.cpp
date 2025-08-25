@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -45,7 +48,7 @@
 
 #include "rocrail/wrapper/public/Program.h"
 #include "rocrail/wrapper/public/Loc.h"
-#include "rocrail/wrapper/public/RocRail.h"
+#include "rocrail/wrapper/public/FreeRail.h"
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocrail/wrapper/public/Plan.h"
 #include "rocrail/wrapper/public/CVByte.h"
@@ -113,7 +116,7 @@ void CV::CVconf() {
   };
   StrTokOp.base.del( tok );
   m_CVcountAll = nridx;
-
+  m_POM->SetValue(wCVconf.ispom(m_CVconf) ? true:false);
 }
 
 
@@ -167,7 +170,9 @@ void CV::init() {
     }
   }
   m_bPOM = False;
+  m_bAcc = False;
   m_bDirect = False;
+  m_Acc->Enable(m_POM->IsChecked());
 }
 
 
@@ -179,12 +184,12 @@ void CV::initValues() {
 }
 
 void CV::initPresets( int nr, const char* val ) {
-  if( nr < 9 ) {
-    wxTextCtrl* tc = (wxTextCtrl*)wxWindow::FindWindowById( nr + VAL_CV, m_Parent );
-    if( tc != NULL ) {
-      tc->SetValue( wxString( val,wxConvUTF8) );
+  if( nr > 0 && nr < 9 ) {
+    wxTextCtrl* tc[] = {NULL, m_CVaddress,m_CVVstart,m_CVaccel,m_CVdecel,m_CVVhigh,m_CVVmid,m_CVversion,m_CVmanufacturedID};
+    if( tc[nr] != NULL ) {
+      tc[nr]->SetValue( wxString( val,wxConvUTF8) );
       if( nr == 8 )
-        tc->SetToolTip(wxString( m_Vendor[atoi(val)&0xFF],wxConvUTF8));
+        tc[nr]->SetToolTip(wxString( m_Vendor[atoi(val)&0xFF],wxConvUTF8));
     }
   }
 }
@@ -228,14 +233,15 @@ void CV::setLocProps( iONode props ) {
     iONode cv = wLoc.getcvbyte( m_LocProps );
     while( cv != NULL ) {
       int cvnr = wCVByte.getnr( cv );
-      str = StrOp.fmt( "%d", wCVByte.getvalue( cv ) );
-      char* rowstr = StrOp.fmt( "%d", cvnr );
-      m_CVTable->SetCellValue(cvnr-1, 0, wxString(str,wxConvUTF8) );
-      m_CVTable->SetRowLabelValue( cvnr-1, wxString(rowstr,wxConvUTF8) );
-      initPresets( cvnr, str );
-      StrOp.free( rowstr );
-      StrOp.free( str );
-
+      if( cvnr > 0 ) {
+        str = StrOp.fmt( "%d", wCVByte.getvalue( cv ) );
+        char* rowstr = StrOp.fmt( "%d", cvnr );
+        m_CVTable->SetCellValue(cvnr-1, 0, wxString(str,wxConvUTF8) );
+        m_CVTable->SetRowLabelValue( cvnr-1, wxString(rowstr,wxConvUTF8) );
+        initPresets( cvnr, str );
+        StrOp.free( rowstr );
+        StrOp.free( str );
+      }
       cv = wLoc.nextcvbyte( m_LocProps, cv );
     };
   }
@@ -244,6 +250,55 @@ void CV::setLocProps( iONode props ) {
     m_saveAllCVs->Enable(false);
 
   }
+}
+
+
+void CV::updateCV(int cv, int value) {
+  TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "update cv%d=%d", cv, value);
+
+  char* val = StrOp.fmt( "%d", value );
+  char* rowstr = StrOp.fmt( "%d", cv );
+  if( cv > 0 && cv < 1024 ) {
+    m_CVTable->SetRowLabelValue( cv-1, wxString(rowstr,wxConvUTF8) );
+    m_CVTable->SetCellValue(cv-1, 0, wxString(val,wxConvUTF8) );
+  }
+  else {
+    TraceOp.trc( "cv", TRCLEVEL_WARNING, __LINE__, 9999, "cv%d out of range", cv);
+  }
+  StrOp.free( rowstr );
+
+  if( cv == 17 ) {
+    m_CV17 = value;
+    int laddr = (m_CV17&0x3f) * 256 + m_CV18;
+    m_CVlongaddress->SetValue( wxString::Format(wxT("%d"), laddr) );
+  }
+  else if( cv == 18 ) {
+    m_CV18 = value;
+    int laddr = (m_CV17&0x3f) * 256 + m_CV18;
+    m_CVlongaddress->SetValue( wxString::Format(wxT("%d"), laddr) );
+  }
+  else if( m_CVnr->GetValue() == cv ) {
+    m_CVvalue->SetValue( wxString( val,wxConvUTF8) );
+    updateCVbits();
+  }
+
+  switch( cv ) {
+  case 1: m_CVaddress->SetValue( wxString( val,wxConvUTF8) ); break;
+  case 2: m_CVVstart->SetValue( wxString( val,wxConvUTF8) ); break;
+  case 3: m_CVaccel->SetValue( wxString( val,wxConvUTF8) ); break;
+  case 4: m_CVdecel->SetValue( wxString( val,wxConvUTF8) ); break;
+  case 5: m_CVVhigh->SetValue( wxString( val,wxConvUTF8) ); break;
+  case 6: m_CVVmid->SetValue( wxString( val,wxConvUTF8) ); break;
+  case 7: m_CVversion->SetValue( wxString( val,wxConvUTF8) ); break;
+  case 8:
+    m_CVmanufacturedID->SetValue( wxString( val,wxConvUTF8) );
+    m_CVmanufacturedID->SetToolTip(wxString( m_Vendor[value&0xFF],wxConvUTF8));
+    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "DCC Manufacturer: %s", m_Vendor[value&0xFF] );
+    wLoc.setdectype(m_LocProps, m_Vendor[value&0xFF] );
+    break;
+  }
+
+  StrOp.free( val );
 }
 
 
@@ -259,66 +314,82 @@ void CV::event( iONode event ) {
     return;
   }
 
+  if( cv == -1 || (cmd == wProgram.datarsp && cv > 0 && cv != m_CVidx) ) {
+    // forced data response
+    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "update unexpected CV%d(%d)=%d ", cv, m_CVidx, ivalue);
+    if( cmd == wProgram.datarsp && cv > 0 && cv < 1024)
+      updateCV(cv, ivalue);
+    return;
+  }
+
   if( cmd == wProgram.datarsp || cmd == wProgram.statusrsp )
     datarsp = true;
 
   if( cv == 0 && datarsp )
     cv = m_CVidx;
 
-  TraceOp.trc( "cv", ivalue != -1 ? TRCLEVEL_INFO:TRCLEVEL_WARNING, __LINE__, 9999,
-      "got program event...cmd=%d cv=%d value=%d %s", cmd, cv, ivalue, cmd == wProgram.datarsp ? "datarsp":"statusrsp" );
+  updateCV(cv, ivalue);
 
-  if( ivalue != -1 && cmd == wProgram.statusrsp && m_CVidx >= 67 && m_CVidx <= 94 ) {
-    if(m_CVidx < 94 && m_bSpeedCurve ) {
+  TraceOp.trc( "cv", ivalue != -1 ? TRCLEVEL_INFO:TRCLEVEL_WARNING, __LINE__, 9999,
+      "got program event...cmd=%d cv=%d value=%d %s speedcurve=%d", cmd, cv, ivalue, cmd == wProgram.datarsp ? "datarsp":"statusrsp", m_bSpeedCurve );
+
+  if( m_bSpeedCurve && ivalue != -1 && (m_CVoperation == CVSET) &&
+      (cmd == wProgram.statusrsp || cmd == wProgram.datarsp) && m_CVidx >= 67 && m_CVidx <= 94 )
+  {
+    if(m_CVidx < 94 ) {
       m_CVoperation = CVSET;
       m_TimerCount = 0;
       doCV( wProgram.set, m_CVidx + 1, m_Curve[m_CVidx-67] );
     }
-    else if(m_CVidx == 94 && m_bSpeedCurve ) {
+    else if(m_CVidx == 94 ) {
       /* post an event to activate the speed curve dialog */
       m_bSpeedCurve = false;
     }
   }
   else if( ivalue != -1 && cmd == wProgram.datarsp ) {
-    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "event for cv %d...", m_CVidx);
-    char* val = StrOp.fmt( "%d", ivalue );
-
+    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "event for cv%d=%d (reported cv%d) speedcurve=%d...", m_CVidx, ivalue, cv, m_bSpeedCurve);
     /*
      * CV18 = addr - 256 * (addr / 256)
      * CV17 = (addr / 256) + 192
      */
     if( m_CVidx == 17 ) {
-      m_CV17 = ivalue;
-      int laddr = (m_CV17&0x3f) * 256 + m_CV18;
-      TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "part 1 of long address(%d) cv%d=%d",
-          laddr, m_CVidx, ivalue );
-      char* lval = StrOp.fmt("%d", laddr);
-      m_CVlongaddress->SetValue( wxString( lval,wxConvUTF8) );
-      StrOp.free(lval);
+      if( !m_bPOM ) {
+        m_CV17 = ivalue;
+        int laddr = (m_CV17&0x3f) * 256 + m_CV18;
+        TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "part 1 of long address(%d) cv%d=%d",
+            laddr, m_CVidx, ivalue );
+        char* lval = StrOp.fmt("%d", laddr);
+        m_CVlongaddress->SetValue( wxString( lval,wxConvUTF8) );
+        StrOp.free(lval);
+      }
       doCV( wProgram.get, 18, 0 );
     }
     else if( m_CVidx == 18 ) {
-      m_CV18 = ivalue;
-      int laddr = (m_CV17&0x3f) * 256 + m_CV18;
-      TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "part 2 of long address(%d) cv%d=%d",
-          laddr, m_CVidx, ivalue );
-      char* lval = StrOp.fmt("%d", laddr);
-      m_CVlongaddress->SetValue( wxString( lval,wxConvUTF8) );
-      StrOp.free(lval);
+      if( !m_bPOM ) {
+        m_CV18 = ivalue;
+        int laddr = (m_CV17&0x3f) * 256 + m_CV18;
+        TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "part 2 of long address(%d) cv%d=%d",
+            laddr, m_CVidx, ivalue );
+        char* lval = StrOp.fmt("%d", laddr);
+        m_CVlongaddress->SetValue( wxString( lval,wxConvUTF8) );
+        StrOp.free(lval);
+      }
       m_bLongAddress = false;
     }
     else if( m_CVidx >= 67 && m_CVidx <= 94 ) {
-      m_Curve[m_CVidx-67] = ivalue;
-      if(m_CVidx < 94 && m_bSpeedCurve ) {
-        m_CVoperation = CVGET;
-        m_TimerCount = 0;
-        doCV( wProgram.get, m_CVidx + 1, 0 );
-      }
-      else if(m_CVidx == 94 && m_bSpeedCurve ) {
-        /* post an event to activate the speed curve dialog */
-        m_bSpeedCurve = false;
-        m_Timer->Stop();
-        onSpeedCurve();
+      if( cv == 0 || cv ==  m_CVidx ) {
+        m_Curve[m_CVidx-67] = ivalue;
+        if(m_CVidx < 94 && m_bSpeedCurve ) {
+          m_CVoperation = CVGET;
+          m_TimerCount = 0;
+          doCV( wProgram.get, m_CVidx + 1, 0 );
+        }
+        else if(m_CVidx == 94 && m_bSpeedCurve ) {
+          /* post an event to activate the speed curve dialog */
+          m_bSpeedCurve = false;
+          m_Timer->Stop();
+          onSpeedCurve();
+        }
       }
     }
     else if( m_CVidx == 29 && m_bConfig ) {
@@ -333,41 +404,12 @@ void CV::event( iONode event ) {
       m_Timer->Stop();
       onDecFX();
     }
-    else {
-      wxTextCtrl* tc = (wxTextCtrl*)wxWindow::FindWindowById( m_CVidx + VAL_CV, m_Parent );
-      if( tc != NULL ) {
-        tc->SetValue( wxString( val,wxConvUTF8) );
-        if( cv == 8 ) {
-          tc->SetToolTip(wxString( m_Vendor[ivalue&0xFF],wxConvUTF8));
-          TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "DCC Manufacturer: %s", m_Vendor[ivalue&0xFF] );
-          wLoc.setdectype(m_LocProps, m_Vendor[ivalue&0xFF] );
-        }
-      }
-    }
 
     if( m_CVnr->GetValue() == m_CVidx ) {
-      m_CVvalue->SetValue( wxString( val,wxConvUTF8) );
+      m_CVvalue->SetValue( wxString::Format(wxT("%d"), ivalue) );
       updateCVbits();
     }
 
-    char* rowstr = StrOp.fmt( "%d", m_CVidx );
-    if( m_CVidx > 0 && m_CVidx < 1024 ) {
-      m_CVTable->SetRowLabelValue( m_CVidx-1, wxString(rowstr,wxConvUTF8) );
-      m_CVTable->SetCellValue(m_CVidx-1, 0, wxString(val,wxConvUTF8) );
-    }
-    StrOp.free( rowstr );
-
-    StrOp.free( val );
-
-  }
-  else if( cmd == wProgram.statusrsp ) {
-    wxTextCtrl* tc = (wxTextCtrl*)wxWindow::FindWindowById( m_CVidx + VAL_CV, m_Parent );
-    if( tc != NULL ) {
-      char* rowstr = StrOp.fmt( "%d", m_CVidx );
-      m_CVTable->SetRowLabelValue( m_CVidx-1, wxString(rowstr,wxConvUTF8) );
-      m_CVTable->SetCellValue(m_CVidx-1, 0, tc->GetValue() );
-      StrOp.free( rowstr );
-    }
   }
   else if( cmd == wProgram.save ) {
   }
@@ -414,7 +456,8 @@ void CV::onDecFX(void) {
   FxDlg*  dlg = new FxDlg(m_Frame, m_FxVal, m_CVnr );
   int rc = dlg->ShowModal();
   if( rc == wxID_OK ) {
-    m_FxVal = dlg->getConfig();
+    int cvnr = 0;
+    m_FxVal = dlg->getConfig(&cvnr);
     TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "FxVal (%d)", m_FxVal );
     m_CVoperation = CVSET;
     doCV( wProgram.set, m_CVnr->GetValue(), m_FxVal );
@@ -427,6 +470,8 @@ void CV::onDecFX(void) {
 
 void CV::update4POM(void) {
   m_bPOM = m_POM->IsChecked()?True:False;
+  m_bAcc = m_Acc->IsChecked()?True:False;
+  m_Acc->Enable(m_POM->IsChecked());
   /*
   m_getAddress->Enable(!m_bPOM);
   m_getVstart->Enable(!m_bPOM);
@@ -441,8 +486,10 @@ void CV::update4POM(void) {
   m_setlongAddress->Enable(!m_bPOM);
   m_setAddress->Enable(!m_bPOM);
 
-  m_ReadAll->Enable(!m_bPOM);
   m_PTonoff->Enable(!m_bPOM);
+
+  wCVconf.setpom(m_CVconf, m_POM->IsChecked() ? True:False);
+
 }
 
 
@@ -508,7 +555,7 @@ void CV::stopProgress() {
     TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "end progress dialog" );
     m_bCleanUpProgress = true;
     m_bSpeedCurve = false;
-    m_Timer->Start( 10, wxTIMER_ONE_SHOT );
+    m_Timer->Start( 1000, wxTIMER_ONE_SHOT );
   }
 }
 
@@ -627,7 +674,7 @@ void CV::saveCVtoFile() {
 
 void CV::OnButton(wxCommandEvent& event)
 {
-  TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "button event: 0x%08X", event.GetEventObject() );
+  TraceOp.trc( "cv", TRCLEVEL_DEBUG, __LINE__, 9999, "button event: 0x%08X", event.GetEventObject() );
 
   if( event.GetEventObject() == m_loadFile ) {
     loadCVfromFile();
@@ -641,6 +688,7 @@ void CV::OnButton(wxCommandEvent& event)
     m_PTonoff->SetLabel( on ? _T("PT on"):_T("PT off") );
     TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "PT %s", on?"on":"off" );
     iONode cmd = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    wProgram.setiid( cmd, m_IID->GetValue().mb_str(wxConvUTF8) );
     wProgram.setcmd( cmd, wProgram.ptstat );
     wxGetApp().sendToRocrail( cmd );
     wProgram.setcmd( cmd, on?wProgram.pton:wProgram.ptoff );
@@ -671,7 +719,7 @@ void CV::OnButton(wxCommandEvent& event)
     m_CVoperation = 0;
     doCV( wProgram.load, m_CVnr->GetValue(), atoi( m_CVvalue->GetValue().mb_str(wxConvUTF8) ) );
   }
-  else if ( event.GetEventObject() == m_POM ) {
+  else if ( event.GetEventObject() == m_POM || event.GetEventObject() == m_Acc ) {
     update4POM();
   }
   else if ( event.GetEventObject() == m_CVvalue ) {
@@ -800,8 +848,11 @@ void CV::OnButton(wxCommandEvent& event)
       doCV( wProgram.get, 67, 0 );
     }
   }
+  else if( event.GetEventObject() == m_CVHelp ) {
+    wxGetApp().openLink( "pt" );
+  }
   else {
-    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "default doCV" );
+    TraceOp.trc( "cv", TRCLEVEL_DEBUG, __LINE__, 9999, "default doCV" );
     doCV( event.GetId() );
   }
 
@@ -849,30 +900,27 @@ void CV::getLongAddress() {
 }
 
 void CV::setLongAddress() {
-  wxTextCtrl* tc = (wxTextCtrl*)wxWindow::FindWindowById( VAL_LADDRESS, m_Parent );
-  if( tc != NULL ) {
-    int addr = atoi( tc->GetValue().mb_str(wxConvUTF8) );
-    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "set long address to %d..." );
+  int addr = atoi( m_CVlongaddress->GetValue().mb_str(wxConvUTF8) );
+  TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "set long address to %d..." );
+  m_CVoperation = CVSET;
+  doCV( wProgram.set, 17, (addr / 256) + 192 );
+  m_CVoperation = CVSET;
+  doCV( wProgram.set, 18, addr - 256 * (addr / 256) );
+  if( wCVconf.islissy( m_CVconf ) ) {
     m_CVoperation = CVSET;
-    doCV( wProgram.set, 17, (addr / 256) + 192 );
+    doCV( wProgram.set, 117, (addr / 256) + 192 );
     m_CVoperation = CVSET;
-    doCV( wProgram.set, 18, addr - 256 * (addr / 256) );
-    if( wCVconf.islissy( m_CVconf ) ) {
-      m_CVoperation = CVSET;
-      doCV( wProgram.set, 117, (addr / 256) + 192 );
-      m_CVoperation = CVSET;
-      doCV( wProgram.set, 118, addr - 256 * (addr / 256) );
-    }
-    if( m_LocProps != NULL ) {
-      wLoc.setaddr(m_LocProps, addr);
-      if( !wxGetApp().isStayOffline() ) {
-        /* Notify RocRail. */
-        iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
-        wModelCmd.setcmd( cmd, wModelCmd.modify );
-        NodeOp.addChild( cmd, (iONode)m_LocProps->base.clone( m_LocProps ) );
-        wxGetApp().sendToRocrail( cmd );
-        cmd->base.del(cmd);
-      }
+    doCV( wProgram.set, 118, addr - 256 * (addr / 256) );
+  }
+  if( m_LocProps != NULL ) {
+    wLoc.setaddr(m_LocProps, addr);
+    if( !wxGetApp().isStayOffline() ) {
+      /* Notify RocRail. */
+      iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
+      wModelCmd.setcmd( cmd, wModelCmd.modify );
+      NodeOp.addChild( cmd, (iONode)m_LocProps->base.clone( m_LocProps ) );
+      wxGetApp().sendToRocrail( cmd );
+      cmd->base.del(cmd);
     }
   }
 }
@@ -909,9 +957,9 @@ void CV::doCV( int id ) {
     return;
   }
 
-  wxTextCtrl* tc = (wxTextCtrl*)wxWindow::FindWindowById( index + VAL_CV, m_Parent );
-  if( tc != NULL )
-    val = atoi( tc->GetValue().mb_str(wxConvUTF8) );
+  wxTextCtrl* tc[] = {NULL, m_CVaddress,m_CVVstart,m_CVaccel,m_CVdecel,m_CVVhigh,m_CVVmid,m_CVversion,m_CVmanufacturedID};
+  if( index < 9 && tc[index] != NULL )
+    val = atoi( tc[index]->GetValue().mb_str(wxConvUTF8) );
   else if( command == wProgram.set ) {
     TraceOp.trc( "cv", TRCLEVEL_WARNING, __LINE__, 9999, "No VAL_CV found for index=%d", index );
     return;
@@ -931,7 +979,7 @@ void CV::doCV( int id ) {
 void CV::doCV( int command, int index, int value ) {
   iONode cmd = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
   int addr = atoi( m_CVaddress->GetValue().mb_str(wxConvUTF8) );
-  wProgram.setlongaddr( cmd, False );
+  wProgram.setlongaddr( cmd, (addr > 127) ? True:False );
 
   if( addr == 0 ) {
     addr = atoi( m_CVlongaddress->GetValue().mb_str(wxConvUTF8) );
@@ -940,56 +988,75 @@ void CV::doCV( int command, int index, int value ) {
 
 
   update4POM();
+  if( m_LocProps != NULL ) {
+    wProgram.setstrval1(cmd, wLoc.getprot(m_LocProps));
+  }
+  wProgram.setiid( cmd, m_IID->GetValue().mb_str(wxConvUTF8) );
   wProgram.setcmd( cmd, command );
   wProgram.setaddr( cmd, addr );
+  wProgram.setdecaddr( cmd, addr );
   wProgram.setcv( cmd, index );
   wProgram.setvalue( cmd, value );
   wProgram.setpom( cmd, m_bPOM );
-  wProgram.setdirect( cmd, m_Direct->IsChecked()?True:False );
-  if( m_LocProps != NULL ) {
-    wProgram.setdecaddr( cmd, wLoc.getaddr( m_LocProps ) );
-    if( index == 1) {
-      wLoc.setaddr(m_LocProps, value);
+  wProgram.setacc( cmd, m_bAcc );
+  wProgram.setmode( cmd, m_Direct->IsChecked()?wProgram.mode_direct:wProgram.mode_page );
+  if( command == wProgram.save ) {
+    if( m_LocProps != NULL ) {
+      TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999,
+          "save CV for %s addr=%d cv=%d value=%d...", wLoc.getid( m_LocProps ), addr, index, value );
+      wProgram.setdecaddr( cmd, wLoc.getaddr( m_LocProps ) );
+      wProgram.setfilename( cmd, wLoc.getid( m_LocProps ) );
+
+      /* What about long addressing?
+      if( index == 1) {
+        wLoc.setaddr(m_LocProps, value);
+      }
+      */
+
       if( !wxGetApp().isStayOffline() ) {
         /* Notify RocRail. */
-        iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
-        wModelCmd.setcmd( cmd, wModelCmd.modify );
-        NodeOp.addChild( cmd, (iONode)m_LocProps->base.clone( m_LocProps ) );
         wxGetApp().sendToRocrail( cmd );
         cmd->base.del(cmd);
       }
     }
   }
-  TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999,
-      "sending program command for addr=%d cmd=%d index=%d value=%d...", addr, command, index, value );
-  wxGetApp().sendToRocrail( cmd );
-  cmd->base.del(cmd);
-  m_CVidx = index;
-  if( !m_bPOM && m_CVoperation > 0 ) {
-    m_TimerCount = 0;
-    bool rc = m_Timer->Start( 1000, wxTIMER_ONE_SHOT );
+  else {
+    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999,
+        "sending program command for addr=%d cmd=%d index=%d value=%d...", addr, command, index, value );
+    wxGetApp().sendToRocrail( cmd );
+    cmd->base.del(cmd);
+    m_CVidx = index;
+    if( !m_bPOM && m_CVoperation > 0 ) {
+      m_TimerCount = 0;
+      bool rc = m_Timer->Start( 1000, wxTIMER_ONE_SHOT );
 
-    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "Timeout timer %sstarted %dms...", rc?"":"NOT ", wCVconf.gettimeout(m_CVconf) * 1000 );
-    startProgress();
+      TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "Timeout timer %sstarted %dms...", rc?"":"NOT ", wCVconf.gettimeout(m_CVconf) * 1000 );
+      startProgress();
 
+    }
   }
 }
 
 void CV::OnTimer(wxTimerEvent& event) {
   if( !MutexOp.trywait( m_TimerMutex, 100 ) ) {
-    TraceOp.trc( "cv", TRCLEVEL_DEBUG, __LINE__, 9999, "timeout on timer mutex!" );
+    TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "timeout on timer mutex!" );
+    event.Skip();
     return;
   }
+  TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "timer tick..." );
 
   if( m_bCleanUpProgress ) {
     if( m_Progress != NULL ) {
+      m_Timer->Stop();
       wxProgressDialog* dlg = m_Progress;
       m_Progress = NULL;
+      dlg->EndModal(0);
       dlg->Destroy();
       TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "cleaned up the progress dialog" );
     }
     m_bCleanUpProgress = false;
     MutexOp.post( m_TimerMutex );
+    event.Skip();
     return;
   }
 
@@ -1005,7 +1072,7 @@ void CV::OnTimer(wxTimerEvent& event) {
         m_TimerCount = wCVconf.gettimeout(m_CVconf);
       }
       else {
-        TraceOp.trc( "cv", TRCLEVEL_DEBUG, __LINE__, 9999, "timer for PT acknowledge" );
+        TraceOp.trc( "cv", TRCLEVEL_INFO, __LINE__, 9999, "timer for PT acknowledge" );
         bool rc = m_Timer->Start( 1000, wxTIMER_ONE_SHOT );
       }
     }
@@ -1104,6 +1171,7 @@ bool CV::Create()
     m_SpeedCurve = NULL;
     m_loadFile = NULL;
     m_saveFile = NULL;
+    m_CVHelp = NULL;
 
     m_CVMainBox = NULL;
     m_CVSubBox1 = NULL;
@@ -1140,45 +1208,63 @@ void CV::CreateControls() {
   m_Parent->SetSizer(m_MainBox);
 
   m_ItemPanel = new wxPanel( m_Parent, -1, wxDefaultPosition, wxDefaultSize, wxSUNKEN_BORDER|wxTAB_TRAVERSAL );
-  m_MainBox->Add(m_ItemPanel, 1, wxALIGN_CENTER_HORIZONTAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_MainBox->Add(m_ItemPanel, 1, wxGROW|wxALL, 2);
   m_PanelMainBox = new wxBoxSizer(wxVERTICAL);
   m_ItemPanel->SetSizer(m_PanelMainBox);
 
 
   // LocList
   m_LocBox = new wxBoxSizer(wxHORIZONTAL);
-  m_PanelMainBox->Add(m_LocBox, 0, wxGROW|wxALL|wxADJUST_MINSIZE, 2);
+  m_PanelMainBox->Add(m_LocBox, 0, wxGROW|wxALL, 2);
 
-  m_labLoc = new wxStaticText( m_ItemPanel, -1, _("Loc"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_LocBox->Add(m_labLoc, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  wxFlexGridSizer* tmp = new wxFlexGridSizer(0, 2, 0, 0);
+  tmp->AddGrowableCol(1);
+  m_PanelMainBox->Add(tmp, 0, wxGROW|wxALL, 2);
+  m_labIID = new wxStaticText( m_ItemPanel, -1, _("IID"), wxDefaultPosition, wxDefaultSize, 0 );
+  tmp->Add(m_labIID, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
+  m_IID = new wxTextCtrl( m_ItemPanel, VAL_ADDRESS, _T(""), wxDefaultPosition, wxDefaultSize, 0 );
+  tmp->Add(m_IID, 0, wxGROW|wxALL, 1);
+
   wxString* m_LcListStrings = NULL;
   m_LcList = new wxComboBox( m_ItemPanel, ID_COMBOBOX_LOCLIST, _T(""), wxDefaultPosition, wxSize(90, 25), 0, m_LcListStrings, wxCB_READONLY );
   m_LocBox->Add(m_LcList, 3, wxGROW|wxALL, 1);
 
   m_loadFile = new wxButton( m_ItemPanel, -1, _("Import"), wxDefaultPosition, wxSize(60, 26), 0 );
-  m_LocBox->Add(m_loadFile, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_LocBox->Add(m_loadFile, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_saveFile = new wxButton( m_ItemPanel, -1, _("Export"), wxDefaultPosition, wxSize(60, 26), 0 );
-  m_LocBox->Add(m_saveFile, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_LocBox->Add(m_saveFile, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
+
+  m_OptionBox = new wxBoxSizer(wxHORIZONTAL);
+  m_PanelMainBox->Add(m_OptionBox, 0, wxGROW|wxALL, 2);
+
+  m_PTonoff = new wxToggleButton( m_ItemPanel, -1, _("PT"), wxDefaultPosition, wxDefaultSize, 0 );
+  m_PTonoff->SetValue(false);
+  m_OptionBox->Add(m_PTonoff, 0, wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_POM = new wxCheckBox( m_ItemPanel, -1, _T("PoM"), wxDefaultPosition, wxDefaultSize, 0 );
   m_POM->SetToolTip(_T("Program On the Main") );
-  m_LocBox->Add(m_POM, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_OptionBox->Add(m_POM, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
+
+  m_Acc = new wxCheckBox( m_ItemPanel, -1, _T("Acc"), wxDefaultPosition, wxDefaultSize, 0 );
+  m_Acc->SetToolTip(_T("Accessory") );
+  m_OptionBox->Add(m_Acc, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_Direct = new wxCheckBox( m_ItemPanel, -1, _T("Direct"), wxDefaultPosition, wxDefaultSize, 0 );
   m_Direct->SetToolTip(_T("Direct programming mode") );
-  m_LocBox->Add(m_Direct, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_OptionBox->Add(m_Direct, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
-  m_TableBox = new wxBoxSizer(wxHORIZONTAL);
-  m_PanelMainBox->Add(m_TableBox, 0, wxGROW|wxALL|wxADJUST_MINSIZE, 2);
+  m_TableBox = new wxFlexGridSizer(0, 2, 0, 0);
+  m_TableBox->AddGrowableCol(1);
+  m_PanelMainBox->Add(m_TableBox, 0, wxGROW|wxALL, 2);
 
   m_FlexGrid = new wxFlexGridSizer(0, 4, 0, 0);
-  m_TableBox->Add(m_FlexGrid, 0, wxGROW|wxALL|wxADJUST_MINSIZE, 2);
+  m_TableBox->Add(m_FlexGrid, 0, wxGROW|wxALL, 2);
 
 
   // Address:
   m_labelCVaddress = new wxStaticText( m_ItemPanel, -1, _("address"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVaddress, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVaddress, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVaddress = new wxTextCtrl( m_ItemPanel, VAL_ADDRESS, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_CENTRE );
   m_FlexGrid->Add(m_CVaddress, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1192,7 +1278,7 @@ void CV::CreateControls() {
 
   // Long Address:
   m_labelCVlongaddress = new wxStaticText( m_ItemPanel, -1, _("longaddress"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVlongaddress, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVlongaddress, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVlongaddress = new wxTextCtrl( m_ItemPanel, VAL_LADDRESS, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_CENTRE );
   m_FlexGrid->Add(m_CVlongaddress, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1206,7 +1292,7 @@ void CV::CreateControls() {
 
   // Vstart:
   m_labelCVVstart = new wxStaticText( m_ItemPanel, -1, _("Vstart"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVVstart, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVVstart, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVVstart = new wxTextCtrl( m_ItemPanel, VAL_VSTART, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_CENTRE );
   m_FlexGrid->Add(m_CVVstart, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1220,7 +1306,7 @@ void CV::CreateControls() {
 
   // Vaccel:
   m_labelCVaccel = new wxStaticText( m_ItemPanel, -1, _("acceleration rate"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVaccel, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVaccel, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVaccel = new wxTextCtrl( m_ItemPanel, VAL_VACCEL, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_CENTRE );
   m_FlexGrid->Add(m_CVaccel, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1234,7 +1320,7 @@ void CV::CreateControls() {
 
   // Vdecel:
   m_labelCVdecel = new wxStaticText( m_ItemPanel, -1, _("deceleration rate"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVdecel, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVdecel, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVdecel = new wxTextCtrl( m_ItemPanel, VAL_VDECEL, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_CENTRE );
   m_FlexGrid->Add(m_CVdecel, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1248,7 +1334,7 @@ void CV::CreateControls() {
 
   // Vhigh:
   m_labelCVVhigh = new wxStaticText( m_ItemPanel, -1, _("Vhigh"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVVhigh, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVVhigh, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVVhigh = new wxTextCtrl( m_ItemPanel, VAL_VHIGH, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_CENTRE );
   m_FlexGrid->Add(m_CVVhigh, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1262,7 +1348,7 @@ void CV::CreateControls() {
 
   // VMid:
   m_labelCVVmid = new wxStaticText( m_ItemPanel, -1, _("Vmid"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVVmid, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVVmid, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVVmid = new wxTextCtrl( m_ItemPanel, VAL_VMID, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_CENTRE );
   m_FlexGrid->Add(m_CVVmid, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1276,7 +1362,7 @@ void CV::CreateControls() {
 
   // version:
   m_labelCVversion = new wxStaticText( m_ItemPanel, -1, _("version"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVversion, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVversion, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVversion = new wxTextCtrl( m_ItemPanel, VAL_VERSION, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_READONLY|wxTE_CENTRE );
   m_FlexGrid->Add(m_CVversion, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1291,7 +1377,7 @@ void CV::CreateControls() {
 
   // manufacturedID:
   m_labelCVmanufacturedID = new wxStaticText( m_ItemPanel, -1, _("manufactured ID"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_FlexGrid->Add(m_labelCVmanufacturedID, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 2);
+  m_FlexGrid->Add(m_labelCVmanufacturedID, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 2);
 
   m_CVmanufacturedID = new wxTextCtrl( m_ItemPanel, VAL_MANUFACTUREDID, _T("0"), wxDefaultPosition, wxSize(60, -1), wxTE_READONLY|wxTE_CENTRE );
   m_FlexGrid->Add(m_CVmanufacturedID, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 1);
@@ -1320,15 +1406,15 @@ void CV::CreateControls() {
   m_CVTable->AutoSizeColumns();
   m_CVTable->AutoSizeRows();
 
-  m_TableBox->Add(m_CVTable, 0, wxALL|wxADJUST_MINSIZE, 2);
+  m_TableBox->Add(m_CVTable, 0, wxGROW|wxALL, 2);
 
 
   TraceOp.trc( "cv", TRCLEVEL_DEBUG, __LINE__, 9999, "Create CV Controls..." );
 
   // CV:
-  wxStaticBox* itemStaticBoxSizer20Static = new wxStaticBox(m_ItemPanel, -1, _("CV"));
+  wxStaticBox* itemStaticBoxSizer20Static = new wxStaticBox(m_ItemPanel, -1, _("CV-Box"));
   m_CVbox = new wxStaticBoxSizer(itemStaticBoxSizer20Static, wxHORIZONTAL);
-  m_PanelMainBox->Add(m_CVbox, 0, wxALL, 3);
+  m_PanelMainBox->Add(m_CVbox, 0, wxALL, 2);
 
   m_MainBox = new wxBoxSizer(wxVERTICAL);
   m_CVbox->Add(m_MainBox, 0, wxALIGN_CENTER_VERTICAL|wxALL, 0);
@@ -1374,30 +1460,28 @@ void CV::CreateControls() {
   m_CVSubBox2->Add(m_bit0, 0, wxALIGN_CENTER_VERTICAL, 0);
 
 
-  wxBoxSizer* buttonSizer1 = new wxBoxSizer(wxHORIZONTAL);
-  m_PanelMainBox->Add(buttonSizer1, 0, wxALL|wxADJUST_MINSIZE, 2);
+  wxFlexGridSizer* buttonSizer1 = new wxFlexGridSizer(0,3,0,0);
+  m_PanelMainBox->Add(buttonSizer1, 0, wxGROW|wxALL, 2);
 
-  m_saveCVs = new wxButton( m_ItemPanel, -1, _("Save"), wxDefaultPosition, wxSize(60, 26), 0 );
+  m_saveCVs = new wxButton( m_ItemPanel, -1, _("Copy"), wxDefaultPosition, wxDefaultSize, 0 );
   buttonSizer1->Add(m_saveCVs, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
-  m_loadCVs = new wxButton( m_ItemPanel, -1, _("Load"), wxDefaultPosition, wxSize(60, 26), 0 );
+  m_loadCVs = new wxButton( m_ItemPanel, -1, _("Load"), wxDefaultPosition, wxDefaultSize, 0 );
   buttonSizer1->Add(m_loadCVs, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
-  m_saveAllCVs = new wxButton( m_ItemPanel, -1, _("SaveAll"), wxDefaultPosition, wxSize(60, 26), 0 );
+  m_saveAllCVs = new wxButton( m_ItemPanel, -1, _("SaveAll"), wxDefaultPosition, wxDefaultSize, 0 );
   buttonSizer1->Add(m_saveAllCVs, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
-  m_SpeedCurve = new wxButton( m_ItemPanel, -1, _("V curve"), wxDefaultPosition, wxSize(60, 26), 0 );
+  m_SpeedCurve = new wxButton( m_ItemPanel, -1, _("V curve"), wxDefaultPosition, wxDefaultSize, 0 );
   buttonSizer1->Add(m_SpeedCurve, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
-  m_Config = new wxButton( m_ItemPanel, -1, _("Config"), wxDefaultPosition, wxSize(60, 26), 0 );
+  m_Config = new wxButton( m_ItemPanel, -1, _("Config"), wxDefaultPosition, wxDefaultSize, 0 );
   buttonSizer1->Add(m_Config, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
+  m_CVHelp = new wxButton( m_ItemPanel, -1, _("Help"), wxDefaultPosition, wxDefaultSize, 0 );
+  buttonSizer1->Add(m_CVHelp, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
 
-  wxBoxSizer* buttonSizer2 = new wxBoxSizer(wxHORIZONTAL);
-  m_PanelMainBox->Add(buttonSizer2, 0, wxALL|wxADJUST_MINSIZE, 2);
+  wxFlexGridSizer* buttonSizer2 = new wxFlexGridSizer(0,3,0,0);
+  m_PanelMainBox->Add(buttonSizer2, 0, wxGROW|wxALL, 2);
 
-  m_PTonoff = new wxToggleButton( m_ItemPanel, -1, _("PT"), wxDefaultPosition, wxSize(75, 26), 0 );
-  m_PTonoff->SetValue(false);
-  buttonSizer2->Add(m_PTonoff, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
-
-  m_WriteAll = new wxButton( m_ItemPanel, -1, _("Write all"), wxDefaultPosition, wxSize(75, 26), 0 );
-  m_ReadAll  = new wxButton( m_ItemPanel, -1, _("Read all"), wxDefaultPosition, wxSize(75, 26), 0 );
-  m_CopyFrom  = new wxButton( m_ItemPanel, -1, _("Copy from..."), wxDefaultPosition, wxSize(75, 26), 0 );
+  m_WriteAll = new wxButton( m_ItemPanel, -1, _("Write all"), wxDefaultPosition, wxDefaultSize, 0 );
+  m_ReadAll  = new wxButton( m_ItemPanel, -1, _("Read all"), wxDefaultPosition, wxDefaultSize, 0 );
+  m_CopyFrom  = new wxButton( m_ItemPanel, -1, _("Copy from..."), wxDefaultPosition, wxDefaultSize, 0 );
 
   buttonSizer2->Add(m_ReadAll, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);
   buttonSizer2->Add(m_WriteAll, 0, wxALIGN_CENTER_VERTICAL|wxALL, 1);

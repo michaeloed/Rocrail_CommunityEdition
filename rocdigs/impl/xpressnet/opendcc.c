@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -89,10 +92,12 @@ static void __evaluateBiDi(obj xpressnet, byte* buffer) {
     /* Loco address from detector
      * 0x75 0xF2 SID_H SID_L D+AddrH AddrL
      */
+    char ident[32];
     iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
     wFeedback.setaddr( evt, buffer[2] * 256 + buffer[3] );
-    wFeedback.setbus( evt, wFeedback.fbtype_railcom );
-    wFeedback.setidentifier( evt, buffer[2] * 256 + buffer[3] );
+    wFeedback.setfbtype( evt, wFeedback.fbtype_railcom );
+    StrOp.fmtb(ident, "%d", buffer[2] * 256 + buffer[3]);
+    wFeedback.setidentifier( evt, ident );
     wFeedback.setstate( evt, wFeedback.getidentifier(evt) > 0 ? True:False );
     if( data->iid != NULL )
       wFeedback.setiid( evt, data->iid );
@@ -107,7 +112,7 @@ static void __evaluateBiDi(obj xpressnet, byte* buffer) {
      * 0x73 0xF0/0xF1 SID_H SID_L */
     iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
     wFeedback.setaddr( evt, buffer[2] * 256 + buffer[3] );
-    wFeedback.setbus( evt, wFeedback.fbtype_railcom );
+    wFeedback.setfbtype( evt, wFeedback.fbtype_railcom );
     wFeedback.setstate( evt, buffer[1] == 0xF1 ? True:False );
     if( data->iid != NULL )
       wFeedback.setiid( evt, data->iid );

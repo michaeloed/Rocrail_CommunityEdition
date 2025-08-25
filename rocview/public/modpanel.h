@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -48,6 +51,7 @@ public:
   void OnAddModule(wxCommandEvent& event);
   void OnProperties(wxCommandEvent& event);
 
+  void showTooltip(bool show);
   void modelEvent( iONode node );
   void reScale( double scale );
   void removeItemFromList( iONode item );
@@ -65,6 +69,7 @@ public:
   bool hasZLevel( iONode zlevel );
   BasePanel* updateZLevel(iONode zlevel);
   iOList getModList() { return m_ModList; }
+  void* GetItem( const char* key );
 
 private:
   DECLARE_EVENT_TABLE()

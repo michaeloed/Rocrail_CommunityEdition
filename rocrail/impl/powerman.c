@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -33,6 +36,8 @@
 #include "rocrail/wrapper/public/Feedback.h"
 #include "rocrail/wrapper/public/Block.h"
 #include "rocrail/wrapper/public/Module.h"
+#include "rocrail/wrapper/public/Action.h"
+#include "rocrail/wrapper/public/ActionCtrl.h"
 
 #include "rocs/public/trace.h"
 #include "rocs/public/node.h"
@@ -94,6 +99,36 @@ static const char* __id( void* inst ) {
   return NULL;
 }
 
+static void __checkAction( iOPowerMan inst, iONode props, const char* state ) {
+  iOPowerManData data   = Data(inst);
+  iOModel     model  = AppOp.getModel();
+  iONode      action = wBooster.getactionctrl( props );
+
+  /* loop over all actions */
+  while( action != NULL ) {
+    int counter = atoi(wActionCtrl.getstate( action ));
+
+    if( StrOp.len(wActionCtrl.getstate( action )) == 0 ||
+        StrOp.equals(state, wActionCtrl.getstate( action )) )
+    {
+
+      iOAction Action = ModelOp.getAction(model, wActionCtrl.getid( action ));
+      if( Action != NULL ) {
+        wActionCtrl.setload(action, wBooster.getload(props));
+        wActionCtrl.setvolt(action, wBooster.getvolt(props));
+        wActionCtrl.settemp(action, wBooster.gettemp(props));
+        ActionOp.exec(Action, action);
+      }
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "action state does not match: [%s-%s]",
+          wActionCtrl.getstate( action ), state );
+    }
+
+    action = wBooster.nextactionctrl( props, action );
+  }
+}
+
 
 static void __sysEvent( obj inst ,const char* cmd ) {
   iOPowerManData data = Data(inst);
@@ -119,6 +154,8 @@ static void __informClientOfShortcut(obj inst, iONode booster, Boolean cleared )
   if( blockids != NULL && StrOp.len( blockids ) > 0 ) {
     iOStrTok tok = StrTokOp.inst( blockids, ',' );
 
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "informing blocks [%s] of short circuit", blockids);
+
     /* iterate all blockid's */
     while( StrTokOp.hasMoreTokens(tok) ) {
       const char* blockid = StrTokOp.nextToken( tok );
@@ -138,6 +175,8 @@ static void __informClientOfShortcut(obj inst, iONode booster, Boolean cleared )
   if( modids != NULL && StrOp.len( modids ) > 0 ) {
     iOStrTok tok = StrTokOp.inst( modids, ',' );
 
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "informing modules [%s] of short circuit", modids);
+
     /* iterate all modid's */
     while( StrTokOp.hasMoreTokens(tok) ) {
       const char* modid = StrTokOp.nextToken( tok );
@@ -153,7 +192,7 @@ static void __informClientOfShortcut(obj inst, iONode booster, Boolean cleared )
 }
 
 
-static void __processEvent( obj inst ,Boolean pulse ,const char* id ,int ident, int val ) {
+static void __processEvent( obj inst ,Boolean pulse ,const char* id ,const char* ident, int val ) {
   iOPowerManData data = Data(inst);
   iONode scbooster = (iONode)MapOp.get( data->scmap, id );
   iONode pwbooster = (iONode)MapOp.get( data->pwmap, id );
@@ -164,7 +203,7 @@ static void __processEvent( obj inst ,Boolean pulse ,const char* id ,int ident, 
 
   if( scbooster != NULL ) {
     TraceOp.trc( name, pulse?TRCLEVEL_WARNING:TRCLEVEL_INFO, __LINE__, 9999,
-        "shortcut %s[%s] event for booster [%s][%s]", pulse?"":"cleared ", id,
+        "short circuit %s[%s] event for booster [%s][%s]", pulse?"":"cleared ", id,
             wBooster.getid(scbooster), wBooster.getdistrict(scbooster) );
     wPwrEvent.setid( pwrevent, wBooster.getid(scbooster) );
     wPwrEvent.setshortcut( pwrevent, pulse );
@@ -194,6 +233,7 @@ static void __processEvent( obj inst ,Boolean pulse ,const char* id ,int ident, 
             wBooster.getid(pwbooster), wBooster.getdistrict(scbooster) );
     wPwrEvent.setid( pwrevent, wBooster.getid(pwbooster) );
     wPwrEvent.setpower( pwrevent, pulse );
+    wBooster.setpower(pwbooster, pulse);
     if( !pulse ) {
       iONode pwrcmd = NodeOp.inst( wPwrCmd.name(), NULL, ELEMENT_NODE );
       wPwrCmd.setid( pwrcmd, wBooster.getid(pwbooster) );
@@ -207,6 +247,71 @@ static void __processEvent( obj inst ,Boolean pulse ,const char* id ,int ident, 
 
 }
 
+
+static void __stateEvent( obj inst, iONode event ) {
+  iOPowerManData data = Data(inst);
+  iONode booster = NULL;
+
+  MutexOp.wait(data->boostermapmux);
+
+  booster = (iONode)MapOp.first( data->boostermap );
+  /* command for all */
+  TraceOp.trc(name, TRCLEVEL_DEBUG, __LINE__, 9999, "State event from %d", wState.getuid(event));
+  while( booster != NULL ) {
+    if( wBooster.getuid(booster) == wState.getuid(event) ) {
+      Boolean shortcut = wState.isshortcut(event);
+      wBooster.setpower(booster, wState.ispower(event));
+
+      wBooster.setload( booster, wBooster.getload(event) );
+      wBooster.setvolt( booster, wBooster.getvolt(event) );
+      wBooster.settemp( booster, wBooster.gettemp(event) );
+      wBooster.setloadmax( booster, wBooster.getloadmax(event) );
+      wBooster.setvoltmin( booster, wBooster.getvoltmin(event) );
+      wBooster.settempmax( booster, wBooster.gettempmax(event) );
+
+      TraceOp.trc(name, shortcut?TRCLEVEL_EXCEPTION:TRCLEVEL_DEBUG, __LINE__, 9999,
+          "booster %s(%08X) power is %s, diagnostics: %dmA %dmV %dC %s",
+          wBooster.getid(booster), wBooster.getuid(booster), wState.ispower(event) ? "ON":"OFF",
+              shortcut?wBooster.getloadmax(booster):wBooster.getload(booster), 
+              wBooster.getvolt(booster), wBooster.gettemp(booster), shortcut?"OVERLOAD":"" );
+
+
+      if( shortcut != wBooster.isshortcut(booster) ) {
+        wBooster.setshortcut( booster, shortcut );
+        __informClientOfShortcut(inst, booster, !shortcut);
+
+        if( !wBooster.isscopt_repoweron(booster) && shortcut ) {
+          iONode pwrcmd = NodeOp.inst( wPwrCmd.name(), NULL, ELEMENT_NODE );
+          wPwrCmd.setid( pwrcmd, wBooster.getid(booster) );
+          wPwrCmd.setcmd( pwrcmd, wPwrCmd.off );
+          PowerManOp.cmd((iOPowerMan)inst, pwrcmd);
+        }
+
+        if( wBooster.isscopt_poweroffall(booster) && shortcut ) {
+          iONode pwrcmd = NodeOp.inst( wPwrCmd.name(), NULL, ELEMENT_NODE );
+          wPwrCmd.setcmd( pwrcmd, wPwrCmd.off );
+          PowerManOp.cmd((iOPowerMan)inst, pwrcmd);
+        }
+
+      }
+
+      if( wBooster.isshortcut(booster) )
+        __checkAction((iOPowerMan)inst, booster, "shortcut");
+      else
+        __checkAction((iOPowerMan)inst, booster, "load");
+
+
+      AppOp.broadcastEvent( (iONode)NodeOp.base.clone(booster) );
+
+    }
+    booster = (iONode)MapOp.next( data->boostermap );
+  }
+
+  MutexOp.post(data->boostermapmux);
+}
+
+
+
 static void* __event( void* inst, const void* evt ) {
   iOPowerManData data = Data(inst);
   iONode node = (iONode)evt;
@@ -215,6 +320,9 @@ static void* __event( void* inst, const void* evt ) {
   }
   else if( node != NULL && StrOp.equals( wSysCmd.name(), NodeOp.getName(node) ) ) {
     __sysEvent( inst ,wSysCmd.getcmd(node) );
+  }
+  else if( node != NULL && StrOp.equals( wState.name(), NodeOp.getName(node) ) ) {
+    __stateEvent( inst, node );
   }
 
   return NULL;
@@ -250,50 +358,155 @@ static void __initBoosters( iOPowerMan inst ) {
   iOPowerManData data = Data(inst);
   iOModel model = AppOp.getModel();
 
+  MutexOp.wait(data->boostermapmux);
+
   iONode booster = wBoosterList.getbooster(data->props);
+  MapOp.clear(data->boostermap);
+
   while( booster != NULL ) {
     iOFBack scfb = ModelOp.getFBack( model, wBooster.getscfb( booster ) );
     iOFBack pwfb = ModelOp.getFBack( model, wBooster.getpowerfb( booster ) );
 
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-        "Init sensors for booster [%s]...", wBooster.getid(booster) );
+    wBooster.setload( booster, 0 );
+    wBooster.setvolt( booster, 0 );
+    wBooster.settemp( booster, 0 );
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "adding booster [%s]...", wBooster.getid(booster) );
 
     MapOp.put( data->boostermap, wBooster.getid(booster), (obj)booster );
 
-    if( scfb != NULL && pwfb != NULL ) {
+    if( scfb != NULL ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Init short circuit sensors for booster [%s]...", wBooster.getid(booster) );
       FBackOp.addListener( scfb, (obj)inst );
+      MapOp.put( data->scmap, wBooster.getscfb( booster ), (obj)booster );
+    }
+    if( pwfb != NULL ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Init power sensors for booster [%s]...", wBooster.getid(booster) );
       FBackOp.addListener( pwfb, (obj)inst );
       MapOp.put( data->scmap, wBooster.getscfb( booster ), (obj)booster );
-      MapOp.put( data->pwmap, wBooster.getpowerfb( booster ), (obj)booster );
-    }
-    else {
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
-          "Sensors for booster %s could not be initialized.", wBooster.getid(booster) );
     }
 
     booster = wBoosterList.nextbooster(data->props, booster);
   }
 
+  MutexOp.post(data->boostermapmux);
 }
+
+
+static const char* _getBooster4Block(iOPowerMan inst, const char* blockid) {
+  iOPowerManData data = Data(inst);
+  iONode booster = wBoosterList.getbooster(data->props);
+  while( booster != NULL ) {
+    const char* blockids = wBooster.getblockids(booster);
+
+    if( blockids != NULL && StrOp.len( blockids ) > 0 ) {
+      iOStrTok tok = StrTokOp.inst( blockids, ',' );
+
+      /* iterate all blockid's */
+      while( StrTokOp.hasMoreTokens(tok) ) {
+        const char* id = StrTokOp.nextToken( tok );
+        if( StrOp.equals(blockid, id )) {
+          StrTokOp.base.del(tok);
+          return wBooster.getid(booster);
+        }
+      };
+      StrTokOp.base.del(tok);
+    }
+    booster = wBoosterList.nextbooster(data->props, booster);
+  };
+  return NULL;
+}
+
+
+static Boolean _hasBlockPower(iOPowerMan inst, const char* blockid) {
+  iOPowerManData data = Data(inst);
+  iONode booster = wBoosterList.getbooster(data->props);
+  while( booster != NULL ) {
+    const char* blockids = wBooster.getblockids(booster);
+
+    if( blockids != NULL && StrOp.len( blockids ) > 0 ) {
+      iOStrTok tok = StrTokOp.inst( blockids, ',' );
+
+      /* iterate all blockid's */
+      while( StrTokOp.hasMoreTokens(tok) ) {
+        const char* id = StrTokOp.nextToken( tok );
+        if( StrOp.equals(blockid, id )) {
+          StrTokOp.base.del(tok);
+          if( wBooster.isdoesreport(booster) || (wBooster.getpowerfb(booster) != NULL && StrOp.len(wBooster.getpowerfb(booster)) > 0 ) ) {
+            if( !wBooster.ispower(booster) ) {
+              TraceOp.trc(name, TRCLEVEL_USER1, __LINE__, 9999, "booster %s if OFF in district %s",
+                  wBooster.getid(booster), wBooster.getdistrict(booster) );
+            }
+            return wBooster.ispower(booster);
+          }
+          else
+            return True;
+        }
+      };
+      StrTokOp.base.del(tok);
+    }
+    booster = wBoosterList.nextbooster(data->props, booster);
+  };
+  return True;
+}
+
 
 static Boolean _cmd(iOPowerMan inst, iONode cmd) {
   iOPowerManData data = Data(inst);
   iOModel model = AppOp.getModel();
+  iOControl control = AppOp.getControl();
   const char* boosterid = wPwrCmd.getid(cmd);
+  const char* blockid   = wPwrCmd.getblockid(cmd);
+
+  if( !StrOp.equals( wPwrCmd.name(), NodeOp.getName(cmd))) {
+    /* Ignore */
+    cmd->base.del(cmd);
+    return False;
+  }
+
+  if( blockid != NULL && StrOp.len( blockid ) > 0 ) {
+    /* try to find the linked booster */
+    boosterid = PowerManOp.getBooster4Block(inst, blockid);
+    if( boosterid == NULL ) {
+      cmd->base.del(cmd);
+      return False;
+    }
+  }
+
+  TraceOp.trc(name, TRCLEVEL_INFO, __LINE__, 9999, "%s=%s booster=%s (block=%s)",
+      NodeOp.getName(cmd), wPwrCmd.getcmd(cmd), boosterid==NULL?"-":boosterid, blockid==NULL?"-":blockid);
+
 
   if( boosterid == NULL || StrOp.len( boosterid ) == 0 ) {
     iONode booster = (iONode)MapOp.first( data->boostermap );
     /* command for all */
-    TraceOp.trc(name, TRCLEVEL_INFO, __LINE__, 9999, "Power command for all boosters.");
+    TraceOp.trc(name, TRCLEVEL_INFO, __LINE__, 9999, "Power command [%s] for all boosters.", wPwrCmd.getcmd(cmd));
     while( booster != NULL ) {
-      iOOutput output = ModelOp.getOutput( model, wBooster.getpowersw(booster) );
-      boosterid = wBooster.getid(booster);
-      TraceOp.trc(name, TRCLEVEL_INFO, __LINE__, 9999, "Power command for booster [%s].", boosterid);
-      if( output != NULL ) {
+      int uid = wBooster.getuid(booster);
+      if( uid > 0 ) {
+        iONode nodeA = NodeOp.inst( wSysCmd.name(), NULL, ELEMENT_NODE );
+        wSysCmd.setbus(nodeA, uid);
+        wSysCmd.setiid(nodeA, wBooster.getiid(booster));
         if( StrOp.equals( wPwrCmd.on, wPwrCmd.getcmd(cmd) ) )
-          OutputOp.on(output);
+          wSysCmd.setcmd(nodeA, wSysCmd.go);
+        else if( StrOp.equals( wPwrCmd.off, wPwrCmd.getcmd(cmd) ) )
+          wSysCmd.setcmd(nodeA, wSysCmd.stop);
         else
-          OutputOp.off(output);
+          wSysCmd.setcmd(nodeA, wPwrCmd.getcmd(cmd));
+        ControlOp.cmd( control, nodeA, NULL );
+      }
+      else {
+        iOOutput output = ModelOp.getOutput( model, wBooster.getpowersw(booster) );
+        boosterid = wBooster.getid(booster);
+        TraceOp.trc(name, TRCLEVEL_INFO, __LINE__, 9999, "Power command [%s] for booster [%s].", wPwrCmd.getcmd(cmd), boosterid);
+        if( output != NULL ) {
+          if( StrOp.equals( wPwrCmd.on, wPwrCmd.getcmd(cmd) ) ) {
+            ThreadOp.sleep(50);
+            OutputOp.on(output);
+          }
+          else if( StrOp.equals( wPwrCmd.off, wPwrCmd.getcmd(cmd) ) )
+            OutputOp.off(output);
+        }
       }
       booster = (iONode)MapOp.next( data->boostermap );
     }
@@ -302,6 +515,7 @@ static Boolean _cmd(iOPowerMan inst, iONode cmd) {
     iONode booster = (iONode)MapOp.get( data->boostermap, boosterid );
     if( booster != NULL ) {
       iOOutput output = ModelOp.getOutput( model, wBooster.getpowersw(booster) );
+      int uid = wBooster.getuid(booster);
       /* single booster command */
       TraceOp.trc(name, TRCLEVEL_INFO, __LINE__, 9999, "Power command for booster [%s].", boosterid);
       if( output != NULL ) {
@@ -309,6 +523,19 @@ static Boolean _cmd(iOPowerMan inst, iONode cmd) {
           OutputOp.on(output);
         else
           OutputOp.off(output);
+      }
+      else if( uid > 0 ) {
+        /* */
+        iONode nodeA = NodeOp.inst( wSysCmd.name(), NULL, ELEMENT_NODE );
+        wSysCmd.setbus(nodeA, uid);
+        wSysCmd.setiid(nodeA, wBooster.getiid(booster));
+        if( StrOp.equals( wPwrCmd.on, wPwrCmd.getcmd(cmd) ) )
+          wSysCmd.setcmd(nodeA, wSysCmd.go);
+        else if( StrOp.equals( wPwrCmd.off, wPwrCmd.getcmd(cmd) ) )
+          wSysCmd.setcmd(nodeA, wSysCmd.stop);
+        else
+          wSysCmd.setcmd(nodeA, wPwrCmd.getcmd(cmd));
+        ControlOp.cmd( control, nodeA, NULL );
       }
     }
     else {
@@ -331,12 +558,14 @@ static struct OPowerMan* _inst( iONode ini ) {
   /* Initialize data->xxx members... */
   data->props = ini;
   data->boostermap = MapOp.inst();
+  data->boostermapmux = MutexOp.inst(NULL, True);
+
   data->scmap = MapOp.inst();
   data->pwmap = MapOp.inst();
 
   __initBoosters(__PowerMan);
 
-  ModelOp.addSysEventListener( AppOp.getModel(), (obj)__PowerMan );
+  /*ModelOp.addSysEventListener( AppOp.getModel(), (obj)__PowerMan );*/
 
   TraceOp.trc(name, TRCLEVEL_INFO, __LINE__, 9999, "Power Manager instantiated.");
 
@@ -347,7 +576,7 @@ static struct OPowerMan* _inst( iONode ini ) {
 
 /**  */
 static void _modify( struct OPowerMan* inst ,iONode mod ) {
-  return;
+  __initBoosters(inst);
 }
 
 

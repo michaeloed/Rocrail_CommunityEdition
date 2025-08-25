@@ -1,7 +1,10 @@
  /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -36,6 +39,7 @@
 #include "rocrail/wrapper/public/Loc.h"
 #include "rocrail/wrapper/public/Feedback.h"
 #include "rocrail/wrapper/public/Switch.h"
+#include "rocrail/wrapper/public/SwitchList.h"
 #include "rocrail/wrapper/public/Output.h"
 #include "rocrail/wrapper/public/Signal.h"
 #include "rocrail/wrapper/public/Program.h"
@@ -46,7 +50,7 @@
 
 static int instCnt = 0;
 
-static __evaluateFB( iOMttmFccData data );
+static void __evaluateFB( iOMttmFccData data );
 
 
 /** ----- OBase ----- */
@@ -135,7 +139,17 @@ static Boolean __updateSlot(iOMttmFccData data, iOSlot slot, Boolean* vdfChanged
     speed  = sx1 & 0x1F;
     dir    = (sx1 & 0x20) ? False:True;
     lights = (sx1 & 0x40) ? True:False;
-    f1_8   = (sx1 & 0x80) ? 0x01:0x00;
+    if (!slot->sx1aux1 && !slot->sx1aux2) {
+      f1_8  = (sx1 & 0x80) ? 0x01:0x00;                      /* Horn at F1 */
+    } 
+    else if (slot->sx1aux1 && !slot->sx1aux2) {
+      f1_8   = data->sx1[slot->bus&0x01][slot->sx1aux1];     /* Aux channel 1: F1-F8 */
+      f9_16  = (sx1 & 0x80) ? 0x01:0x00;                     /* Horn at F9 */
+    } 
+    else {
+      f1_8   = data->sx1[slot->bus&0x01][slot->sx1aux1];     /* Aux channel 1: F1-F8 */
+      f9_16  = data->sx1[slot->bus&0x01][slot->sx1aux2];     /* Aux channel 2: F9-F16 */
+    }
   }
 
   if( slot->speed != speed ) {
@@ -160,7 +174,6 @@ static Boolean __updateSlot(iOMttmFccData data, iOSlot slot, Boolean* vdfChanged
         "lights change event from %s to %s for %s", slot->lights?"on":"off", lights?"on":"off", slot->id );
     slot->lights = lights;
     *vdfChanged = True;
-    *funChanged = True;
     changed = True;
   }
   if( slot->f1_8 != f1_8 ) {
@@ -184,7 +197,7 @@ static Boolean __updateSlot(iOMttmFccData data, iOSlot slot, Boolean* vdfChanged
 }
 
 
-static Boolean __updateSlots(iOMttmFccData data) {
+static void __updateSlots(iOMttmFccData data) {
   if( MutexOp.wait( data->lcmux ) ) {
     iOSlot slot = (iOSlot)MapOp.first( data->lcmap );
     while( slot != NULL ) {
@@ -210,7 +223,7 @@ static Boolean __updateSlots(iOMttmFccData data) {
           wLoc.setfn( nodeC, slot->lights);
           wLoc.setdir( nodeC, slot->dir );
           wLoc.setthrottleid( nodeC, "fcc" );
-          wLoc.setcmd( nodeC, wLoc.direction );
+          wLoc.setcmd( nodeC, wLoc.dirfun );
           data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
         }
 
@@ -253,30 +266,132 @@ static Boolean __updateSlots(iOMttmFccData data) {
 }
 
 
-static void __evaluateRsp( iOMttmFccData data, byte* out, int outsize, byte* in, int insize ) {
+static void __evaluatePT( iOMttmFccData data, byte* out, byte* in) {
+  int cv = out[1] * 256 + out[2];
+  if( in[0] == 0x00 ) {
+    /* write cv */
+    if( data->listenerFun != NULL && data->listenerObj != NULL ) {
+      iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+      wProgram.setcv( node, cv );
+      wProgram.setvalue( node, -1 );
+      wProgram.setcmd( node, wProgram.datarsp );
+      if( data->iid != NULL )
+        wProgram.setiid( node, data->iid );
+      data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+    }
+  }
+  else if( in[0] == 0x01 ) {
+    /* read cv */
+    int val = in[1];
+    if( data->listenerFun != NULL && data->listenerObj != NULL ) {
+      iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+      wProgram.setcv( node, cv );
+      wProgram.setvalue( node, val );
+      wProgram.setcmd( node, wProgram.datarsp );
+      if( data->iid != NULL )
+        wProgram.setiid( node, data->iid );
+      data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+    }
+  }
 }
+
+
+static void __evaluateRsp( iOMttmFccData data, byte* out, int outsize, byte* in, int insize ) {
+  switch( in[0] ) {
+  case 0x00:
+  case 0x01:
+    if( insize == 3 )
+      __evaluatePT(data, out, in);
+    break;
+  }
+}
+
 
 static Boolean __transact( iOMttmFccData data, byte* out, int outsize, byte* in, int insize ) {
   Boolean rc = data->dummyio;
 
   if( MutexOp.wait( data->mux ) ) {
-    TraceOp.dump( name, TRCLEVEL_BYTE, out, outsize );
+    TraceOp.dump( name, TRCLEVEL_BYTE, (char*)out, outsize );
     if( !data->dummyio ) {
-      if( rc = SerialOp.write( data->serial, out, outsize ) ) {
+      if( (rc = SerialOp.write( data->serial, (char*)out, outsize )) ) {
         if( insize > 0 ) {
           TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "insize=%d", insize);
-          rc = SerialOp.read( data->serial, in, insize );
+          rc = SerialOp.read( data->serial, (char*)in, insize );
           if( rc ) {
-            TraceOp.dump( name, TRCLEVEL_BYTE, in, insize );
+            TraceOp.dump( name, TRCLEVEL_BYTE, (char*)in, insize );
             __evaluateRsp(data, out, outsize, in, insize);
           }
         }
       }
     }
+    else if(insize == 226) {
+      /*
+      if( in[1] > 0 )
+        in[1] = 0;
+      else
+        in[1] = 0xFF;
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "transact in=0x%08X", in );
+      TraceOp.dump( name, TRCLEVEL_BYTE, in, 16 );
+      ThreadOp.sleep(1000);
+      */
+    }
     MutexOp.post( data->mux );
   }
   return rc;
 }
+
+
+static iOPoint __getPointByAddr(iOMttmFccData data, int bus, int addr, int port) {
+  char key[32] = {'\0'};
+  iOPoint point = NULL;
+
+  StrOp.fmtb( key, "%d_%d_%d", bus, addr, port );
+
+  if( MutexOp.wait( data->pointmux ) ) {
+    point = (iOPoint)MapOp.first( data->pointmap);
+    while( point != NULL ) {
+      if( point->bus == bus && point->addr == addr && point->port == port) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "point found for %s by address %s", point->id, key );
+        break;
+      }
+      point = (iOPoint)MapOp.next( data->pointmap);
+    };
+    MutexOp.post(data->pointmux);
+  }
+  return point;
+}
+
+
+static iOPoint __getPoint(iOMttmFccData data, iONode node) {
+  int bus   = wSwitch.getbus(node);
+  int addr  = wSwitch.getaddr1(node);
+  int port  = wSwitch.getport1(node);
+  char key[32] = {'\0'};
+  iOPoint point = NULL;
+
+  StrOp.fmtb( key, "%d_%d_%d", bus, addr, port );
+
+  point = (iOPoint)MapOp.get( data->pointmap, key );
+  if( point != NULL ) {
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "point exist for %s", key );
+    return point;
+  }
+
+  point = allocMem( sizeof( struct point) );
+  point->bus  = bus;
+  point->addr = addr;
+  point->port = port;
+  point->id = StrOp.dup(wSwitch.getid(node));
+  if( MutexOp.wait( data->pointmux ) ) {
+    MapOp.put( data->pointmap, key, (obj)point);
+    MutexOp.post(data->pointmux);
+  }
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "switch %s created for %s", wSwitch.getid(node), key );
+  return point;
+}
+
+
 
 
 static iOSlot __getSlot(iOMttmFccData data, iONode node) {
@@ -363,6 +478,17 @@ static iOSlot __getSlot(iOMttmFccData data, iONode node) {
     slot->steps = steps;
     slot->ebreak = ebreak;
     slot->sx1 = sx1;
+    if (sx1) {
+      slot->sx1aux1 = slot->sx1aux2 = 0;
+      if (fncnt > 0) {
+        slot->sx1aux1 = addr+1;	/* First SX1 auxchannel at loco address + 1 */
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "SX1 Auxchannel 1 Addr=%d", slot->sx1aux1 );
+      }
+      if (fncnt > 8) {
+        slot->sx1aux2 = addr+2;	/* Second SX1 auxchannel at loco address + 2 */
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "SX1 Auxchannel 2 Addr=%d", slot->sx1aux2 );
+      }
+    }
     slot->bus = wLoc.getbus(node);
     slot->id = StrOp.dup(wLoc.getid(node));
     if( MutexOp.wait( data->lcmux ) ) {
@@ -410,9 +536,6 @@ static void __updateFB( iOMttmFccData data, iONode fbInfo ) {
     }
   }
 
-  if( data->dummyio ) {
-    __evaluateFB(data);
-  }
 }
 
 
@@ -421,6 +544,7 @@ static int __translate( iOMttmFccData data, iONode node, byte* out, int *insize 
 
   if( StrOp.equals( NodeOp.getName( node ), wFbInfo.name() ) ) {
     __updateFB( data, node );
+    data->fbInited = False;
   }
   /* Switch command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSwitch.name() ) ) {
@@ -428,6 +552,11 @@ static int __translate( iOMttmFccData data, iONode node, byte* out, int *insize 
     int addr  = wSwitch.getaddr1( node ) & 0x7F;
     byte pin  = 0x01 << ( wSwitch.getport1( node ) - 1 );
     byte mask = ~pin;
+
+    iOPoint point = __getPoint(data, node);
+    if( point != NULL ) {
+      point->lastcmd = SystemOp.getTick();
+    }
 
     out[0] = bus;
     out[1] = addr | 0x80;
@@ -504,6 +633,7 @@ static int __translate( iOMttmFccData data, iONode node, byte* out, int *insize 
     Boolean fn = wLoc.isfn( node );
     int    dir = wLoc.isdir( node );
     int  spcnt = wLoc.getspcnt( node );
+    byte horn;
 
     int index = 0;
 
@@ -552,11 +682,18 @@ static int __translate( iOMttmFccData data, iONode node, byte* out, int *insize 
       out[2] = speed & 0x1F;
       out[2] |= (wLoc.isdir(node) ? 0x00:0x20);
       out[2] |= (wLoc.isfn(node)  ? 0x40:0x00);
-      out[2] |= ((slot->f1_8 & 0x01)  ? 0x80:0x00);
+      if (!slot->sx1aux1 && !slot->sx1aux2)
+        horn = slot->f1_8 & 0x01;    /* Horn at F1 */
+      else if (slot->sx1aux1 && !slot->sx1aux2)
+        horn = slot->f9_16 & 0x01;   /* Horn at F9 */
+      else
+        horn = 0x00;
+      out[2] |= ((horn & 0x01) ? 0x80:0x00);
 
       slot->speed = speed;
       slot->dir = wLoc.isdir(node);
       slot->lights = wLoc.isfn(node);
+      slot->lastcmd = SystemOp.getTick();
 
       *insize = 1;
       return 3;
@@ -618,7 +755,7 @@ static int __translate( iOMttmFccData data, iONode node, byte* out, int *insize 
     Boolean f14 = wFunCmd.isf14( node );
     Boolean f15 = wFunCmd.isf15( node );
     Boolean f16 = wFunCmd.isf16( node );
-
+    byte in = 0;
     iOSlot slot = __getSlot(data, node );
 
     if( slot == NULL ) {
@@ -631,15 +768,46 @@ static int __translate( iOMttmFccData data, iONode node, byte* out, int *insize 
       /* native selectrix SX1 */
       int   addr = wFunCmd.getaddr( node );
 
+      if (slot->sx1aux2) {
+        out[0] = wLoc.getbus(node)&0x01;
+        out[1] = slot->sx1aux2;
+        out[1] |= 0x80;
+        out[2] = (f9 << 0 | f10 << 1 | f11 << 2 | f12 << 3 | f13 << 4 | f14 << 5 | f15 << 6 | f16 << 7);
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "SX1 Auxchannel 2 command for loco [%s]", wLoc.getid(node) );
+        slot->f9_16 = out[2];
+        slot->lastcmd = SystemOp.getTick();
+        __transact( data, out, 3, &in, 1 );
+      }
+
+      if (slot->sx1aux1) {
+        out[0] = wLoc.getbus(node)&0x01;
+        out[1] = slot->sx1aux1;
+        out[1] |= 0x80;
+        out[2] = (f1 << 0 | f2 << 1 | f3 << 2 | f4 << 3 | f5 << 4 | f6 << 5 | f7 << 6 | f8 << 7);
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "SX1 Auxchannel 1 command for loco [%s]", wLoc.getid(node) );
+        slot->f1_8 = out[2];
+        slot->lastcmd = SystemOp.getTick();
+        __transact( data, out, 3, &in, 1 );
+      }
+
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "SX1 function command for %s", wLoc.getid(node) );
       out[0] = wLoc.getbus(node)&0x01;
       out[1] = wLoc.getaddr(node);
       out[1] |= 0x80;
       out[2] = slot->speed & 0x1F;
       out[2] |= (slot->dir ? 0x00:0x20);
+      slot->lights = wLoc.isfn(node);    /* save light function */ 
       out[2] |= (slot->lights ? 0x40:0x00);
-      out[2] |= (f1 ? 0x80:0x00);
+      if (!slot->sx1aux1 && !slot->sx1aux2) {
+        out[2] |= (f1 ? 0x80:0x00);      /* Horn at F1 */
       slot->f1_8 = f1 ? 0x01:0x00;
+      } 
+      else if (slot->sx1aux1 && !slot->sx1aux2) {
+        out[2] |= (f9 ? 0x80:0x00);      /* Horn at F9 */
+        slot->f9_16 = f9 ? 0x01 : 0x00;
+      } /* No else */
+
+      slot->lastcmd = SystemOp.getTick();
 
       *insize = 1;
       return 3;
@@ -655,16 +823,69 @@ static int __translate( iOMttmFccData data, iONode node, byte* out, int *insize 
       slot->f1_8  = out[3];
       slot->f9_16 = out[4];
       *insize = 1;
-      return 5;
+      return 6;
     }
     
+  }
+
+
+  /* Program command. */
+  else if( StrOp.equals( NodeOp.getName( node ), wProgram.name() ) ) {
+    if( wProgram.getcmd( node ) == wProgram.set ) {
+      int cv    = wProgram.getcv( node );
+      int value = wProgram.getvalue( node );
+      int addr  = wProgram.getaddr( node );
+
+      if( wProgram.ispom(node) ) {
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "POM: set CV%d of SX2 loc %d to %d...", cv, addr, value );
+        /* SX2: 0x7A Adresse (High) Adresse (Low) PA (High) PA (Low) Wert */
+        out[0] = 0x7A;
+        out[1] = addr/256;
+        out[2] = addr%256;
+        out[3] = cv/256;
+        out[4] = cv%256;
+        out[5] = value;
+        *insize = 1;
+        return 6;
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "set CV%d of SX2 loc %d to %d...", cv, addr, value );
+        /* SX2: 0x83 0xCA High Low Wert */
+        out[0] = 0x83;
+        out[1] = 0xCA;
+        out[2] = cv/256;
+        out[3] = cv%256;
+        out[4] = value;
+        *insize = 3;
+        return 5;
+      }
+    }
+    else if( wProgram.getcmd( node ) == wProgram.get ) {
+      int cv    = wProgram.getcv( node );
+      int addr  = wProgram.getaddr( node );
+      if( wProgram.ispom(node) ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "*** not supported *** POM: read CV%d of loc %d...", cv, addr );
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "read CV%d of SX2 loc %d...", cv, addr );
+        /* SX2: 0x83 0xC2 High Low 0x00 */
+        out[0] = 0x83;
+        out[1] = 0xC2;
+        out[2] = cv/256;
+        out[3] = cv%256;
+        out[4] = 0;
+        *insize = 3;
+        return 5;
+      }
+    }
+
   }
 
   return 0;
 }
 
 
-static __evaluateFB( iOMttmFccData data ) {
+static void __evaluateFB( iOMttmFccData data ) {
   int bus = 0;
   int mod = 0;
 
@@ -677,7 +898,7 @@ static __evaluateFB( iOMttmFccData data ) {
     data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
   }
 
-  TraceOp.trc( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_DEBUG, __LINE__, 9999, "evaluate sensors..." );
+  TraceOp.trc( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_DEBUG, __LINE__, 9999, "evaluate sensors (initial=%d)...", data->fbInited );
 
   for( bus = 0; bus < 2; bus++ ) {
     if( data->fbmodcnt[bus] == 0 )
@@ -686,16 +907,19 @@ static __evaluateFB( iOMttmFccData data ) {
     for( mod = 0; mod < data->fbmodcnt[bus]; mod++ ) {
       int addr = data->fbmods[bus][mod];
       byte in = data->sx1[bus][addr];
+      byte ctrl = data->sx1[bus][addr+1];
+      byte id = data->sx1[bus][addr+2];
+      char ident[32];
       
-      if( in != data->fbstate[bus][addr] ) {
+      if( !data->fbInited || (in != data->fbstate[bus][addr]) ) {
         int n = 0;
         int port = 0;
         int state = 0;
         for( n = 0; n < 8; n++ ) {
-          if( (in & (0x01 << n)) != (data->fbstate[bus][addr] & (0x01 << n)) ) {
+          if( !data->fbInited || ((in & (0x01 << n)) != (data->fbstate[bus][addr] & (0x01 << n))) ) {
             port = n;
             state = (in & (0x01 << n)) ? 1:0;
-            TraceOp.dump ( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_BYTE, (char*)&in, 1 );
+            TraceOp.dump ( name, TRCLEVEL_BYTE, (char*)&in, 1 );
             TraceOp.trc( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_DEBUG, __LINE__, 9999, "fb %d = %d", addr*8+port+1, state );
             {
               /* inform listener: Node3 */
@@ -712,9 +936,68 @@ static __evaluateFB( iOMttmFccData data ) {
         }
         data->fbstate[bus][addr] = in;
       }
+
+      if( wDigInt.isreadbidi( data->ini ) ) {
+        if (ctrl != data->fbstate[bus][addr+1]) {
+          int port = ctrl & 0x07;
+          int rraddr = addr*8+port+1;
+          int state = (data->fbstate[bus][addr] & (0x01 << port)) ? 1:0;
+          Boolean arrived = (ctrl & 0x08) ? True:False;
+          Boolean direction = (ctrl & 0x10) ? True:False;
+          iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco address for unit %d:%d(%d) is %d and did %s in Direction %s", addr, port, rraddr, id & 0x7F, arrived?"arrive":"depart", direction?"Forward":"Backward" );
+          wFeedback.setstate( evt, state?True:False);
+          wFeedback.setdirection( evt, direction);
+          wFeedback.setaddr( evt, rraddr );
+          wFeedback.setbus( evt, bus );
+          wFeedback.setfbtype( evt, wFeedback.fbtype_lissy );
+          StrOp.fmtb(ident, "%d", id & 0x7F);
+          wFeedback.setidentifier( evt, arrived ? ident:"0" );
+          if( data->iid != NULL )
+            wFeedback.setiid( evt, data->iid );
+
+          data->listenerFun( data->listenerObj, evt, TRCLEVEL_INFO );
+          data->fbstate[bus][addr+1] = ctrl;
+          data->fbstate[bus][addr+2] = id;
+        }
+      }
     }
   }
+  data->fbInited = True;
   
+
+  /* Check switches */
+  TraceOp.trc( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_DEBUG, __LINE__, 9999, "evaluate switches (initial=%d)...", data->swInited );
+  if( MutexOp.wait( data->pointmux ) ) {
+    iOPoint point = (iOPoint)MapOp.first( data->pointmap );
+    while( point != NULL ) {
+      byte pin  = 0x01 << ( point->port - 1 );
+      byte mask = ~pin;
+
+      if( !data->swInited || ((data->sx1[point->bus][point->addr] & pin) != (data->swstate[point->bus][point->addr] & pin)) ) {
+        data->swstate[point->bus][point->addr] &= mask;
+        data->swstate[point->bus][point->addr] |= (data->sx1[point->bus][point->addr] & pin);
+
+        if( SystemOp.getTick() - point->lastcmd > 100  ) {
+          iONode nodeC = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+          if( data->iid != NULL )
+            wSwitch.setiid( nodeC, data->iid );
+          wSwitch.setid( nodeC, point->id );
+          wSwitch.setstate( nodeC, (data->sx1[point->bus][point->addr] & pin) ? "straight":"turnout" );
+          wSwitch.setbus(nodeC, point->bus);
+          wSwitch.setaddr1(nodeC, point->addr);
+          wSwitch.setport1(nodeC, point->port);
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "switch %s update to 0x%02X", point->id, data->sx1[point->bus][point->addr] & pin );
+          data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+        }
+      }
+
+      point = (iOPoint)MapOp.next(data->pointmap);
+    }
+    data->swInited = True;
+    MutexOp.post(data->pointmux);
+  }
+
 }
 
 
@@ -738,7 +1021,7 @@ static void __sxReader( void* threadinst ) {
     byte cmd[2];
     Boolean ok = True;
     
-    ThreadOp.sleep( 100 );
+    ThreadOp.sleep( 50 );
     if( ok ) {
       cmd[0] = 0x78;
       cmd[1] = 0x03;
@@ -750,7 +1033,7 @@ static void __sxReader( void* threadinst ) {
       }
     }
     
-    ThreadOp.sleep( 100 );
+    ThreadOp.sleep( 50 );
     if( ok ) {
       cmd[0] = 0x78;
       cmd[1] = 0xC0;
@@ -784,9 +1067,20 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
   MemOp.set( in, 0x00, sizeof( in ) );
 
   if( cmd != NULL ) {
-    int size = __translate( data, cmd, out, &insize );
-    TraceOp.dump( NULL, TRCLEVEL_BYTE, out, size );
-    if( __transact( data, (char*)out, size, (char*)in, insize ) ) {
+    if( StrOp.equals( NodeOp.getName( cmd ), wSwitchList.name() ) ) {
+      int cnt = NodeOp.getChildCnt(cmd);
+      int i;
+      for( i = 0; i < cnt; i++ ) {
+        /* build the point map */
+        __getPoint(data, NodeOp.getChild(cmd, i) );
+      }
+      data->swInited = False;
+    }
+    else {
+      int size = __translate( data, cmd, out, &insize );
+      TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)out, size );
+      if( __transact( data, out, size, in, insize ) ) {
+      }
     }
   }
 
@@ -798,11 +1092,12 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOMttmFccData data = Data(inst);
   data->run = False;
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "shutting down <%s>...", data->iid );
-  SerialOp.close( data->serial );
+  if( data->serial != NULL )
+    SerialOp.close( data->serial );
 }
 
 
@@ -845,7 +1140,7 @@ static Boolean _supportPT( obj inst ) {
 /** vmajor*1000 + vminor*100 + patch */
 static int vmajor = 2;
 static int vminor = 0;
-static int patch  = 0;
+static int patch  = 1;
 static int _version( obj inst ) {
   iOMttmFccData data = Data(inst);
   return vmajor*10000 + vminor*100 + patch;
@@ -862,10 +1157,13 @@ static struct OMttmFcc* _inst( const iONode ini ,const iOTrace trc ) {
   SystemOp.inst();
 
   /* Initialize data->xxx members... */
-  data->mux     = MutexOp.inst( NULL, True );
-  data->lcmux   = MutexOp.inst( NULL, True );
-  data->lcmap   = MapOp.inst();
+  data->mux      = MutexOp.inst( NULL, True );
+  data->lcmux    = MutexOp.inst( NULL, True );
+  data->lcmap    = MapOp.inst();
+  data->pointmux = MutexOp.inst( NULL, True );
+  data->pointmap = MapOp.inst();
 
+  data->ini      = ini;
   data->device   = StrOp.dup( wDigInt.getdevice( ini ) );
   data->iid      = StrOp.dup( wDigInt.getiid( ini ) );
   data->dummyio  = wDigInt.isdummyio(ini);
@@ -875,12 +1173,13 @@ static struct OMttmFcc* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid      = %s", data->iid );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device   = %s", data->device );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bidi     = %s", wDigInt.isreadbidi( data->ini ) ? "yes":"no" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
   data->serialOK = False;
   if( !data->dummyio ) {
     data->serial = SerialOp.inst( data->device );
-    SerialOp.setFlow( data->serial, none );
+    SerialOp.setFlow( data->serial, 0 );
     SerialOp.setLine( data->serial, 230400, 8, 1, none, wDigInt.isrtsdisabled( ini ) );
     SerialOp.setTimeout( data->serial, wDigInt.gettimeout(ini), wDigInt.gettimeout(ini) );
     data->serialOK = SerialOp.open( data->serial );
@@ -894,8 +1193,9 @@ static struct OMttmFcc* _inst( const iONode ini ,const iOTrace trc ) {
   else {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unable to initialize device; switch to dummy mode" );
     data->dummyio = True;
-    data->sx1[0][8] = 0x40;
-    data->sx1[0][112] = 0x01;
+    data->run = True;
+    data->sxReader = ThreadOp.inst( "sxReader", &__sxReader, __MttmFcc );
+    ThreadOp.start( data->sxReader );
   }
 
   instCnt++;

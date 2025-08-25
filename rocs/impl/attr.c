@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -54,11 +57,24 @@ static const char* __name(void) {
 static unsigned char* __serialize(void* inst, long* size) {
   iOAttrData data = Data(inst);
   Boolean utf8 = ( DocOp.isUTF8Encoding() && DocOp.isUTF2Latin() );
-  char* val = utf8 ? SystemOp.latin2utf(data->val):StrOp.dup( data->val );
-  char* s = StrOp.fmt( "%s=\"%s\"", data->name, val );
-  *size = StrOp.len( s );
-  StrOp.free( val );
-  return (unsigned char*)s;
+  if( data->val != NULL ) {
+    char* val = utf8 ? SystemOp.latin2utf(data->val):StrOp.dup( data->val );
+    char* s = NULL;
+    s = StrOp.cat( s, data->name);
+    s = StrOp.cat( s, "=\"");
+    s = StrOp.cat( s, val);
+    s = StrOp.cat( s, "\"");
+    *size = StrOp.len( s );
+    StrOp.free( val );
+    return (unsigned char*)s;
+  }
+  else {
+    char* s = NULL;
+    s = StrOp.cat( s, data->name);
+    s = StrOp.cat( s, "=\"\"");
+    *size = StrOp.len( s );
+    return (unsigned char*)s;
+  }
 }
 
 /* ------------------------------------------------------------
@@ -96,7 +112,7 @@ static void __deserialize(void* inst, unsigned char* a) {
 static char* __toString(void* inst) {
   iOAttrData data = Data(inst);
   char* str = allocIDMem( StrOp.len(data->name) + StrOp.len(data->val) + 4, RocsStrID );
-  str = StrOp.fmtb( str, "%s=\"%s\"", data->name, data->val );
+  str = StrOp.fmtb( str, "%s=\"%s\"", data->name, data->val==NULL?"":data->val );
   return str;
 }
 
@@ -728,7 +744,7 @@ static const char* __escapeStr( iOAttr inst, const char* str ) {
     int len = StrOp.len( str );
     int i = 0;
     int idx = 0;
-    char* buffer = allocIDMem( 1 + len * 6, RocsAttrID ); /* Worst case. */
+    char* buffer = allocIDMem( 1 + len * 10, RocsAttrID ); /* Worst case. */
 
     for( i = 0; i < len; i++ ) {
       if( str[i] == '&' && str[i+1] == '#' ) {
@@ -738,6 +754,10 @@ static const char* __escapeStr( iOAttr inst, const char* str ) {
           buffer[idx] = str[i];
           idx++;
           data->escaped = True;
+        }
+        else {
+          buffer[idx] = str[i];
+          idx++;
         }
       }
       else if( str[i] == '&' ) {

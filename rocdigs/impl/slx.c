@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -328,7 +331,7 @@ static int __translate( iOSLX slx, iONode node, byte* cmd, int* bus ) {
   /* TODO: bus. System command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSysCmd.name() ) ) {
     const char* cmdstr = wSysCmd.getcmd( node );
-    if( StrOp.equals( cmdstr, wSysCmd.stop ) || StrOp.equals( cmd, wSysCmd.ebreak ) ) {
+    if( StrOp.equals( cmdstr, wSysCmd.stop ) || StrOp.equals( (char*)cmd, wSysCmd.ebreak ) ) {
       cmd[0] = 127;
       cmd[0] |= WRITE_FLAG;
       cmd[1] = 0x00;
@@ -364,7 +367,7 @@ static int __translate( iOSLX slx, iONode node, byte* cmd, int* bus ) {
   return 0;
 }
 
-static __evaluateFB( iOSLX slx, byte in, int addr, int bus ) {
+static void __evaluateFB( iOSLX slx, byte in, int addr, int bus ) {
   iOSLXData data = Data(slx);
 
   if( in != data->fbstate[bus][addr] ) {
@@ -449,7 +452,7 @@ static Boolean __updateSlot(iOSLXData data, iOSlot slot, Boolean* vdfChanged, Bo
 
 
 
-static Boolean __updateSlots(iOSLX slx) {
+static void __updateSlots(iOSLX slx) {
   iOSLXData data = Data(slx);
   if( MutexOp.wait( data->lcmux ) ) {
     iOSlot slot = (iOSlot)MapOp.first( data->lcmap );
@@ -563,7 +566,7 @@ static iONode _cmd( obj inst ,const iONode nodeA ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOSLXData data = Data(inst);
 
   /* TODO: bus */

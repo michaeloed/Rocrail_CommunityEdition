@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -232,6 +235,14 @@ static obj _getPost( iOThread inst ) {
     return QueueOp.get( data->queue );
   }
   return NULL;
+}
+
+static Boolean _hasPost( iOThread inst ) {
+  if( inst != NULL ) {
+    iOThreadData data = Data(inst);
+    return !QueueOp.isEmpty( data->queue );
+  }
+  return False;
 }
 
 static obj _waitPost( iOThread inst ) {

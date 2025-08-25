@@ -1,3 +1,9 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef __fxdlg__
 #define __fxdlg__
 
@@ -22,11 +28,14 @@ protected:
 	void onCancel( wxCommandEvent& event );
 	void onOK( wxCommandEvent& event );
   void onFunction( wxCommandEvent& event );
+  void onGeneration( wxCommandEvent& event );
+  void onActivation( wxCommandEvent& event );
+  void onHelp( wxCommandEvent& event );
 
 public:
 	/** Constructor */
   FxDlg( wxWindow* parent, int p_FX, wxSpinCtrl* p_CVnr );
-  int getConfig();
+  int getConfig(int* cvnr);
 
 
 };

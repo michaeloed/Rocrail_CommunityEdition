@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -30,7 +33,9 @@
 
 ////@begin includes
 #include "wx/notebook.h"
+#include "wx/listctrl.h"
 #include "wx/spinctrl.h"
+#include "wx/grid.h"
 ////@end includes
 
 #include "basedlg.h"
@@ -44,7 +49,9 @@
 
 ////@begin forward declarations
 class wxNotebook;
+class wxListCtrl;
 class wxSpinCtrl;
+class wxGrid;
 ////@end forward declarations
 
 /*!
@@ -55,9 +62,10 @@ class wxSpinCtrl;
 #define ID_DIALOG_FEEDBACK 10084
 #define ID_NOTEBOOK_FEEDBACK 10085
 #define ID_PANEL_FB_INDEX 10013
-#define ID_LISTBOX_FB 10014
+#define ID_LISTCTRLINDEX_FB 10407
 #define ID_BUTTON_FB_NEW 10015
 #define ID_BUTTON_FB_DELETE 10016
+#define ID_BUTTON_FB_AUTOADDR 10442
 #define ID_BUTTON_FB_DOC 10353
 #define ID_PANEL_FB_GENERAL 10017
 #define wxID_STATIC_FB_ID 10018
@@ -79,10 +87,14 @@ class wxSpinCtrl;
 #define ID_PANEL_FB_INTERFACE 10012
 #define wxID_STATIC_FB_IID 10000
 #define ID_TEXTCTRL_FB_IID 10001
-#define wxID_STATIC_FB_BUS 10254
 #define wxID_STATIC_FB_ADDRESS1 10002
-#define ID_TEXTCTRL_FB_ADDRESS1 10003
+#define ID_FB_TYPE 10396
 #define ID_PANEL_FB_WIRING 10334
+#define ID_PANEL_FB_GPS 10444
+#define ID_PANEL_FB_STATISTICS 10475
+#define ID_FEEDBACK_STATISTIC_GRIG 10476
+#define ID_STATISTIC_DELETE 10477
+#define ID_STATISTIC_SHOW_ALL 10478
 #define SYMBOL_FEEDBACKDIALOG_STYLE wxCAPTION|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCLOSE_BOX
 #define SYMBOL_FEEDBACKDIALOG_TITLE _("Sensors")
 #define SYMBOL_FEEDBACKDIALOG_IDNAME ID_DIALOG_FEEDBACK
@@ -111,10 +123,15 @@ class FeedbackDialog: public wxDialog, public BaseDialog
   DECLARE_EVENT_TABLE()
 
   void initLabels();
-  void initIndex();
+  bool initIndex();
   void initValues();
   bool evaluate();
+  void doStatistic(iONode l_Props);
+  int findStatisticCol( wxString lcid);
+  void StatisticDeleteAll();
+
   int m_TabAlign;
+  bool m_bStatisticShowAll;
 
 public:
     /// Constructors
@@ -131,8 +148,11 @@ public:
 
 ////@begin FeedbackDialog event handler declarations
 
-    /// wxEVT_COMMAND_LISTBOX_SELECTED event handler for ID_LISTBOX_FB
-    void OnListboxFbSelected( wxCommandEvent& event );
+    /// wxEVT_COMMAND_LIST_ITEM_SELECTED event handler for ID_LISTCTRLINDEX_FB
+    void OnListctrlindexFbSelected( wxListEvent& event );
+
+    /// wxEVT_COMMAND_LIST_COL_CLICK event handler for ID_LISTCTRLINDEX_FB
+    void OnListctrlindexFbColLeftClick( wxListEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_FB_NEW
     void OnButtonFbNewClick( wxCommandEvent& event );
@@ -140,11 +160,23 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_FB_DELETE
     void OnButtonFbDeleteClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_FB_AUTOADDR
+    void OnButtonFbAutoaddrClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_FB_DOC
     void OnButtonFbDocClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_FEEDBACK_ACTIONS
     void OnFeedbackActionsClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_RADIOBOX_SELECTED event handler for ID_FB_TYPE
+    void OnFbTypeSelected( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_STATISTIC_DELETE
+    void OnStatisticDeleteClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_STATISTIC_SHOW_ALL
+    void OnStatisticShowAllClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
@@ -154,6 +186,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_APPLY
     void OnApplyClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end FeedbackDialog event handler declarations
 
@@ -175,9 +210,10 @@ public:
 ////@begin FeedbackDialog member variables
     wxNotebook* m_Notebook;
     wxPanel* m_IndexPanel;
-    wxListBox* m_List;
+    wxListCtrl* m_List2;
     wxButton* m_New;
     wxButton* m_Delete;
+    wxButton* m_AutoAdressing;
     wxButton* m_Doc;
     wxPanel* m_General;
     wxStaticText* m_LabelId;
@@ -190,6 +226,11 @@ public:
     wxTextCtrl* m_Description;
     wxStaticText* m_labAccNr;
     wxSpinCtrl* m_AccNr;
+    wxStaticText* m_labTimer;
+    wxSpinCtrl* m_Timer;
+    wxStaticText* m_labTimerMS;
+    wxStaticText* m_labMaxLoad;
+    wxSpinCtrl* m_MaxLoad;
     wxCheckBox* m_State;
     wxCheckBox* m_Road;
     wxCheckBox* m_Show;
@@ -205,12 +246,23 @@ public:
     wxRadioBox* m_ori;
     wxPanel* m_Interface;
     wxStaticText* m_Labeliid;
-    wxTextCtrl* m_iid;
-    wxStaticText* m_Label_Bus;
-    wxRadioBox* m_Bus;
+    wxComboBox* m_iid;
+    wxStaticText* m_labUIDName;
+    wxTextCtrl* m_UIDName;
+    wxStaticBox* m_AddressBox;
+    wxStaticText* m_labBusNr;
+    wxTextCtrl* m_BusNr;
     wxStaticText* m_LabelAddress;
-    wxTextCtrl* m_Address;
+    wxSpinCtrl* m_Address;
+    wxStaticBox* m_CutoutBox;
+    wxStaticText* m_labCutoutBus;
+    wxTextCtrl* m_CutoutBus;
+    wxStaticText* m_labCutoutAddr;
+    wxSpinCtrl* m_CutoutAddr;
+    wxRadioBox* m_Type;
+    wxStaticBox* m_OptionsBox;
     wxCheckBox* m_ActiveLow;
+    wxCheckBox* m_ResetWC;
     wxPanel* m_Wiring;
     wxStaticBox* m_CTCBox;
     wxStaticText* m_labCTCIID;
@@ -222,6 +274,25 @@ public:
     wxStaticText* m_labCTCGate;
     wxRadioBox* m_CTCGate;
     wxCheckBox* m_AsSwitch;
+    wxPanel* m_GPSTab;
+    wxStaticBox* m_GPSCoordinates;
+    wxStaticText* m_labGPSX;
+    wxSpinCtrl* m_GPSX;
+    wxStaticText* m_labGPSY;
+    wxSpinCtrl* m_GPSY;
+    wxStaticText* m_labGPSZ;
+    wxSpinCtrl* m_GPSZ;
+    wxStaticBox* m_GPSTolerance;
+    wxStaticText* m_labGPSToleranceX;
+    wxSpinCtrl* m_GPSToleranceX;
+    wxStaticText* m_labGPSToleranceY;
+    wxSpinCtrl* m_GPSToleranceY;
+    wxStaticText* m_labGPSToleranceZ;
+    wxSpinCtrl* m_GPSToleranceZ;
+    wxPanel* m_StatisticsTab;
+    wxGrid* m_StatisticGrid;
+    wxButton* m_StatisticDelete;
+    wxButton* m_StatisticShowAll;
     wxButton* m_Cancel;
     wxButton* m_OK;
     wxButton* m_Apply;

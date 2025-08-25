@@ -1,13 +1,9 @@
-/** ------------------------------------------------------------
-  * Module:
-  * Object:
-  * ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocgui/dialogs/rocgui-dialogs.pjd,v $
-  * $Author: robvrs $
-  * $Date: 2006/02/22 14:10:57 $
-  * $Revision: 1.63 $
-  * $Name:  $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef _SELTABTRACKDLG_H_
 #define _SELTABTRACKDLG_H_
 
@@ -85,6 +81,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end SelTabTrackDialog event handler declarations
 

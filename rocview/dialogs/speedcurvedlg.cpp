@@ -1,5 +1,12 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #include "speedcurvedlg.h"
 
+#include "rocview/public/guiapp.h"
 #include "rocs/public/trace.h"
 
 SpeedCurveDlg::SpeedCurveDlg( wxWindow* parent, int* curve )
@@ -144,5 +151,10 @@ void SpeedCurveDlg::onCancel( wxCommandEvent& event ) {
 }
 void SpeedCurveDlg::onOK( wxCommandEvent& event ) {
   EndModal( wxID_OK );
+}
+
+
+void SpeedCurveDlg::onHelp( wxCommandEvent& event ) {
+  wxGetApp().openLink( "pt" );
 }
 

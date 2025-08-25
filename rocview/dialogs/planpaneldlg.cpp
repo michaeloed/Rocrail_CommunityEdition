@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -59,9 +62,8 @@ BEGIN_EVENT_TABLE( PlanPanelProps, wxDialog )
 
 ////@begin PlanPanelProps event table entries
     EVT_BUTTON( wxID_OK, PlanPanelProps::OnOkClick )
-
     EVT_BUTTON( wxID_CANCEL, PlanPanelProps::OnCancelClick )
-
+    EVT_BUTTON( wxID_HELP, PlanPanelProps::OnHelpClick )
 ////@end PlanPanelProps event table entries
 
 END_EVENT_TABLE()
@@ -79,13 +81,14 @@ PlanPanelProps::PlanPanelProps( wxWindow* parent, wxWindowID id, const wxString&
     Create(parent, id, caption, pos, size, style);
 }
 
-PlanPanelProps::PlanPanelProps( wxWindow* parent, iONode zlevel )
+PlanPanelProps::PlanPanelProps( wxWindow* parent, iONode zlevel, int newlevel )
 {
   Create(parent, -1, wxGetApp().getMsg("planprops") );
   m_Props = zlevel;
 
   if( m_Props == NULL ) {
     m_Props = NodeOp.inst( wZLevel.name(), NULL, ELEMENT_NODE );
+    wZLevel.setz( m_Props, newlevel );
   }
   initLabels();
   initValues();
@@ -106,10 +109,7 @@ void PlanPanelProps::initLabels() {
 void PlanPanelProps::initValues() {
   // General
   m_Title->SetValue( wxString( wZLevel.gettitle( m_Props ),wxConvUTF8 ) );
-  char* val = StrOp.fmt( "%d", wZLevel.getz( m_Props ) );
-  m_ZLevel->SetValue( wxString(val,wxConvUTF8 ) );
-  //m_ZLevel->Enable(false);
-  StrOp.free( val );
+  m_ZLevel->SetValue( wZLevel.getz( m_Props ) );
 }
 
 
@@ -118,7 +118,7 @@ void PlanPanelProps::evaluate() {
     return;
   // General
   wZLevel.settitle( m_Props, m_Title->GetValue().mb_str(wxConvUTF8) );
-  wZLevel.setz( m_Props, atoi( m_ZLevel->GetValue().mb_str(wxConvUTF8) ) );
+  wZLevel.setz( m_Props, m_ZLevel->GetValue() );
 }
 
 
@@ -165,32 +165,36 @@ void PlanPanelProps::CreateControls()
     wxBoxSizer* itemBoxSizer2 = new wxBoxSizer(wxVERTICAL);
     itemDialog1->SetSizer(itemBoxSizer2);
 
-    wxFlexGridSizer* itemFlexGridSizer3 = new wxFlexGridSizer(2, 2, 0, 0);
-    itemFlexGridSizer3->AddGrowableCol(1);
-    itemBoxSizer2->Add(itemFlexGridSizer3, 0, wxGROW|wxALL, 5);
+    wxFlexGridSizer* itemFlexGridSizer3 = new wxFlexGridSizer(0, 2, 0, 0);
+    itemBoxSizer2->Add(itemFlexGridSizer3, 0, wxALIGN_LEFT|wxALL, 5);
 
     m_LabelTitle = new wxStaticText( itemDialog1, ID_STATICTEXT_PP_TITLE, _("Title"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer3->Add(m_LabelTitle, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 5);
+    itemFlexGridSizer3->Add(m_LabelTitle, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_Title = new wxTextCtrl( itemDialog1, ID_TEXTCTRL_PP_TITLE, _T(""), wxDefaultPosition, wxSize(200, -1), 0 );
+    m_Title = new wxTextCtrl( itemDialog1, ID_TEXTCTRL_PP_TITLE, wxEmptyString, wxDefaultPosition, wxSize(200, -1), 0 );
     m_Title->SetMaxLength(40);
     itemFlexGridSizer3->Add(m_Title, 1, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
     m_LabelZLevel = new wxStaticText( itemDialog1, ID_STATICTEXT_PP_ZLEVEL, _("zLevel"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer3->Add(m_LabelZLevel, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 5);
+    itemFlexGridSizer3->Add(m_LabelZLevel, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_ZLevel = new wxTextCtrl( itemDialog1, ID_TEXTCTRL_PP_ZLEVEL, _("0"), wxDefaultPosition, wxDefaultSize, wxTE_CENTRE );
+    m_ZLevel = new wxSpinCtrl( itemDialog1, wxID_ANY, wxT("0"), wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 1000, 0 );
     itemFlexGridSizer3->Add(m_ZLevel, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+
+    itemFlexGridSizer3->AddGrowableCol(1);
 
     wxStdDialogButtonSizer* itemStdDialogButtonSizer8 = new wxStdDialogButtonSizer;
 
-    itemBoxSizer2->Add(itemStdDialogButtonSizer8, 0, wxALIGN_RIGHT|wxALL, 5);
+    itemBoxSizer2->Add(itemStdDialogButtonSizer8, 0, wxGROW|wxALL, 5);
     m_OK = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
     m_OK->SetDefault();
     itemStdDialogButtonSizer8->AddButton(m_OK);
 
     m_Cancel = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
     itemStdDialogButtonSizer8->AddButton(m_Cancel);
+
+    wxButton* itemButton11 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer8->AddButton(itemButton11);
 
     itemStdDialogButtonSizer8->Realize();
 
@@ -258,4 +262,14 @@ void PlanPanelProps::OnCancelClick( wxCommandEvent& event )
   EndModal( 0 );
 }
 
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void PlanPanelProps::OnHelpClick( wxCommandEvent& event )
+{
+  wxGetApp().openLink( "track-diagram" );
+}
 

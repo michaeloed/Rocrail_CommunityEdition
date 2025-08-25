@@ -1,3 +1,9 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef __speedcurvedlg__
 #define __speedcurvedlg__
 
@@ -21,7 +27,7 @@ class SpeedCurveDlg : public speedcurvedlggen
   void onLogarithmize( wxCommandEvent& event );
   void onCancel( wxCommandEvent& event );
   void onOK( wxCommandEvent& event );
-
+  void onHelp( wxCommandEvent& event );
 
 public:
 	/** Constructor */

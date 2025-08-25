@@ -1,23 +1,23 @@
 <!--
- Rocrail - Model Railroad Software
-
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
-
+ This is part of FreeRail - Model Railway Software
+ 
+ Copyright: See AUTHORS at the top-level directory of this project and
+ at GitHub <https://github.com/michaeloed/FreeRail/>
+ 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 2
+ as published by the Free Software Foundation; either version 3
  of the License, or (at your option) any later version.
-
+ 
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ General Public License for more details.
+ 
  You should have received a copy of the GNU General Public License
- along with this program; if not, write to the Free Software
- Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
 -->
-<Project name="RocInt" title="RocRail Interfaces" docname="rocintapi" source="$Source: /cvsroot/rojav/rocint/rocint.xml,v $" revision="$Revision: 1.4 $">
+<Project name="RocInt" title="FreeRail Interfaces" docname="rocintapi" source="$Source: /cvsroot/rojav/rocint/rocint.xml,v $" revision="$Revision: 1.4 $">
 
   <interface name="DigInt" use="node">
     <typedef def="void (*digint_listener)(obj,iONode,int)"/>
@@ -35,6 +35,7 @@
     <fun name="halt" vt="void">
       <param name="inst" vt="obj"/>
       <param name="poweroff" vt="Boolean"/>
+      <param name="shutdown" vt="Boolean"/>
     </fun>
     <fun name="supportPT" vt="Boolean">
       <param name="inst" vt="obj"/>
@@ -80,6 +81,9 @@
     <fun name="gogo" vt="void">
       <param name="inst" vt="this" remark="LcDriver instance"/>
     </fun>
+    <fun name="stepvirtual" vt="Boolean">
+      <param name="inst" vt="this" remark="LcDriver instance"/>
+    </fun>
     <fun name="stop" vt="void">
       <param name="inst" vt="this" remark="LcDriver instance"/>
     </fun>
@@ -101,6 +105,12 @@
       <param name="inst" vt="this" remark="LcDriver instance"/>
       <param name="blockid" vt="const char*" remark="New current block."/>
     </fun>
+    <fun name="getCurblock" vt="const char*">
+      <param name="inst" vt="this" remark="LcDriver instance"/>
+    </fun>
+    <fun name="getCurroute" vt="const char*">
+      <param name="inst" vt="this" remark="LcDriver instance"/>
+    </fun>
     <fun name="gotoblock" vt="void">
       <param name="inst" vt="this" remark="LcDriver instance"/>
       <param name="blockid" vt="const char*" remark="Block to find."/>
@@ -109,7 +119,14 @@
       <param name="inst" vt="this" remark="LcDriver instance"/>
       <param name="scheduleid" vt="const char*" remark="Schedule to use."/>
     </fun>
+    <fun name="usetour" vt="void">
+      <param name="inst" vt="this" remark="LcDriver instance"/>
+      <param name="tourid" vt="const char*" remark="Tour to use."/>
+    </fun>
     <fun name="getschedule" vt="const char*">
+      <param name="inst" vt="this" remark="LcDriver instance"/>
+    </fun>
+    <fun name="gettour" vt="const char*">
       <param name="inst" vt="this" remark="LcDriver instance"/>
     </fun>
     <fun name="version" vt="int" remark="vmajor*1000 + vminor*100 + patch">
@@ -133,21 +150,44 @@
     <fun name="isDepartureAllowed" vt="Boolean">
       <param name="inst" vt="this"/>
       <param name="LocoId" vt="const char*"/>
+      <param name="force" vt="Boolean"/>
+    </fun>
+    <fun name="didNotDepart" vt="void">
+      <param name="inst" vt="this"/>
+      <param name="LocoId" vt="const char*"/>
     </fun>
     <fun name="isReady" vt="Boolean">
       <param name="inst" vt="this"/>
     </fun>
+    <fun name="isFreeBlockOnEnter" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
     <fun name="hasExtStop" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="locoid" vt="const char*"/>
+    </fun>
+    <fun name="allowBBT" vt="Boolean">
       <param name="inst" vt="this"/>
     </fun>
     <fun name="isFree" vt="Boolean">
       <param name="inst" vt="this"/>
       <param name="locid" vt="const char*" remark="Querying loc"/>
     </fun>
+    <fun name="isTTBlock" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="isTD" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="resetTD" vt="void">
+      <param name="inst" vt="this"/>
+    </fun>
     <fun name="isSuited" vt="int">
       <param name="inst" vt="this"/>
       <param name="loc" vt="iOLoc" remark="Loc instance"/>
-    </fun>
+      <param name="restlen" vt="int*"/>
+      <param name="checkprev" vt="Boolean"/>
+      </fun>
     <fun name="isState" vt="Boolean">
       <param name="inst" vt="this"/>
       <param name="state" vt="const char*" remark="State to compare with."/>
@@ -165,15 +205,24 @@
       <param name="reset" vt="Boolean" remark="reset all triggers"/>
       <param name="reverse" vt="Boolean" remark="reverse enter"/>
       <param name="indelay" vt="int" remark="in event delay timer"/>
+      <param name="masterId" vt="const char*" remark="Master block"/>
+      <param name="force" vt="Boolean" remark="force reverse by action"/>
     </fun>
     <fun name="unLock" vt="Boolean">
       <param name="inst" vt="this"/>
       <param name="locid" vt="const char*" remark="Unlocking loc"/>
+      <param name="routeid" vt="const char*" remark="By route"/>
     </fun>
     <fun name="setLocSchedule" vt="Boolean">
       <param name="inst" vt="this"/>
       <param name="scid" vt="const char*" remark="schedule for current loc"/>
-    </fun>
+      <param name="manual" vt="Boolean"/>
+      </fun>
+    <fun name="setLocTour" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="tourid" vt="const char*" remark="tour for current loc"/>
+      <param name="manual" vt="Boolean"/>
+      </fun>
     <fun name="getLoc" vt="const char*">
       <param name="inst" vt="this" remark="Loc instance"/>
     </fun>
@@ -218,7 +267,8 @@
       <param name="inst" vt="this" remark="Block instance"/>
       <param name="loc" vt="iOLoc" remark="Loc instance"/>
       <param name="reverse" vt="Boolean" remark="reverse signal"/>
-    </fun>
+      <param name="oppwait" vt="Boolean*" remark="Wait for opposite direction."/>
+      </fun>
     <fun name="inBlock" vt="void">
       <param name="inst" vt="this" remark="Block instance"/>
       <param name="locid" vt="const char*" remark="Loc id"/>
@@ -226,6 +276,11 @@
     <fun name="enterBlock" vt="void">
       <param name="inst" vt="this" remark="Block instance"/>
       <param name="locid" vt="const char*" remark="Loc id"/>
+    </fun>
+    <fun name="exitBlock" vt="void">
+      <param name="inst" vt="this" remark="Block instance"/>
+      <param name="locid" vt="const char*" remark="Loco id"/>
+      <param name="unexpected" vt="Boolean" remark="Train did not stop within the IN section."/>
     </fun>
     <fun name="green" vt="Boolean">
       <param name="inst" vt="this" remark="Block instance"/>
@@ -263,9 +318,16 @@
       <param name="inst" vt="this" remark="Block instance"/>
       <param name="loc" vt="iOLoc" remark="Loc instance"/>
       <param name="reverse" vt="Boolean" remark="reverse signal"/>
-    </fun>
+      <param name="oppwait" vt="int*" remark="Wait for opposite direction."/>
+      </fun>
     <fun name="getMaxKmh" vt="int">
       <param name="inst" vt="this" remark="Block instance"/>
+    </fun>
+    <fun name="getmvspeed" vt="float">
+      <param name="inst" vt="this" remark="get last speed measured in this block"/>
+    </fun> 
+    <fun name="getDepartDelay" vt="int">
+      <param name="inst" vt="this" remark="Block departure delay"/>
     </fun>
     <fun name="getVelocity" vt="const char*">
       <param name="inst" vt="this" remark="Block instance"/>
@@ -293,17 +355,22 @@
       <param name="inst" vt="this" remark="Block instance"/>
       <param name="locid" vt="const char*" remark="Unlocking loc"/>
     </fun>
-    <fun name="event" vt="void">
+    <fun name="event" vt="Boolean">
       <param name="inst" vt="this" remark="Block instance"/>
       <param name="puls" vt="Boolean" remark="event value"/>
       <param name="id" vt="const char*" remark="event(fb) ID"/>
-      <param name="ident" vt="long" remark="ID of object which triggered the event. (barcode reader)"/>
-      <param name="val" vt="int" remark="Value of object which triggered the event. (barcode reader)"/>
+      <param name="ident1" vt="const char*" remark="ID of object which triggered the event."/>
+      <param name="ident2" vt="const char*" remark="ID of object which triggered the event."/>
+      <param name="ident3" vt="const char*" remark="ID of object which triggered the event."/>
+      <param name="ident4" vt="const char*" remark="ID of object which triggered the event."/>
+      <param name="val" vt="int" remark="Value of object which triggered the event."/>
       <param name="wheelcount" vt="int" remark="Number of wheels counted sofar."/>
       <param name="evtDescr" vt="iONode" remark="event description: optional"/>
+      <param name="dir" vt="Boolean" remark="Running direction of loco"/>
     </fun>
     <fun name="reset" vt="void">
       <param name="inst" vt="this" remark="Block instance"/>
+      <param name="saveCurBlock" vt="Boolean" remark="save current block occupation"/>
     </fun>
     <fun name="setManager" vt="void">
       <param name="inst" vt="this" remark="Block instance"/>
@@ -332,11 +399,30 @@
     <fun name="getWheelCount" vt="int">
       <param name="inst" vt="this" remark="Block instance"/>
     </fun>
-  </interface>
-
-  <interface name="AnalyserInt" use="node" remark="Interface for the analyser">
-    <fun name="analyse" vt="void">
-      <param name="inst" vt="this" remark="Analyse instance."/>
+    <fun name="setTempWait" vt="void">
+      <param name="inst" vt="this" remark="Block instance"/>
+      <param name="wait" vt="Boolean"/>
+    </fun>
+    <fun name="setGhostDetected" vt="void">
+      <param name="inst" vt="this" remark="Block instance"/>
+      <param name="key" vt="const char*"/>
+      <param name="ident" vt="const char*"/>
+    </fun>
+    <fun name="getRandomRate" vt="int">
+      <param name="inst" vt="this" remark="Block instance"/>
+      <param name="lcid" vt="const char*"/>
+    </fun>
+    <fun name="setClass" vt="void">
+      <param name="inst" vt="this" remark="Block instance"/>
+      <param name="class" vt="const char*"/>
+    </fun>
+    <fun name="setMasterID" vt="void">
+      <param name="inst" vt="this" remark="Block instance"/>
+      <param name="masterid" vt="const char*"/>
+    </fun>
+    <fun name="hasClass" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="class" vt="const char*"/>
     </fun>
   </interface>
 

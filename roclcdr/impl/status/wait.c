@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -41,24 +44,42 @@
 
 void statusWait( iILcDriverInt inst, Boolean reverse ) {
   iOLcDriverData data = Data(inst);
+  iONode bkprops = NULL;
 
-  iONode bkprops = (iONode)data->curBlock->base.properties( data->curBlock );
+  if( data->curBlock == NULL ) {
+    iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+    data->run = False;
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101, "no current block set for loco [%s]: stop auto mode.",  data->loc->getId( data->loc ) );
+    wLoc.setV( cmd, 0 );
+    data->loc->cmd( data->loc, cmd );
+
+    data->state = LC_IDLE;
+    data->loc->setMode(data->loc, wLoc.mode_idle, "");
+    return;
+  }
+
+  bkprops = (iONode)data->curBlock->base.properties( data->curBlock );
   /* Station wait or all destinations are occupied. */
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "Wait in block for \"%s\"...",
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "Wait in block for [%s]...",
                  data->loc->getId( data->loc ) );
 
 
   {
 
     data->state = LC_TIMER;
-    data->loc->setMode(data->loc, wLoc.mode_wait);
+    data->loc->setMode(data->loc, wLoc.mode_wait, "");
+    Boolean oppwait = True;
+    int    ioppwait = 0;
+    Boolean wait    = data->curBlock->wait(data->curBlock, data->loc, reverse, &oppwait );
+    Boolean mainline =  wBlock.ismainline(data->curBlock->base.properties(data->curBlock) );
 
-    if( data->curBlock->wait(data->curBlock, data->loc, reverse ) ) {
+
+    if( wait ) {
       Boolean ice = StrOp.equals( wLoc.cargo_ice, wLoc.getcargo( data->loc->base.properties( data->loc ) ) );
-      if( ice && data->prevState == LC_FINDDEST )
-        data->timer = 1; /* just wait 100ms */
+      if( (mainline || ice) && data->prevState == LC_FINDDEST )
+        data->timer = 1 * wLoc.getpriority( data->loc->base.properties( data->loc ) ); /* just wait 100ms multiplied by prio */
       else {
-        data->timer = data->curBlock->getWait( data->curBlock, data->loc, reverse );
+        data->timer = data->curBlock->getWait( data->curBlock, data->loc, reverse, &ioppwait );
 
         if( data->timer != -1 ) {
           if( data->prevState == LC_FINDDEST )
@@ -70,15 +91,15 @@ void statusWait( iILcDriverInt inst, Boolean reverse ) {
     }
     else {
       Boolean ice = StrOp.equals( wLoc.cargo_ice, wLoc.getcargo( data->loc->base.properties( data->loc ) ) );
-      if( ice && data->prevState == LC_FINDDEST )
-        data->timer = 1; /* just wait 100ms */
+      if( (mainline || ice) && data->prevState == LC_FINDDEST )
+        data->timer = 1 * wLoc.getpriority( data->loc->base.properties( data->loc ) ); /* just wait 100ms multiplied by prio */
       else
-        data->timer = wLoc.getpriority( data->loc->base.properties( data->loc ) ); /* just wait 1 second, 10 x 100ms */
+        data->timer = 5 * wLoc.getpriority( data->loc->base.properties( data->loc ) ); /* just wait 1 second, 10 x 100ms */
     }
 
 
     data->curBlock->resetTrigs( data->curBlock );
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "Setting state for [%s] timer=%d from LC_WAITBLOCK to LC_TIMER.",
                    data->loc->getId( data->loc ), data->timer );
   }

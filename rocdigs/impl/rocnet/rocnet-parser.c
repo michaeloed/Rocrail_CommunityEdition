@@ -1,7 +1,7 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -145,7 +145,7 @@ byte* rocnetParseGeneral( iOrocNet rocnet, byte* rn ) {
 
 byte* rocnetParseOutput( iOrocNet rocnet, byte* rn ) {
   iOrocNetData data       = Data(rocnet);
-  int          addr       = 0;
+  int          port       = rn[RN_PACKET_DATA + 3];
   int          rcpt       = 0;
   int          sndr       = 0;
   Boolean      isThis     = rocnetIsThis( rocnet, rn);
@@ -158,14 +158,14 @@ byte* rocnetParseOutput( iOrocNet rocnet, byte* rn ) {
   switch( action ) {
   case RN_OUTPUT_SWITCH:
     TraceOp.trc( myname, TRCLEVEL_INFO, __LINE__, 9999,
-        "output SWITCH(%s) addr=%d %s action for %d from %d%s, %d data bytes",
-        rnActionTypeString(rn), addr, rn[RN_PACKET_DATA + 0] & RN_OUTPUT_ON ? "on":"off",
+        "output SWITCH(%s %d) addr=%d %s action for %d from %d%s, %d data bytes",
+        rnActionTypeString(rn), actionType, port, rn[RN_PACKET_DATA + 0] & RN_OUTPUT_ON ? "on":"off",
         rcpt, sndr, isThis?"(this)":"", rn[RN_PACKET_LEN] );
     break;
   case RN_OUTPUT_SWITCH_MULTI:
     TraceOp.trc( myname, TRCLEVEL_INFO, __LINE__, 9999,
         "output SWITCH MULTI(%s) addr=%d %02X:%02X action for %d from %d%s, %d data bytes",
-        rnActionTypeString(rn), addr, rn[RN_PACKET_DATA + 1], rn[RN_PACKET_DATA + 3],
+        rnActionTypeString(rn), port, rn[RN_PACKET_DATA + 1], rn[RN_PACKET_DATA + 3],
         rcpt, sndr, isThis?"(this)":"", rn[RN_PACKET_LEN] );
     break;
   default:

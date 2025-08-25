@@ -1,7 +1,10 @@
 # ------------------------------------------------------------
 # Rocrail - Model Railroad Software
 #
-# Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+# Copyright (C) 2002-2012 Rob Versluis, Rocrail.net
+#
+# Without an official permission commercial use is not permitted.
+# Forking this project is not permitted.  
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -50,15 +53,21 @@ endif
 
 PLATFORM=LINUX
 ifeq ($(PLATFORM),WIN32)
-	LIBS=-liphlpapi -lmpr -lwsock32 -ladvapi32 $(SSLLIBS)
+	LIBS=-liphlpapi -lmpr -lws2_32 -ladvapi32 $(SSLLIBS)
 	COREDIR=win
 	BINSUFFIX=.exe
-	CC_EXTRA_FLAGS=
+	CC_EXTRA_FLAGS=-mthreads
 else
 	COREDIR=unx
 	BINSUFFIX=
 	CC_EXTRA_FLAGS=-fPIC
 endif
+ifeq ($(PLATFORM),WIN64)
+    LIBS=-liphlpapi -lmpr -lmswsock -lws2_32 -ladvapi32 $(SSLLIBS)
+    COREDIR=win
+    BINSUFFIX=.exe
+    CC_EXTRA_FLAGS=
+endif 
 
 MOUNTPOINT=..
 OUTDIR=..$(FS)$(COREDIR)bin

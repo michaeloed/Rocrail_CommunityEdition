@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -59,6 +62,8 @@ class wxGrid;
 #define ID_TEXTCTRL_TT_ID 10002
 #define wxID_STATIC_TT_DESC 10133
 #define ID_TEXTCTRL_TT_DESC 10129
+#define ID_TT_MANAGER 10400
+#define ID_TT_ACTIONS 10144
 #define ID_PANEL_TT_LOCATION 10006
 #define wxID_STATIC_TT_X 10010
 #define ID_TEXTCTRL_TT_X 10011
@@ -131,6 +136,12 @@ public:
 
 ////@begin TurntableDialog event handler declarations
 
+    /// wxEVT_COMMAND_CHECKBOX_CLICKED event handler for ID_TT_MANAGER
+    void OnManagerClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_TT_ACTIONS
+    void OnTtActionsClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_COMBOBOX_SELECTED event handler for ID_COMBOBOX_TT_TYPE
     void OnTypeSelected( wxCommandEvent& event );
 
@@ -154,6 +165,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end TurntableDialog event handler declarations
 
@@ -182,9 +196,14 @@ public:
     wxTextCtrl* m_ID;
     wxStaticText* m_LabelDesc;
     wxTextCtrl* m_Desc;
+    wxStaticText* m_labRandomRate;
+    wxSpinCtrl* m_RandomRate;
     wxStaticBoxSizer* m_OptionsBox;
     wxCheckBox* m_Manager;
     wxCheckBox* m_EmbeddedBlock;
+    wxCheckBox* m_Traverser;
+    wxCheckBox* m_Move4Opp;
+    wxButton* m_Actions;
     wxPanel* m_LocationPanel;
     wxStaticText* m_LabelX;
     wxTextCtrl* m_x;
@@ -192,11 +211,15 @@ public:
     wxTextCtrl* m_y;
     wxStaticText* m_LabelZ;
     wxTextCtrl* m_z;
+    wxStaticText* m_labSize;
+    wxSpinCtrl* m_Size;
     wxPanel* m_Interface;
     wxStaticText* m_Labeliid;
-    wxTextCtrl* m_IID;
+    wxComboBox* m_IID;
     wxStaticText* m_Label_Bus;
     wxTextCtrl* m_Bus;
+    wxStaticText* m_labUIDName;
+    wxTextCtrl* m_UIDName;
     wxStaticText* m_LabelAddress;
     wxTextCtrl* m_Address;
     wxTextCtrl* m_AddressDir;
@@ -204,6 +227,8 @@ public:
     wxTextCtrl* m_PolAddr;
     wxStaticText* m_labActFn;
     wxSpinCtrl* m_ActFn;
+    wxStaticText* m_labLightsFn;
+    wxSpinCtrl* m_LightsFn;
     wxStaticText* m_labMotorOffDelay;
     wxSpinCtrl* m_MotorOffDelay;
     wxStaticText* m_LabelType;
@@ -214,6 +239,7 @@ public:
     wxSpinCtrl* m_Delay;
     wxStaticText* m_labPause;
     wxSpinCtrl* m_Pause;
+    wxCheckBox* m_Inv;
     wxStaticText* m_labProt;
     wxComboBox* m_Prot;
     wxStaticText* m_labBridgeSensor1;
@@ -222,6 +248,8 @@ public:
     wxComboBox* m_BridgeSensor2;
     wxStaticText* m_labBridgeSensorMid;
     wxComboBox* m_BridgeSensorMid;
+    wxStaticText* m_labBridgeSensorMid2;
+    wxComboBox* m_BridgeSensorMid2;
     wxStaticText* m_labPSen;
     wxComboBox* m_PSen;
     wxCheckBox* m_SwapRotation;
@@ -231,29 +259,47 @@ public:
     wxTextCtrl* m_Addr0;
     wxStaticText* m_labPort0;
     wxTextCtrl* m_Port0;
+    wxRadioBox* m_Bit0Cmd;
     wxStaticText* m_labAddr1;
     wxTextCtrl* m_Addr1;
     wxStaticText* m_labPort1;
     wxTextCtrl* m_Port1;
+    wxRadioBox* m_Bit1Cmd;
     wxStaticText* m_labAddr2;
     wxTextCtrl* m_Addr2;
     wxStaticText* m_labPort2;
     wxTextCtrl* m_Port2;
+    wxRadioBox* m_Bit2Cmd;
     wxStaticText* m_labAddr3;
     wxTextCtrl* m_Addr3;
     wxStaticText* m_labPort3;
     wxTextCtrl* m_Port3;
+    wxRadioBox* m_Bit3Cmd;
     wxStaticText* m_labAddr4;
     wxTextCtrl* m_Addr4;
     wxStaticText* m_labPort4;
     wxTextCtrl* m_Port4;
+    wxRadioBox* m_Bit4Cmd;
+    wxStaticText* m_labAddr6;
+    wxTextCtrl* m_Addr6;
+    wxStaticText* m_labPort6;
+    wxTextCtrl* m_Port6;
+    wxRadioBox* m_Bit5Cmd;
     wxCheckBox* m_InvertPos;
+    wxCheckBox* m_SingleGatePos;
     wxStaticBox* m_NewPositionFlagBox;
     wxStaticText* m_labAddr5;
     wxTextCtrl* m_Addr5;
     wxStaticText* m_labPort5;
     wxTextCtrl* m_Port5;
     wxCheckBox* m_InvertNew;
+    wxCheckBox* m_SingleGateNew;
+    wxStaticBox* m_ResetFlagBox;
+    wxStaticText* m_labResetAddr;
+    wxTextCtrl* m_ResetAddr;
+    wxStaticText* m_labResetPort;
+    wxTextCtrl* m_ResetPort;
+    wxRadioBox* m_ResetCmd;
     wxPanel* m_TracksPanel;
     wxGrid* m_TracksGrid;
     wxButton* m_AddTrack;

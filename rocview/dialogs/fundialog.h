@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -105,21 +108,24 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_OK
     void OnOkClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end FunctionDialog event handler declarations
 
 ////@begin FunctionDialog member function declarations
 
-    iONode GetProps() const { return m_Props ; }
-    void SetProps(iONode value) { m_Props = value ; }
-
-    int GetIFunction() const { return m_iFunction ; }
-    void SetIFunction(int value) { m_iFunction = value ; }
-
     iONode GetFunDef() const { return m_FunDef ; }
     void SetFunDef(iONode value) { m_FunDef = value ; }
 
+    iONode GetProps() const { return m_Props ; }
+    void SetProps(iONode value) { m_Props = value ; }
+
     bool GetBNewFunEvent() const { return m_bNewFunDef ; }
     void SetBNewFunEvent(bool value) { m_bNewFunDef = value ; }
+
+    int GetIFunction() const { return m_iFunction ; }
+    void SetIFunction(int value) { m_iFunction = value ; }
 
     /// Retrieves bitmap resources
     wxBitmap GetBitmapResource( const wxString& name );
@@ -142,10 +148,10 @@ public:
     wxComboBox* m_BlockOffEvent;
     wxButton* m_Cancel;
     wxButton* m_OK;
-    iONode m_Props;
-    int m_iFunction;
     iONode m_FunDef;
+    iONode m_Props;
     bool m_bNewFunDef;
+    int m_iFunction;
 ////@end FunctionDialog member variables
 };
 

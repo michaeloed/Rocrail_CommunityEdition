@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -30,8 +33,8 @@
 
 ////@begin includes
 #include "wx/notebook.h"
-#include "wx/statline.h"
 #include "wx/spinctrl.h"
+#include "wx/statline.h"
 ////@end includes
 
 #include "rocs/public/node.h"
@@ -55,24 +58,24 @@ class wxSpinCtrl;
 #define ID_PANEL_RR_INI 10092
 #define wxID_STATIC_RR_PLANFILE 10093
 #define ID_TEXTCTRL_RR_PLANFILE 10094
+#define ID_BUTTON_PLANFILE 10002
+#define ID_BUTTON_OCCFILE 10420
+#define ID_BUTTON_LOCOFILE 10419
+#define ID_BUTTON_KEYPATH 10411
 #define wxID_STATIC_RR_LIBPATH 10095
 #define ID_TEXTCTRL_RR_LIBPATH 10096
-#define wxID_STATIC_RR_TRACEFILE 10097
-#define ID_TEXTCTRL_RR_TRACEFILE 10101
 #define ID_PANEL_RR_TRACE 10102
 #define ID_CHECKBOX_RR_AUTO 10006
 #define ID_CHECKBOX_RR_MONITOR 10232
 #define ID_CHECKBOX_RR_BYTE 10007
 #define ID_CHECKBOX_RR_DEBUG 10005
+#define wxID_STATIC_RR_TRACEFILE 10097
+#define ID_TEXTCTRL_RR_TRACEFILE 10101
 #define ID_PANEL_RR_SERVICE 10107
 #define wxID_STATIC_RR_HTTPPORT 10003
 #define ID_TEXTCTRL_RR_HTTPPORT 10004
 #define wxID_STATIC_RR_SEVICE_REFRESH 10319
 #define ID_TEXTCTRL_RR_SERVICE_REFRESH 10320
-#define wxID_STATIC_RR_WEBSERVICE_PORT 10321
-#define ID_TEXTCTRL_RR_WEBSERVICE_PORT 10322
-#define wxID_STATIC_RR_WEBSERVICE_REFRESH 10323
-#define ID_TEXTCTRL_RR_WEBSERVICE_REFRESH 10324
 #define wxID_STATIC_RR_CLOCK_DEVIDER 10103
 #define ID_TEXTCTRL_RR_CLOCK_DEVIDER 10104
 #define wxID_STATIC_RR_CLOCK_HOUR 10155
@@ -96,10 +99,19 @@ class wxSpinCtrl;
 #define ID_LISTBOX_RR_CONTROLLERS 10154
 #define ID_BUTTON_RR_DELETE 10105
 #define ID_BUTTON_RR_PROPS 10156
+#define ID_BUTTON_RR_DEFAULT 10322
 #define ID_COMBOBOX_RR_LIB 10001
 #define ID_BUTTON_RR_ADD 10000
 #define ID_PANEL_R2RNET 10281
 #define ID_BUTTON_R2RNET_ROUTES 10327
+#define ID_PANEL_ANALYSER 10416
+#define ID_PANEL_ROCWEB 10479
+#define ID_ROCWEB_WEB_BUTTON 10481
+#define ID_ROCWEB_SVGPATH_BUTTON 10339
+#define ID_ROCWEB_SVGPATH2_BUTTON 10480
+#define ID_ROCWEB_SVGPATH3_BUTTON 10482
+#define ID_ROCWEB_SVGPATH4_BUTTON 10483
+#define ID_ROCWEB_SVGPATH5_BUTTON 10484
 #define SYMBOL_ROCRAILINIDIALOG_STYLE wxCAPTION|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCLOSE_BOX
 #define SYMBOL_ROCRAILINIDIALOG_TITLE _("Rocrail Properties")
 #define SYMBOL_ROCRAILINIDIALOG_IDNAME ID_DIALOG_RR_INI
@@ -150,8 +162,23 @@ public:
     /// wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED event handler for ID_NOTEBOOK_RR
     void OnNotebookRrPageChanged( wxNotebookEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_PLANFILE
+    void OnButtonPlanfileClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_OCCFILE
+    void OnButtonOccfileClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_LOCOFILE
+    void OnButtonLocofileClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_KEYPATH
+    void OnButtonKeypathClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_LISTBOX_SELECTED event handler for ID_LISTBOX_RR_CONTROLLERS
     void OnListboxRrControllersSelected( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_LISTBOX_DOUBLECLICKED event handler for ID_LISTBOX_RR_CONTROLLERS
+    void OnListboxRrControllersDoubleClicked( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_RR_DELETE
     void OnButtonRrDeleteClick( wxCommandEvent& event );
@@ -159,11 +186,32 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_RR_PROPS
     void OnButtonRrPropsClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_RR_DEFAULT
+    void OnButtonRrDefaultClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_RR_ADD
     void OnButtonRrAddClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_R2RNET_ROUTES
     void OnButtonR2rnetRoutesClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_ROCWEB_WEB_BUTTON
+    void OnRocwebWebButtonClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_ROCWEB_SVGPATH_BUTTON
+    void OnSvgPath1Click( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_ROCWEB_SVGPATH2_BUTTON
+    void OnSvgPath2Click( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_ROCWEB_SVGPATH3_BUTTON
+    void OnSvgPath3Click( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_ROCWEB_SVGPATH4_BUTTON
+    void OnSvgPath4Click( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_ROCWEB_SVGPATH5_BUTTON
+    void OnSvgPath5Click( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_OK
     void OnOkClick( wxCommandEvent& event );
@@ -171,18 +219,18 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
 
-    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_APPLY
-    void OnApplyClick( wxCommandEvent& event );
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end RocrailIniDialog event handler declarations
 
 ////@begin RocrailIniDialog member function declarations
 
-    iONode GetProps() const { return m_Props ; }
-    void SetProps(iONode value) { m_Props = value ; }
-
     iONode GetController() const { return m_Controller ; }
     void SetController(iONode value) { m_Controller = value ; }
+
+    iONode GetProps() const { return m_Props ; }
+    void SetProps(iONode value) { m_Props = value ; }
 
     /// Retrieves bitmap resources
     wxBitmap GetBitmapResource( const wxString& name );
@@ -199,16 +247,37 @@ public:
     wxPanel* m_GeneralPanel;
     wxStaticText* m_LabelPlanfile;
     wxTextCtrl* m_PlanFile;
+    wxButton* m_PlanFileDlg;
     wxStaticText* m_labOccFile;
     wxTextCtrl* m_OccFile;
+    wxButton* m_OpenOccFile;
+    wxStaticText* m_labLocoFile;
+    wxTextCtrl* m_LocoFile;
+    wxButton* m_LocoFileDlg;
     wxStaticText* m_labPlanType;
     wxRadioBox* m_PlanType;
+    wxCheckBox* m_Backup;
+    wxTextCtrl* m_BackupPath;
+    wxStaticText* m_labKeyPath;
+    wxTextCtrl* m_KeyPath;
     wxStaticText* m_LabelLibPath;
     wxTextCtrl* m_LibPath;
     wxStaticText* m_labImgPath;
     wxTextCtrl* m_ImgPath;
-    wxStaticText* m_LabelTraceFile;
-    wxTextCtrl* m_TraceFile;
+    wxStaticText* m_labIconPath;
+    wxTextCtrl* m_IconPath;
+    wxStaticText* m_labIssuesPath;
+    wxTextCtrl* m_IssuePath;
+    wxStaticText* m_labSoundPath;
+    wxTextCtrl* m_SoundPath;
+    wxStaticText* m_labSoundPlayer;
+    wxTextCtrl* m_SoundPlayer;
+    wxCheckBox* m_SoundPlayerLocation;
+    wxStaticBox* m_ScBox;
+    wxStaticText* m_labScSensor;
+    wxComboBox* m_ScSensor;
+    wxStaticText* m_labScIID;
+    wxTextCtrl* m_ScIID;
     wxStaticText* m_labPTIID;
     wxTextCtrl* m_PTIID;
     wxStaticText* m_labLCIID;
@@ -217,49 +286,57 @@ public:
     wxTextCtrl* m_DPIID;
     wxStaticText* m_labSVIID;
     wxTextCtrl* m_SVIID;
-    wxStaticText* m_labAnalyze;
-    wxStaticBox* m_ScBox;
-    wxStaticText* m_labScSensor;
-    wxComboBox* m_ScSensor;
-    wxStaticText* m_labScIID;
-    wxTextCtrl* m_ScIID;
+    wxCheckBox* m_FSUTF8;
     wxPanel* m_TracePanel;
     wxStaticBoxSizer* m_TraceLevel;
     wxCheckBox* m_Auto;
     wxCheckBox* m_Monitor;
+    wxCheckBox* m_Calc;
     wxStaticBox* m_DevTraceLevel;
     wxCheckBox* m_Byte;
     wxCheckBox* m_Info;
     wxCheckBox* m_Debug;
+    wxStaticText* m_labNrTraceFiles;
+    wxSpinCtrl* m_NrTraceFiles;
+    wxStaticText* m_labTraceFileSize;
+    wxSpinCtrl* m_TraceFileSize;
     wxCheckBox* m_SendAllTraces;
+    wxStaticText* m_LabelTraceFile;
+    wxTextCtrl* m_TraceFile;
+    wxStaticText* m_labProtPath;
+    wxTextCtrl* m_ProtPath;
     wxPanel* m_ServicePanel;
     wxStaticBoxSizer* m_HttpBox;
     wxStaticText* m_LabelHttpPort;
     wxTextCtrl* m_HttpPort;
     wxStaticText* m_LabServiceRefresh;
     wxTextCtrl* m_ServiceRefresh;
-    wxStaticBoxSizer* m_WebServiceBox;
-    wxStaticText* m_LabWebServicePort;
-    wxTextCtrl* m_WebServicePort;
-    wxStaticText* m_LabWebServiceRefresh;
-    wxTextCtrl* m_WebServiceRefresh;
     wxStaticBoxSizer* m_ClockBox;
     wxStaticText* m_labDevider;
     wxTextCtrl* m_Divider;
+    wxTextCtrl* m_ClockUpdate;
     wxStaticText* m_labHour;
     wxTextCtrl* m_Hour;
     wxStaticText* m_labMinute;
     wxTextCtrl* m_Minute;
+    wxCheckBox* m_StopClockAtPowerOff;
     wxStaticBoxSizer* m_ClientBox;
     wxStaticText* m_LabelClientPort;
     wxTextCtrl* m_ClientPort;
     wxStaticText* m_LabelMaxCon;
     wxTextCtrl* m_MaxCon;
+    wxStaticText* m_labControlCode;
+    wxTextCtrl* m_ControlCode;
+    wxStaticText* m_labSlaveCode;
+    wxTextCtrl* m_SlaveCode;
     wxCheckBox* m_OnlyFirstMaster;
     wxStaticBox* m_SrcpService;
     wxStaticText* m_labSrcpPort;
     wxSpinCtrl* m_SrcpPort;
     wxCheckBox* m_SrcpServiceActive;
+    wxStaticText* m_labSRCPDevice;
+    wxComboBox* m_SRCPDevice;
+    wxStaticBox* m_SNMPBox;
     wxStaticText* m_labSnmpPort;
     wxSpinCtrl* m_SnmpPort;
     wxCheckBox* m_SnmpServiceActive;
@@ -284,7 +361,7 @@ public:
     wxStaticText* m_labSavePosTime;
     wxSpinCtrl* m_SavePosTime;
     wxStaticText* m_labEventTimeout;
-    wxTextCtrl* m_EventTimeout;
+    wxSpinCtrl* m_EventTimeout;
     wxStaticText* m_labSignalReset;
     wxSpinCtrl* m_SignalReset;
     wxStaticText* m_labRouteSwTime;
@@ -297,32 +374,62 @@ public:
     wxSpinCtrl* m_LocoStartGap;
     wxStaticText* m_labBlockInitPause;
     wxSpinCtrl* m_BlockInitPause;
-    wxCheckBox* m_Check2In;
+    wxStaticText* m_labSyncRouteTimeout;
+    wxSpinCtrl* m_SyncRouteTimeout;
+    wxStaticText* m_labVirtualTimer;
+    wxSpinCtrl* m_VirtualTimer;
     wxCheckBox* m_secondNextBlock;
     wxCheckBox* m_EnableSwFb;
     wxCheckBox* m_DisableRouteVreduce;
-    wxCheckBox* m_GreenAspect;
     wxCheckBox* m_SkipSetSw;
     wxCheckBox* m_SkipSetSg;
     wxCheckBox* m_UseBiCom;
+    wxCheckBox* m_CreateGuestOnBiDi;
+    wxCheckBox* m_UseBiDiDirection;
+    wxCheckBox* m_UseIdent;
     wxCheckBox* m_StopAtIdentMisMatch;
     wxCheckBox* m_PowerOffAtGhost;
+    wxCheckBox* m_EBreakAtGhost;
     wxCheckBox* m_KeepGhost;
     wxCheckBox* m_DisableSteal;
     wxCheckBox* m_PowerOffAtReset;
     wxCheckBox* m_ZeroThrottleID;
-    wxCheckBox* m_UseBlockSide;
     wxCheckBox* m_StopNoneCommuter;
+    wxCheckBox* m_SyncRoutes;
+    wxCheckBox* m_TimedSensors;
+    wxCheckBox* m_EnableAnalyzer;
+    wxCheckBox* m_ForceUnlock;
+    wxCheckBox* m_ReleaseOnIdle;
+    wxCheckBox* m_CloseOnGhost;
+    wxCheckBox* m_UseOnlyFirstIdent;
+    wxCheckBox* m_ActionTimer60;
+    wxCheckBox* m_RestoreSchedule;
+    wxCheckBox* m_SelectShortestBlock;
+    wxCheckBox* m_CloseNoEvents;
+    wxCheckBox* m_DisableBlockWait4GoManual;
+    wxCheckBox* m_StopAtIn4GoManual;
+    wxCheckBox* m_V0AtPowerOn;
+    wxCheckBox* m_GreenAspect;
     wxRadioBox* m_DefAspect;
+    wxCheckBox* m_ResetFxSp;
+    wxCheckBox* m_ProcessSignalEvents;
+    wxCheckBox* m_UseRandomRate;
+    wxCheckBox* m_RedirectToMaster;
+    wxCheckBox* m_Weather;
+    wxCheckBox* m_V0OnEbreak;
     wxPanel* m_ControllersPanel;
     wxListBox* m_Controllers;
     wxButton* m_ControllerDelete;
     wxButton* m_ControllerProps;
+    wxButton* m_Default;
     wxStaticBoxSizer* m_AddControllerBox;
     wxComboBox* m_Lib;
     wxButton* m_ControllerAdd;
     wxStaticBox* m_ControllerOptionsBox;
     wxCheckBox* m_PowerOffOnExit;
+    wxCheckBox* m_PowerOnAtInit;
+    wxCheckBox* m_Shutdown;
+    wxCheckBox* m_NoDevCheck;
     wxPanel* m_R2RnetPanel;
     wxStaticText* m_labR2RnetID;
     wxTextCtrl* m_R2RnetID;
@@ -334,11 +441,53 @@ public:
     wxTextCtrl* m_R2RnetRoutes;
     wxButton* m_R2RnetRoutesDlg;
     wxCheckBox* m_R2RnetEnable;
+    wxPanel* m_AnalyserPanel;
+    wxStaticBox* m_AnaGenerate;
+    wxCheckBox* m_SetRouteId;
+    wxCheckBox* m_SetBlockId;
+    wxCheckBox* m_AddSignalBlockAssignment;
+    wxCheckBox* m_AddFeedbackBlockAssignment;
+    wxStaticBox* m_AnaClean;
+    wxCheckBox* m_CleanRouteId;
+    wxCheckBox* m_ResetBlockId;
+    wxCheckBox* m_ResetSignalBlockAssignment;
+    wxCheckBox* m_ResetFeedbackBlockAssignment;
+    wxStaticBox* m_AnaCheck;
+    wxCheckBox* m_BasicCheck;
+    wxCheckBox* m_BlockCheck;
+    wxCheckBox* m_RouteCheck;
+    wxCheckBox* m_ActionCheck;
+    wxStaticBox* m_AnaReset;
+    wxCheckBox* m_BasicClean;
+    wxCheckBox* m_BlockClean;
+    wxCheckBox* m_RouteClean;
+    wxCheckBox* m_ActionClean;
+    wxPanel* m_RocWebPanel;
+    wxStaticBoxSizer* m_WebServiceBox;
+    wxStaticText* m_LabWebServicePort;
+    wxSpinCtrl* m_WebServicePort;
+    wxStaticText* m_labWebPath;
+    wxTextCtrl* m_WebPath;
+    wxButton* m_WebPathDlg;
+    wxStaticText* m_labTheme1;
+    wxTextCtrl* m_SVGPath;
+    wxButton* m_SvgPathDlg;
+    wxStaticText* m_labTheme2;
+    wxTextCtrl* m_SVGPath2;
+    wxButton* m_SvgPath2Dlg;
+    wxStaticText* m_labTheme3;
+    wxTextCtrl* m_SVGPath3;
+    wxButton* m_SvgPath3Dlg;
+    wxStaticText* m_labTheme4;
+    wxTextCtrl* m_SVGPath4;
+    wxButton* m_SvgPath4Dlg;
+    wxStaticText* m_labTheme5;
+    wxTextCtrl* m_SVGPath5;
+    wxButton* m_SvgPath5Dlg;
     wxButton* m_OK;
     wxButton* m_Cancel;
-    wxButton* m_Apply;
-    iONode m_Props;
     iONode m_Controller;
+    iONode m_Props;
 ////@end RocrailIniDialog member variables
     void event( iONode event );
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -42,6 +45,11 @@ static const char* __id( void* inst ) {
 }
 
 static void* __event( void* inst, const void* evt ) {
+  iORConData data = Data(inst);
+  iONode node = (iONode)evt;
+  char* strCmd = NodeOp.base.toString( node );
+  RConOp.write( inst, strCmd );
+  StrOp.free( strCmd );
   return NULL;
 }
 
@@ -58,6 +66,15 @@ static char* __toString(void* inst) {
 }
 static void __del(void* inst) {
   iORConData data = Data(inst);
+  if( data->sh != NULL ) {
+    SocketOp.disConnect( data->sh );
+    SocketOp.base.del(data->sh);
+  }
+  data->run = False;
+  if( data->infoReader != NULL ) {
+    ThreadOp.kill(data->infoReader);
+  }
+  ThreadOp.sleep(10);
   StrOp.free( data->host );
   freeMem( data );
   freeMem( inst );

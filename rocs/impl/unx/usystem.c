@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -74,6 +77,12 @@ Boolean rocs_system_uBusyWait( int us) {
 struct timespec rqtp = { 0, us * 1000 };
 while (nanosleep(&rqtp, &rqtp)==-1);
 return True;
+#endif
+}
+
+Boolean rocs_system_usWait( int us) {
+#ifdef __ROCS_SYSTEM__
+  return usleep(us)==-1 ? False:True;
 #endif
 }
 

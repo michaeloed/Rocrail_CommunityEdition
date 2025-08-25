@@ -1,7 +1,7 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -44,9 +44,9 @@ static void __reader( void* threadinst ) {
     byte packet[0x7F];
     MemOp.set( packet, 0, 0x7F);
 
-    int packetSize = SocketOp.recvfrom( data->readUDP, packet, 0x7F, NULL, NULL );
+    int packetSize = SocketOp.recvfrom( data->readUDP, (char*)packet, 0x7F, NULL, NULL );
 
-    if( packetSize > 0 ) {
+    if( packetSize > 0 && packetSize < 0x7F ) {
       if( data->usedouble && MemOp.cmp( data->prevPacket, packet, packetSize ) ) {
         /* reject double packet */
         MemOp.set(data->prevPacket, 0, 0x7F );
@@ -55,7 +55,7 @@ static void __reader( void* threadinst ) {
       else {
         byte* p = allocMem(0x7F+1);
         MemOp.copy( data->prevPacket, packet, packetSize );
-        if( data->expectdouble ) {
+        if( data->usedouble && data->expectdouble ) {
           data->packetloss++;
           TraceOp.trc( "lbudp", TRCLEVEL_WARNING, __LINE__, 9999, "packet loss [0x%02X] of %d total losses", data->prevPacket[0], data->packetloss );
         }
@@ -95,7 +95,7 @@ static void __reader( void* threadinst ) {
       }
     }
     else {
-      TraceOp.trc( "lbudp", TRCLEVEL_WARNING, __LINE__, 9999, "unexpected packet size %d received" );
+      TraceOp.trc( "lbudp", TRCLEVEL_WARNING, __LINE__, 9999, "unexpected packet size %d received", packetSize );
       ThreadOp.sleep(10);
     }
 
@@ -119,8 +119,11 @@ Boolean lbUDPConnect( obj inst ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
   data->udpQueue  = QueueOp.inst(1000);
+
+  /* Obsolete options:
   data->useseq    = loconet != NULL ? wLocoNet.isuseseq(loconet):False;
   data->usedouble = loconet != NULL ? wLocoNet.isusedouble(loconet):False;
+  */
 
   data->readUDP = SocketOp.inst( wDigInt.gethost(data->ini), wDigInt.getport(data->ini), False, True, True );
   if( wDigInt.getlocalip( data->ini ) != NULL && StrOp.len(wDigInt.getlocalip( data->ini )) > 0 ) {
@@ -165,17 +168,17 @@ Boolean lbUDPWrite( obj inst, unsigned char *msg, int len ) {
     data->outseq++;
     MemOp.copy( out+1, msg, len);
     if( data->usedouble ) {
-      Boolean rc = SocketOp.sendto( data->writeUDP, msg, len+1, NULL, 0 );
+      Boolean rc = SocketOp.sendto( data->writeUDP, (char*)msg, len+1, NULL, 0 );
       ThreadOp.sleep(1);
     }
-    return SocketOp.sendto( data->writeUDP, out, len+1, NULL, 0 );
+    return SocketOp.sendto( data->writeUDP, (char*)out, len+1, NULL, 0 );
   }
   else {
     if( data->usedouble ) {
-      Boolean rc = SocketOp.sendto( data->writeUDP, msg, len, NULL, 0 );
+      Boolean rc = SocketOp.sendto( data->writeUDP, (char*)msg, len, NULL, 0 );
       ThreadOp.sleep(1);
     }
-    return SocketOp.sendto( data->writeUDP, msg, len, NULL, 0 );
+    return SocketOp.sendto( data->writeUDP, (char*)msg, len, NULL, 0 );
   }
 }
 

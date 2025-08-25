@@ -211,7 +211,7 @@ int accDecoderPkt2(byte* retVal, int addr, int active, int outputChannel) {
   int highAddr = ( (~addr) >> 6) & 0x07;
 
   retVal[0] = (byte) (0x80 | lowAddr);
-  retVal[1] = (byte) (0x80 | (highAddr << 4 ) | ( active << 3) | outputChannel&0x07);
+  retVal[1] = (byte) (0x80 | (highAddr << 4 ) | ( active << 3) | (outputChannel&0x07));
   retVal[2] = (byte) (retVal[0] ^ retVal[1]);
 
   return 3;
@@ -229,7 +229,7 @@ int accDecoderPkt2(byte* retVal, int addr, int active, int outputChannel) {
  int accDecoderPktOpsMode2(byte* retVal, int addr, int active, int outputChannel, int cvNum, int data) {
 
   if (addr < 1 || addr>511) {
-    printf("invalid address %d\n"+addr);
+    printf("invalid address %d\n",addr);
     return 0;
   }
   if (active < 0 || active>1) {
@@ -258,7 +258,7 @@ int accDecoderPkt2(byte* retVal, int addr, int active, int outputChannel) {
   int highCVnum = ((cvNum-1) >> 8) & 0x03;
 
   retVal[0] = (byte) (0x80 | lowAddr);
-  retVal[1] = (byte) (0x80 | (highAddr << 4 ) | ( active << 3) | outputChannel&0x07);
+  retVal[1] = (byte) (0x80 | (highAddr << 4 ) | ( active << 3) | (outputChannel&0x07));
   retVal[2] = (byte) (0xEC | highCVnum);
   retVal[3] = (byte) (lowCVnum);
   retVal[4] = (byte) (0xFF & data);
@@ -428,11 +428,11 @@ int opsCvWriteByte(byte* retVal, int address, Boolean longAddr, int cvNum, int d
   }
 
   if (data<0 || data>255) {
-    printf("invalid data "+data);
+    printf("invalid data %d",data);
     return 0;
   }
   if (cvNum<1 || cvNum>512) {
-    printf("invalid CV number "+cvNum);
+    printf("invalid CV number %d", cvNum);
     return 0;
   }
 
@@ -468,7 +468,7 @@ int speedStep128Packet(byte* retVal, int address, Boolean longAddr, int speed, B
   }
 
   if (speed<0 || speed>127) {
-    printf("invalid speed %d\n",speed);
+    printf("invalid speed %d > 127\n",speed);
     return 0;
   }
 
@@ -516,7 +516,7 @@ int speedStep28Packet(byte* retVal, int address, Boolean longAddr, int speed, Bo
   }
 
   if (speed<0 || speed>28) {
-      printf("invalid speed %d\n",speed);
+      printf("invalid speed %d > 28\n",speed);
       return 0;
   }
   int speedC = (speed&0x1F) >> 1;
@@ -549,7 +549,7 @@ int speedStep28Packet(byte* retVal, int address, Boolean longAddr, int speed, Bo
 int speedStep14Packet(byte* retVal, int address, Boolean longAddr, int speed, Boolean fwd, Boolean F0) {
 
   if (speed < 0 || speed > 15) {
-    printf("invalid speed %d\n", speed);
+    printf("invalid speed %d > 15\n", speed);
     return 0;
   }
 

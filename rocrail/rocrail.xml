@@ -1,25 +1,25 @@
 <!--
- Rocrail - Model Railroad Software
-
- Copyright (C) 2002-2009 - Rob Versluis <r.j.versluis@rocrail.net>
-
+ This is part of FreeRail - Model Railway Software
+ 
+ Copyright: See AUTHORS at the top-level directory of this project and
+ at GitHub <https://github.com/michaeloed/FreeRail/>
+ 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 2
+ as published by the Free Software Foundation; either version 3
  of the License, or (at your option) any later version.
-
+ 
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ General Public License for more details.
+ 
  You should have received a copy of the GNU General Public License
- along with this program; if not, write to the Free Software
- Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
 -->
-<Project name="RocRail" title="RocRail API" docname="rocrailapi" source="$Source: /cvsroot/rojav/rocrail/rocrail.xml,v $" revision="$Revision: 1.56 $">
+<Project name="RocRail" title="FreeRail API" docname="freerailapi" source="$Source: /cvsroot/rojav/rocrail/rocrail.xml,v $" revision="$Revision: 1.56 $">
 
-  <object name="App" use="node" include="clntcon,srcpcon,control,model,http,display,snmp" remark="RocRail application">
+  <object name="App" use="node" include="clntcon,srcpcon,control,weather,model,http,snmp,script" remark="FreeRail application">
     <fun name="inst" vt="this">
     </fun>
     <fun name="Main" vt="int">
@@ -37,11 +37,16 @@
     </fun>
     <fun name="getModel" vt="iOModel"/>
     <fun name="getControl" vt="iOControl"/>
+    <fun name="getWeather" vt="iOWeather"/>
     <fun name="getClntCon" vt="iOClntCon"/>
     <fun name="getSrcpCon" vt="iOSrcpCon"/>
-    <fun name="shutdown" vt="Boolean"/>
+    <fun name="shutdown" vt="Boolean">
+      <param name="network" vt="int" remark="Shutdown RocNet too."/>
+      <param name="signalname" vt="const char*" remark="Signal name."/>
+    </fun>
     <fun name="saveIni" vt="void"/>
     <fun name="stop" vt="void"/>
+    <fun name="ebreak" vt="void"/>
     <fun name="go" vt="void"/>
     <fun name="getStartTime" vt="long" remark=""/>
     <fun name="getBackTrace" vt="const char**" remark="Get the the last 10 exceptions."/>
@@ -49,8 +54,9 @@
     <fun name="isStress" vt="Boolean" remark=""/>
     <fun name="getIniFile" vt="const char*" remark="Current ini filename."/>
     <fun name="listThreads" vt="void" remark=""/>
-    <fun name="getLibPath" vt="const char*" remark="Path to the rocrail libraries."/>
+    <fun name="getLibPath" vt="const char*" remark="Path to the FreeRail libraries."/>
     <fun name="getImgPath" vt="const char*" remark="Path to images."/>
+    <fun name="getIconPath" vt="const char*" remark="Path to icons."/>
     <fun name="getrevno" vt="int"/>
     <fun name="isCreateModplan" vt="Boolean"/>
     <fun name="isRunAtStartup" vt="Boolean"/>
@@ -61,12 +67,16 @@
       <param name="count" vt="int" remark="Link count."/>
       <param name="up" vt="Boolean" remark="upLink."/>
     </fun>
+    <fun name="play" vt="void">
+      <param name="record" vt="const char*"/>
+    </fun>
+    <fun name="stopPlay" vt="void"/>
     <data>
-      <var name="ini" vt="iONode" remark="RocRail ini"/>
-      <var name="newini" vt="iONode" remark="RocRail ini"/>
+      <var name="ini" vt="iONode" remark="FreeRail ini"/>
+      <var name="newini" vt="iONode" remark="FreeRail ini"/>
       <var name="model" vt="iOModel" remark=""/>
       <var name="control" vt="iOControl" remark=""/>
-      <var name="display" vt="iODisplay" remark=""/>
+      <var name="weather" vt="iOWeather" remark=""/>
       <var name="clntCon" vt="iOClntCon" remark=""/>
       <var name="srcpCon" vt="iOSrcpCon" remark=""/>
       <var name="appstartTime" vt="long"/>
@@ -80,6 +90,7 @@
       <var name="createmodplan" vt="Boolean"/>
       <var name="revno" vt="int"/>
       <var name="run" vt="Boolean"/>
+      <var name="script" vt="iOScript"/>
     </data>
   </object>
 
@@ -99,7 +110,7 @@
   </interface>
 
   <object name="Block" interface="$../rocint/rocint.xml:BlockBase" use="list,map,node,mutex" include="loc,htmlint,$rocint/public/blockbase" remark="Block object">
-    <typedef def="enum {enter_event=100,enter2pre_event,enter2in_event,in_event,exit_event,pre2in_event,ghost_event,occupied_event,ident_event,shortin_event,run_event,stall_event,takeover_event,release_event,swap_event} block_fbevent"/>
+    <typedef def="enum {enter_event=100,enter2pre_event,enter2in_event,in_event,exit_event,pre2in_event,ghost_event,occupied_event,ident_event,shortin_event,run_event,stall_event,takeover_event,release_event,swap_event,enter2shortin_event,free_event,cmd_event} block_fbevent"/>
     <typedef def="enum {suits_not=0,suits_well=1,suits_ok=2} block_suits"/>
     <typedef def="void (*block_listener)(obj,block_fbevent)"/>
     <fun name="inst" vt="this">
@@ -122,6 +133,7 @@
       <param name="inst" vt="this" remark="Block instance"/>
     </fun>
     <fun name="getEventCode" vt="int">
+      <param name="inst" vt="this" remark="Block instance"/>
       <param name="evtname" vt="const char*"/>
     </fun>
     <data>
@@ -138,14 +150,6 @@
       <var name="listenerObj" vt="obj"/>
       <var name="listenerFun" vt="block_listener"/>
       <var name="closereq" vt="Boolean"/>
-      <var name="trig_enter" vt="Boolean"/>
-      <var name="trig_in" vt="Boolean"/>
-      <var name="trig_exit" vt="Boolean"/>
-      <var name="trig_out" vt="Boolean"/>
-      <var name="trig_enter_mid" vt="Boolean"/>
-      <var name="trig_exit_mid" vt="Boolean"/>
-      <var name="trig_renter_mid" vt="Boolean" remark="reverse enter"/>
-      <var name="trig_rexit_mid" vt="Boolean" remark="reverse exit"/>
       <var name="minbklc" vt="int"/>
       <var name="linkto" vt="iIBlockBase"/>
       <var name="props" vt="iONode" remark="Block properties"/>
@@ -156,6 +160,7 @@
       <var name="muxLock" vt="iOMutex"/>
       <var name="mvMillis" vt="int"/>
       <var name="mvTime" vt="long"/>
+      <var name="mvspeed" vt="float"/>
       <var name="manager" vt="iIBlockBase"/>
       <var name="occtime" vt="long"/>
       <var name="ghost" vt="Boolean"/>
@@ -163,10 +168,18 @@
       <var name="wheelcount" vt="int"/>
       <var name="wheelcounterId" vt="const char*"/>
       <var name="forceblocktimer" vt="Boolean"/>
+      <var name="pendingFree" vt="Boolean"/>
+      <var name="tempwait" vt="Boolean"/>
+      <var name="muxFiFO" vt="iOMutex"/>
+      <var name="fifoList" vt="iOList"/>
+      <var name="arrivalPending" vt="Boolean"/>
+      <var name="inPending" vt="Boolean"/>
+      <var name="fifo0departing" vt="Boolean"/>
+      <var name="forcelock" vt="Boolean"/>
     </data>
   </object>
 
-  <object name="Stage" interface="$../rocint/rocint.xml:BlockBase" use="list,map,node,mutex" include="loc,htmlint,$rocint/public/blockbase" remark="Block object">
+  <object name="Stage" interface="$../rocint/rocint.xml:BlockBase" use="list,map,node,mutex,thread" include="loc,htmlint,$rocint/public/blockbase" remark="Block object">
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Stage node"/>
     </fun>
@@ -183,6 +196,9 @@
       <var name="id" vt="const char*"/>
       <var name="locId" vt="const char*"/>
       <var name="targetSection" vt="int"/>
+      <var name="pendingSection" vt="int"/>
+      <var name="pendingFree" vt="Boolean"/>
+      <var name="pendingMove" vt="Boolean"/>
       <var name="props" vt="iONode" remark="Stage properties"/>
       <var name="sectionList" vt="iOList"/>
       <var name="fbMap" vt="iOMap"/>
@@ -202,7 +218,15 @@
       <var name="trig_exit_mid" vt="Boolean"/>
       <var name="trig_renter_mid" vt="Boolean" remark="reverse enter"/>
       <var name="trig_rexit_mid" vt="Boolean" remark="reverse exit"/>
-    </data>
+      <var name="mapMux" vt="iOMutex"/>
+      <var name="wait4enter" vt="Boolean"/>
+      <var name="early2in" vt="Boolean"/>
+      <var name="moveMux" vt="iOMutex"/>
+      <var name="watchdog" vt="iOThread"/>
+      <var name="run" vt="Boolean"/>
+      <var name="wdrun" vt="Boolean"/>
+      <var name="ghost" vt="Boolean"/>
+      </data>
   </object>
 
   <object name="ClntCon" use="node,map,socket,thread,mutex" remark="Client connection.">
@@ -255,7 +279,7 @@
   </object>
 
 
-  <object name="SrcpCon" use="node,map,socket,thread,mutex" remark="SRCP Client connection.">
+  <object name="SrcpCon" use="node,map,socket,thread,mutex,serial" remark="SRCP Client connection.">
     <typedef def="void(*srcpcon_callback)(obj,iONode)"/>
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Client connection setup"/>
@@ -296,11 +320,13 @@
       <var name="muxMap" vt="iOMutex"/>
       <var name="broadcaster" vt="iOThread"/>
       <var name="port" vt="int"/>
-    </data>
+      <var name="serial" vt="iOSerial"/>
+      <var name="serialOK" vt="Boolean"/>
+      </data>
   </object>
 
 
-  <object name="Control" use="node,map,thread" include="r2rnet,clntcon,powerman,$rocint/public/digint" remark="Control center for RocRail">
+  <object name="Control" use="node,map,thread" include="r2rnet,clntcon,powerman,$rocint/public/digint" remark="Control center for FreeRail">
     <typedef def="enum {CMD_OK=0,CMD_RETRY,CMD_ERROR} cmd_state"/>
     <typedef def="void(*control_callback)(obj,iONode)"/>
     <fun name="inst" vt="this">
@@ -330,6 +356,15 @@
       <param name="inst" vt="this" remark="Control instance"/>
       <param name="boosterlist" vt="iONode" remark="Booster list"/>
     </fun>
+    <fun name="power4Block" vt="Boolean">
+      <param name="inst" vt="this" remark="Control instance"/>
+      <param name="blockid" vt="const char*"/>
+      <param name="power" vt="Boolean"/>
+    </fun>
+    <fun name="hasBlockPower" vt="Boolean">
+      <param name="inst" vt="this" remark="Control instance"/>
+      <param name="blockid" vt="const char*"/>
+    </fun>
     <fun name="getR2Rnet" vt="iOR2Rnet">
       <param name="inst" vt="this" remark="Control instance"/>
     </fun>
@@ -343,21 +378,25 @@
       <var name="time" vt="long"/>
       <var name="timeset" vt="Boolean"/>
       <var name="clockrun" vt="Boolean"/>
+      <var name="temp" vt="int"/>
       <var name="txshortidsrun" vt="Boolean"/>
       <var name="power" vt="Boolean"/>
+      <var name="enablecom" vt="Boolean"/>
       <var name="programming" vt="Boolean"/>
       <var name="trackbus" vt="Boolean"/>
       <var name="sensorbus" vt="Boolean"/>
       <var name="accessorybus" vt="Boolean"/>
+      <var name="needkey4loconet" vt="Boolean"/>
       <var name="checker" vt="iOThread"/>
       <var name="powerman" vt="iOPowerMan"/>
       <var name="r2rnet" vt="iOR2Rnet"/>
-    </data>
+      <var name="devlist" vt="char*"/>
+      </data>
   </object>
 
 
   <object name="FBack" interface="HtmlInt" use="node,list" include="htmlint" remark="Feedback object">
-    <typedef def="void (*fback_listener)(obj,Boolean,const char*,int,int,int)"/>
+    <typedef def="void (*fback_listener)(obj,Boolean,const char*,const char*,const char*,const char*,const char*,int,int,Boolean)"/>
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Feedback node"/>
     </fun>
@@ -396,7 +435,7 @@
     <fun name="getState" vt="Boolean">
       <param name="inst" vt="this" remark="Feedback instance"/>
     </fun>
-    <fun name="getIdentifier" vt="int">
+    <fun name="getIdentifier" vt="const char*">
       <param name="inst" vt="this" remark="Feedback instance"/>
     </fun>
     <fun name="setState" vt="void">
@@ -425,10 +464,25 @@
       <param name="inst" vt="this" remark="Block instance"/>
       <param name="count" vt="int" remark="Car count; Count cars before firing an event."/>
     </fun>
+    <fun name="doTimedOff" vt="void">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="hasShortcut" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="isAtGPSPos" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="sid" vt="int"/>
+      <param name="x" vt="int"/>
+      <param name="y" vt="int"/>
+      <param name="z" vt="int"/>
+      <param name="state" vt="Boolean*"/>
+      </fun>
     <data>
       <var name="props" vt="iONode" remark="Feedback properties"/>
       <var name="state" vt="Boolean" remark="Current state"/>
       <var name="addrKey" vt="char*" remark="Address key"/>
+      <var name="cutoutAddrKey" vt="char*" remark="Address key"/>
       <var name="listenerObj" vt="obj" remark="Feedback listener object"/>
       <var name="listenerFun" vt="fback_listener" remark="Feedback listener function"/>
       <var name="listeners" vt="iOList" remark="Feedback listeners"/>
@@ -436,15 +490,24 @@
       <var name="carcount" vt="int"/>
       <var name="countedcars" vt="int"/>
       <var name="wheelcount" vt="int"/>
-    </data>
+      <var name="timer" vt="int"/>
+      <var name="timedoff" vt="int"/>
+      <var name="shortcut" vt="Boolean"/>
+      </data>
   </object>
 
 
-  <object name="Loc" interface="HtmlInt" use="node,thread,map" include="htmlint" remark="Loc object">
+  <object name="Loc" interface="HtmlInt" use="node,thread,map,mutex" include="htmlint" remark="Loc object">
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Loc node"/>
     </fun>
     <fun name="getId" vt="const char*">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="getTrain" vt="const char*">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="getEngine" vt="const char*">
       <param name="inst" vt="this" remark="Loc instance"/>
     </fun>
     <fun name="getCurBlock" vt="const char*">
@@ -476,6 +539,12 @@
       <param name="carcount" vt="int" remark="Number of cars"/>
     </fun>
     <fun name="go" vt="Boolean">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="gomanual" vt="Boolean">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="govirtual" vt="Boolean">
       <param name="inst" vt="this" remark="Loc instance"/>
     </fun>
     <fun name="goNet" vt="void">
@@ -514,6 +583,7 @@
       <param name="event" vt="int" remark="Event code"/>
       <param name="wait" vt="int" units="ms" remark="wait time before processing the event"/>
       <param name="forcewait" vt="Boolean" remark="Force to use this wait time instead of the optional loco event wait."/>
+      <param name="id" vt="const char*" remark="Sensor ID"/>
     </fun>
     <fun name="reset" vt="void">
       <param name="inst" vt="this" remark="Loc instance"/>
@@ -526,13 +596,24 @@
       <param name="inst" vt="this" remark="Loc instance"/>
       <param name="blockid" vt="const char*"/>
     </fun>
+    <fun name="getNextGotoBlock" vt="const char*">
+      <param name="inst" vt="this" remark="Loc instance"/>
+      <param name="prevblockid" vt="const char*"/>
+    </fun>
     <fun name="useSchedule" vt="void">
       <param name="inst" vt="this" remark="Loc instance"/>
       <param name="scheduleid" vt="const char*"/>
     </fun>
+    <fun name="useTour" vt="void">
+      <param name="inst" vt="this" remark="Loc instance"/>
+      <param name="tourid" vt="const char*"/>
+    </fun>
     <fun name="getSchedule" vt="const char*">
       <param name="inst" vt="this" remark="Loc instance"/>
       <param name="index" vt="int*" remark="Current schedule index."/>
+    </fun>
+    <fun name="getTour" vt="const char*">
+      <param name="inst" vt="this" remark="Loc instance"/>
     </fun>
     <fun name="normalizeID" vt="char*">
       <param name="id" vt="const char*" remark="Loc ID"/>
@@ -540,7 +621,10 @@
     <fun name="getAddress" vt="int">
       <param name="inst" vt="this" remark="Loc instance"/>
     </fun>
-    <fun name="getIdent" vt="long">
+    <fun name="getSecAddress" vt="int">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="getIdent" vt="const char*">
       <param name="inst" vt="this" remark="Loc instance"/>
     </fun>
     <fun name="getCV" vt="int">
@@ -556,6 +640,7 @@
       <param name="inst" vt="this" remark="Loc instance"/>
       <param name="cmd" vt="iONode" remark="Optional cmd node with placing information."/>
       <param name="consist" vt="Boolean" remark="Swap in context of a multiple unit."/>
+      <param name="direct" vt="Boolean"/>
     </fun>
     <fun name="swapBlockEnterSide" vt="void">
       <param name="inst" vt="this" remark="Loc instance"/>
@@ -567,6 +652,9 @@
       <param name="curblockid" vt="const char*" remark="Current block ID"/>
     </fun>
     <fun name="getDir" vt="Boolean">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="getPlacing" vt="Boolean">
       <param name="inst" vt="this" remark="Loc instance"/>
     </fun>
     <fun name="isAutomode" vt="Boolean">
@@ -598,16 +686,72 @@
     <fun name="setMode" vt="void">
       <param name="inst" vt="this" remark="Loc instance"/>
       <param name="mode" vt="const char*" remark="Automatic mode phase."/>
+      <param name="reason" vt="const char*" remark="Automatic mode reason."/>
     </fun>
     <fun name="matchIdent" vt="Boolean">
       <param name="inst" vt="this" remark="Loco instance"/>
-      <param name="ident" vt="long" remark="Loco ident code"/>
+      <param name="ident1" vt="const char*" remark="Loco ident code"/>
+      <param name="ident2" vt="const char*" remark="Loco ident code"/>
+      <param name="ident3" vt="const char*" remark="Loco ident code"/>
+      <param name="ident4" vt="const char*" remark="Loco ident code"/>
     </fun>
     <fun name="getCarCount" vt="int">
       <param name="inst" vt="this" remark="Loco instance"/>
     </fun>
     <fun name="depart" vt="void">
       <param name="inst" vt="this" remark="Loco instance"/>
+    </fun>
+    <fun name="getFnNrByDesc" vt="int">
+      <param name="inst" vt="this" remark="Loco instance"/>
+      <param name="desc" vt="const char*" remark="Function description"/>
+    </fun>
+    <fun name="isCheck2In" vt="Boolean">
+      <param name="inst" vt="this" remark="Loco instance"/>
+    </fun>
+    <fun name="resetBBT" vt="void">
+      <param name="inst" vt="this" remark="Loco instance"/>
+    </fun>
+    <fun name="isCommuter" vt="Boolean">
+      <param name="inst" vt="this" remark="Loco instance"/>
+    </fun>
+    <fun name="getCargo" vt="const char*">
+      <param name="inst" vt="this" remark="Loco instance"/>
+    </fun>
+    <fun name="getClass" vt="const char*">
+      <param name="inst" vt="this" remark="Loco instance"/>
+    </fun>
+    <fun name="hasClass" vt="Boolean">
+      <param name="inst" vt="this" remark="Loco instance"/>
+      <param name="class" vt="const char*"/>
+    </fun>
+    <fun name="isGoManual" vt="Boolean">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="saveSpeed" vt="int">
+      <param name="inst" vt="this" remark="Loc instance"/>
+      <param name="reset" vt="Boolean"/>
+    </fun>
+    <fun name="fifoTop" vt="void">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="isManually" vt="Boolean">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="isReduceSpeedAtEnter" vt="Boolean">
+      <param name="inst" vt="this" remark="Loc instance"/>
+    </fun>
+    <fun name="setClass" vt="void">
+      <param name="inst" vt="this" remark="Loc instance"/>
+      <param name="class" vt="const char*"/>
+    </fun>
+    <fun name="adjustAccel" vt="void">
+      <param name="inst" vt="this" remark="Loc instance"/>
+      <param name="accel" vt="int"/>
+      <param name="weight" vt="int"/>
+    </fun>
+    <fun name="setMaxKmh" vt="void">
+      <param name="inst" vt="this" remark="Loc instance"/>
+      <param name="maxkmh" vt="int"/>
     </fun>
     <data include="$rocint/public/lcdriverint">
       <var name="props" vt="iONode"/>
@@ -618,9 +762,11 @@
       <var name="go" vt="Boolean"/>
       <var name="goNet" vt="Boolean"/>
       <var name="brake" vt="Boolean"/>
+      <var name="check2in" vt="Boolean"/>
       <var name="curGroup" vt="const char*"/>
       <var name="prevBlock" vt="const char*"/>
       <var name="curBlock" vt="const char*"/>
+      <var name="curSensor" vt="const char*"/>
       <var name="destBlock" vt="const char*"/>
       <var name="gotoBlock" vt="const char*" remark="goto this block if found"/>
       <var name="driver" vt="iILcDriverInt"/>
@@ -664,7 +810,11 @@
       <var name="fneventblock" vt="char*"/>
       <var name="ignevt" vt="int"/>
       <var name="fxrestored" vt="Boolean"/>
+      <var name="fxrestoredbythread" vt="Boolean"/>
+      <var name="speedrestoredbythread" vt="Boolean"/>
       <var name="fxsleep" vt="int"/>
+      <var name="fxgroup" vt="int"/>
+      <var name="fxresetpending" vt="Boolean"/>
       <var name="enter" vt="Boolean"/>
       <var name="enterId" vt="const char*"/>
       <var name="enterTick" vt="int"/>
@@ -680,9 +830,48 @@
       <var name="outId" vt="const char*"/>
       <var name="outTick" vt="int"/>
       <var name="gomanual" vt="Boolean"/>
+      <var name="manual" vt="Boolean"/>
       <var name="runtime" vt="long"/>
       <var name="secondnextblock" vt="Boolean"/>
       <var name="usemanualroutes" vt="Boolean"/>
+      <var name="infocheck" vt="int"/>
+      <var name="released" vt="Boolean"/>
+      <var name="nrruns" vt="int"/>
+      <var name="blocktrip" vt="char*"/>
+      <var name="bbt" vt="Boolean"/>
+      <var name="bbtMap" vt="iOMap"/>
+      <var name="bbtCycle" vt="int"/>
+      <var name="bbtCycleSpeed" vt="int"/>
+      <var name="bbtCycleNr" vt="int"/>
+      <var name="bbtEnter" vt="unsigned long"/>
+      <var name="bbtIn" vt="unsigned long"/>
+      <var name="bbtEnterBlock" vt="const char*"/>
+      <var name="bbtInBlock" vt="const char*"/>
+      <var name="bbtPrevBlock" vt="const char*"/>
+      <var name="bbtRoute" vt="const char*"/>
+      <var name="bbtEnterSpeed" vt="int"/>
+      <var name="bbtSpeed" vt="int"/>
+      <var name="bbtSpeedInterval" vt="int"/>
+      <var name="bbtInterval" vt="int"/>
+      <var name="bbtAtMinSpeed" vt="Boolean"/>
+      <var name="bbtAtMin" vt="unsigned long"/>
+      <var name="bbtInTimer" vt="int"/>
+      <var name="bbtStepCount" vt="int"/>
+      <var name="bbtExternalStop" vt="Boolean"/>
+      <var name="bbtGenerateIn" vt="Boolean"/>
+      <var name="bbtDelay" vt="int"/>
+      <var name="sbtMap" vt="iOMap"/>
+      <var name="sbtEnterBlock" vt="const char*"/>
+      <var name="sbtInterval" vt="int"/>
+      <var name="sbtDecelerate" vt="int"/>
+      <var name="lastfncmd" vt="long"/>
+      <var name="govirtual" vt="Boolean"/>
+      <var name="muxEngine" vt="iOMutex"/>
+      <var name="muxCmd" vt="iOMutex"/>
+      <var name="savedSpeed" vt="int"/>
+      <var name="v0sleep" vt="int"/>
+      <var name="v0pending" vt="Boolean"/>
+      <var name="maxkmh" vt="int"/>
     </data>
   </object>
 
@@ -690,9 +879,10 @@
   <object name="Model" use="node,list,map,doc,mutex,file" include="#stdio,block,loc,car,operator,route,fback,switch,track,signal,tt,output,text,seltab,stage,action,location,$rocint/public/blockbase" remark="The plan model">
     <typedef def="void (*model_listener)(obj,iONode)"/>
     <fun name="inst" vt="this">
-      <param name="planfile" vt="const char*" remark="PLan filename"/>
-    </fun>
-    <fun name="init" vt="void">
+      <param name="planfile" vt="const char*" remark="Plan filename"/>
+      <param name="locofile" vt="const char*" remark="Loco filename"/>
+      </fun>
+    <fun name="init" vt="Boolean">
       <param name="inst" vt="this" remark="Model instance"/>
     </fun>
     <fun name="addListener" vt="void">
@@ -744,40 +934,95 @@
     <fun name="getLoc" vt="iOLoc">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="LocID to search for"/>
-    </fun>
+      <param name="props" vt="iONode" remark="Optional loco properties"/>
+      <param name="generate" vt="Boolean" remark="Generate Loco if not found by ID or address."/>
+      </fun>
     <fun name="getCar" vt="iOCar">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="CarID to search for"/>
+    </fun>
+    <fun name="getDec" vt="iONode">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="DecID to search for"/>
     </fun>
     <fun name="getOperator" vt="iOOperator">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="Operator ID to search for"/>
     </fun>
-    <fun name="getSwByAddress" vt="iOSwitch">
+    <fun name="getOperator4Car" vt="iOOperator">
       <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="Car ID to search for"/>
+    </fun>
+    <fun name="getSensorsByAddress" vt="iOList">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="iid" vt="const char*" remark="Optional IID"/>
+      <param name="bus" vt="int" remark="Bus number to search for"/>
+      <param name="addr" vt="int" remark="Decoder address to search for"/>
+      <param name="uidname" vt="const char*" remark="Alternative name for the bus number."/>
+    </fun>
+    <fun name="getSwByAddress" vt="obj">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="iid" vt="const char*" remark="Optional IID"/>
+      <param name="bus" vt="int" remark="Bus number to search for"/>
       <param name="addr" vt="int" remark="Decoder address to search for"/>
       <param name="port" vt="int" remark="Decoder port to search for"/>
-    </fun>
+      <param name="gate" vt="int" remark="Decoder gate to search for"/>
+      <param name="type" vt="int" remark="Port type to search for"/>
+      <param name="uidname" vt="const char*" remark="Alternative name for the bus number."/>
+      <param name="offset" vt="obj" remark="Optional switch object offset to be able to find another switch with the same address."/>
+      </fun>
     <fun name="getSgByAddress" vt="iOSignal">
       <param name="inst" vt="this" remark="Model instance"/>
+      <param name="iid" vt="const char*" remark="Optional IID"/>
+      <param name="bus" vt="int" remark="Bus number to search for"/>
       <param name="addr" vt="int" remark="Decoder address to search for"/>
       <param name="port" vt="int" remark="Decoder port to search for"/>
+      <param name="type" vt="int" remark="Port type to search for"/>
+      <param name="uidname" vt="const char*" remark="Alternative name for the bus number."/>
+    </fun>
+    <fun name="getCoByAddress" vt="iOOutput">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="iid" vt="const char*" remark="Optional IID"/>
+      <param name="bus" vt="int" remark="Bus number to search for"/>
+      <param name="addr" vt="int" remark="Decoder address to search for"/>
+      <param name="port" vt="int" remark="Decoder port to search for"/>
+      <param name="type" vt="int" remark="Port type to search for"/>
+      <param name="uidname" vt="const char*" remark="Alternative name for the bus number."/>
     </fun>
     <fun name="getLocByAddress" vt="iOLoc">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="decaddr" vt="int" remark="Loc decoder address to search for"/>
+      <param name="iid" vt="const char*" remark="Optional IID"/>
+    </fun>
+    <fun name="getCarByAddress" vt="iOCar">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="decaddr" vt="int" remark="Car decoder address to search for"/>
+      <param name="iid" vt="const char*" remark="Optional IID"/>
     </fun>
     <fun name="getLocByIdent" vt="iOLoc">
       <param name="inst" vt="this" remark="Model instance"/>
-      <param name="ident" vt="long" remark="Loc identifier to search for"/>
+      <param name="ident1" vt="const char*" remark="Loc identifier to search for"/>
+      <param name="ident2" vt="const char*" remark="Loc identifier to search for"/>
+      <param name="ident3" vt="const char*" remark="Loc identifier to search for"/>
+      <param name="ident4" vt="const char*" remark="Loc identifier to search for"/>
+      <param name="dir" vt="Boolean" remark="Loco direction"/>
+    </fun>
+    <fun name="getCarByIdent" vt="iOCar">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="ident" vt="const char*" remark="Identifier to search for"/>
     </fun>
     <fun name="getLocIDs" vt="iOList">
       <param name="inst" vt="this" remark="Model instance"/>
     </fun>
     <fun name="getBlock" vt="iIBlockBase">
       <param name="inst" vt="this" remark="Model instance"/>
-      <param name="id" vt="const char*" remark="BlocID to search for"/>
-    </fun>
+      <param name="id" vt="const char*" remark="BlockID to search for"/>
+      </fun>
+    <fun name="getBlockByAddr" vt="iIBlockBase">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="iid" vt="const char*" remark="Block trackdriver IID"/>
+      <param name="addr" vt="int" remark="Block trackdriver address"/>
+      </fun>
     <fun name="getTrack" vt="iOTrack">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="TrackID to search for"/>
@@ -794,6 +1039,14 @@
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="FBackID to search for"/>
     </fun>
+    <fun name="getGPSSensor" vt="iOFBack">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="sid" vt="int"/>
+      <param name="x" vt="int"/>
+      <param name="y" vt="int"/>
+      <param name="z" vt="int"/>
+      <param name="state" vt="Boolean*"/>
+      </fun>
     <fun name="getSwitch" vt="iOSwitch">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="SwitchID to search for"/>
@@ -807,6 +1060,10 @@
       <param name="id" vt="const char*" remark="OutputID to search for"/>
     </fun>
     <fun name="getRoute" vt="iORoute">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="RouteID to search for"/>
+    </fun>
+    <fun name="getResolvedRouteID" vt="const char*">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="RouteID to search for"/>
     </fun>
@@ -834,6 +1091,14 @@
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="ScheduleID to search for"/>
     </fun>
+    <fun name="getTour" vt="iONode">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="TourID to search for"/>
+    </fun>
+    <fun name="getWeather" vt="iONode">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="WeatherID to search for"/>
+    </fun>
     <fun name="getText" vt="iOText">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="id" vt="const char*" remark="TextID to search for"/>
@@ -845,9 +1110,21 @@
     <fun name="getTitle" vt="const char*">
       <param name="inst" vt="this" remark="Model instance"/>
     </fun>
+    <fun name="getVariable" vt="iONode">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="Variable ID to search for"/>
+    </fun>
+    <fun name="getSysVar" vt="char*">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="Variable ID to search for"/>
+    </fun>
+    <fun name="addVariable" vt="iONode">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="Variable ID to search for"/>
+    </fun>
     <fun name="analyse" vt="void">
       <param name="inst" vt="this" remark="Model instance"/>
-      <param name="cleanrun" vt="Boolean" remark="Clean"/>
+      <param name="mode" vt="int" remark="analyse/clean/health check/extended Check"/>
     </fun>
     <fun name="addNetRoute" vt="void">
       <param name="inst" vt="this" remark="Model instance"/>
@@ -872,15 +1149,14 @@
       <param name="loc" vt="iOLoc" remark="Loc instance"/>
       <param name="routeRef" vt="iORoute*" remark="Route reference"/>
       <param name="gotoBlockId" vt="const char*" remark="Wanted blockid"/>
-      <param name="trysamedir" vt="Boolean" remark="Try to find a destination in the same direction of the running train"/>
-      <param name="tryoppositedir" vt="Boolean" remark="Try to find a destination in the to-from direction"/>
-      <param name="forcesamedir" vt="Boolean" remark="find a destination in the same direction of the running train"/>
       <param name="swapPlacingInPrevRoute" vt="Boolean" remark="the route bevore is swapping the placement/direction"/>
+      <param name="forceOppDir" vt="Boolean" remark="find a destination in the opposite direction of the running train"/>
+      <param name="schedule" vt="Boolean"/>
+      <param name="secondnextblock" vt="Boolean"/>
     </fun>
-    <fun name="findRoute" vt="iORoute" remark="returns the fitting route">
+    <fun name="getScheduleIndex" vt="int" remark="returns the fitting route">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="scheduleid" vt="const char*" remark="scheduleid"/>
-      <param name="scheduleIdx" vt="int*" remark="schedule index"/>
       <param name="curblockid" vt="const char*" remark="current blockid"/>
       <param name="loc" vt="iOLoc" remark="Loc instance"/>
     </fun>
@@ -892,9 +1168,9 @@
       <param name="curblockid" vt="const char*" remark="current blockid"/>
       <param name="currouteid" vt="const char*" remark="current routeid"/>
       <param name="loc" vt="iOLoc" remark="Loc instance"/>
-      <param name="forceSameDir" vt="Boolean" remark="Force same direction."/>
       <param name="swapPlacingInPrevRoute" vt="Boolean" remark="Force same direction."/>
       <param name="indelay" vt="int*" remark="in event delay timer"/>
+      <param name="secondnextblock" vt="Boolean"/>
     </fun>
     <fun name="calcRoute" vt="iORoute" remark="returns the route to start with">
       <param name="inst" vt="this" remark="Model instance"/>
@@ -903,7 +1179,6 @@
       <param name="toLocationId" vt="const char*" remark="Wanted location"/>
       <param name="toBlockId" vt="const char*" remark="Wanted block"/>
       <param name="loc" vt="iOLoc" remark="Loc instance"/>
-      <param name="forceSameDir" vt="Boolean" remark="Force same direction."/>
       <param name="swapPlacingInPrevRoute" vt="Boolean" remark="Force same direction."/>
     </fun>
     <fun name="cmd" vt="Boolean">
@@ -915,7 +1190,8 @@
     </fun>
     <fun name="initField" vt="void">
       <param name="inst" vt="this" remark="Model instance"/>
-    </fun>
+      <param name="full" vt="Boolean"/>
+      </fun>
     <fun name="printLocs" vt="void">
       <param name="inst" vt="this" remark="Model instance"/>
       <param name="f" vt="FILE *" remark="Stream object"/>
@@ -991,9 +1267,6 @@
     <fun name="getLocoMap" vt="iOMap">
       <param name="inst" vt="this" remark="Control instance"/>
     </fun>
-    <fun name="isCheck2In" vt="Boolean">
-      <param name="inst" vt="this" remark="Model instance"/>
-    </fun>
     <fun name="isEnableSwFb" vt="Boolean">
       <param name="inst" vt="this" remark="Model instance"/>
     </fun>
@@ -1008,6 +1281,7 @@
     </fun>
     <fun name="saveBlockOccupancy" vt="void">
       <param name="inst" vt="this" remark="Model instance"/>
+      <param name="occfilename" vt="const char*" remark="Optional filename"/>
     </fun>
     <fun name="loadBlockOccupancy" vt="void">
       <param name="inst" vt="this" remark="Model instance"/>
@@ -1061,17 +1335,42 @@
       <param name="scid" vt="const char*" remark="schedule ID"/>
       <param name="lcid" vt="const char*" remark="loco ID"/>
     </fun>
-    <data include="mvtrack,modplan,$rocint/public/analyserint">
+    <fun name="forceUnlock" vt="void">
+      <param name="inst" vt="this" remark="Model instance"/>
+    </fun>
+    <fun name="getMasterLoc" vt="iOLoc">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="slaveID" vt="const char*"/>
+    </fun>
+    <fun name="hasBlockCars" vt="Boolean">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="id" vt="const char*" remark="BlockID to search for"/>
+    </fun>
+    <fun name="isSaveOnShutdown" vt="Boolean">
+      <param name="inst" vt="this" remark="Model instance"/>
+    </fun>
+    <fun name="getResolveVariable" vt="iONode">
+      <param name="inst" vt="this" remark="Model instance"/>
+      <param name="varid" vt="const char*" remark="VarID to search for"/>
+      <param name="map" vt="iOMap" remark="Map with replacements"/>
+    </fun>
+    <fun name="initMasterLocMap" vt="void">
+      <param name="inst" vt="this" remark="Model instance"/>
+    </fun>
+    <data include="mvtrack,modplan">
       <var name="callback" vt="model_listener"/>
       <var name="cbCargo" vt="obj"/>
       <var name="healthy" vt="Boolean"/>
       <var name="autoMode" vt="Boolean"/>
       <var name="fileName" vt="const char*"/>
+      <var name="locoFileName" vt="const char*"/>
       <var name="title" vt="const char*"/>
       <var name="planFile" vt="iOFile"/>
       <var name="planDoc" vt="iODoc"/>
       <var name="model" vt="iONode"/>
       <var name="locMap" vt="iOMap"/>
+      <var name="locList" vt="iOList"/>
+      <var name="masterLocMap" vt="iOMap"/>
       <var name="carMap" vt="iOMap"/>
       <var name="operatorMap" vt="iOMap"/>
       <var name="switchMap" vt="iOMap"/>
@@ -1095,22 +1394,27 @@
       <var name="coAddrMap" vt="iOMap"/>
       <var name="locationMap" vt="iOMap"/>
       <var name="scheduleMap" vt="iOMap"/>
+      <var name="tourMap" vt="iOMap"/>
+      <var name="weatherMap" vt="iOMap"/>
       <var name="actionMap" vt="iOMap"/>
       <var name="waybillMap" vt="iOMap"/>
       <var name="muxFindDest" vt="iOMutex"/>
       <var name="fbAddresses[32][256]" vt="byte" remark="array of active feedback module addresses used to inform the digint"/>
       <var name="levelItemsMap" vt="iOMap"/>
-      <var name="check2in" vt="Boolean"/>
       <var name="occMap" vt="iOMap"/>
       <var name="occMux" vt="iOMutex"/>
       <var name="mvtrack" vt="iOMVTrack"/>
       <var name="enableswfb" vt="Boolean"/>
       <var name="moduleplan" vt="iOModPlan"/>
       <var name="sysEventListeners" vt="iOList"/>
+      <var name="startallera" vt="int"/>
       <var name="pendinginitfield" vt="Boolean"/>
       <var name="pendingstartall" vt="Boolean"/>
+      <var name="pendingstartallvirtual" vt="Boolean"/>
       <var name="muxSysEvent" vt="iOMutex"/>
-      <var name="analyser" vt="iIAnalyserInt"/>
+      <var name="timedoff" vt="iOThread"/>
+      <var name="locationMux" vt="iOMutex"/>
+      <var name="saveonshutdown" vt="Boolean"/>
     </data>
     <struct name="LevelList" typedef="*iOLevelList">
       <var name="list" vt="iOList"/>
@@ -1120,6 +1424,24 @@
     </struct>
   </object>
 
+  <object name="ModelUtils" use="node,list,map" include="block,loc,car,operator,route,fback,switch,track,signal,tt,output,text,seltab,stage,action,location,$rocint/public/blockbase" remark="The model utilities">
+    <fun name="inst" vt="this">
+      <param name="model" vt="iONode"/>
+    </fun>
+    <fun name="setModel" vt="void">
+      <param name="inst" vt="this"/>
+      <param name="model" vt="iONode"/>
+    </fun>
+    <fun name="renameItemDependencies" vt="Boolean">
+      <param name="model" vt="iONode"/>
+      <param name="id" vt="const char*"/>
+      <param name="previd" vt="const char*"/>
+      <param name="props" vt="iONode"/>
+    </fun>
+    <data>
+      <var name="model" vt="iONode"/>
+    </data>
+  </object>
 
   <object name="RCon" use="node,thread,socket" remark="RCon object">
     <typedef def="void (*rcon_callback)(obj, iONode)"/>
@@ -1167,6 +1489,10 @@
     <fun name="getToBlock" vt="const char*">
       <param name="inst" vt="this" remark="Route instance"/>
     </fun>
+    <fun name="getBlockSignalSide" vt="Boolean">
+      <param name="inst" vt="this" remark="Route instance"/>
+      <param name="bkid" vt="const char*" remark="Block ID"/>
+    </fun>
     <fun name="getToBlockSide" vt="Boolean">
       <param name="inst" vt="this" remark="Route instance"/>
     </fun>
@@ -1184,6 +1510,7 @@
       <param name="locid" vt="const char*" remark="Unlocking locid"/>
       <param name="resblocks" vt="const char**" remark="Reserved blocks; not to unlock as crossing blocks."/>
       <param name="unlockswitches" vt="Boolean" remark="unlock all switches for this route"/>
+      <param name="force" vt="Boolean" remark="Force unlock."/>
     </fun>
     <fun name="cmd" vt="Boolean">
       <param name="inst" vt="this" remark="Route instance"/>
@@ -1201,20 +1528,21 @@
       <param name="blockid" vt="const char*"/>
       <param name="fromto" vt="Boolean*"/>
     </fun>
-    <fun name="getDir" vt="Boolean">
-      <param name="inst" vt="this" remark="Route instance"/>
-    </fun>
     <fun name="getVelocity" vt="const char*">
       <param name="inst" vt="this" remark="Route instance"/>
       <param name="percent" vt="int*" remark="Speed percent"/>
+      <param name="loco" vt="iOLoc" remark="Loco to check for speed condition."/>
     </fun>
-    <fun name="isSwap" vt="Boolean">
+    <fun name="getMaxKmh" vt="int">
       <param name="inst" vt="this" remark="Route instance"/>
     </fun>
     <fun name="isSwapPost" vt="Boolean">
       <param name="inst" vt="this" remark="Route instance"/>
     </fun>
     <fun name="hasThrownSwitch" vt="Boolean">
+      <param name="inst" vt="this" remark="Route instance"/>
+    </fun>
+    <fun name="hasSwitchCommands" vt="Boolean">
       <param name="inst" vt="this" remark="Route instance"/>
     </fun>
     <fun name="isSet" vt="Boolean" remark="true if all turnouts are set">
@@ -1237,19 +1565,45 @@
     <fun name="isSetCrossingblockSignals" vt="Boolean">
       <param name="inst" vt="this" remark="Route instance"/>
     </fun>
+    <fun name="link" vt="Boolean">
+      <param name="inst" vt="this" remark="Route instance"/>
+      <param name="linkto" vt="int" remark="link to port"/>
+    </fun>
+    <fun name="unLink" vt="Boolean">
+      <param name="inst" vt="this" remark="Route instance"/>
+    </fun>
+    <fun name="isLocked" vt="Boolean">
+      <param name="inst" vt="this" remark="Route instance"/>
+    </fun>
+    <fun name="setClosed" vt="void">
+      <param name="inst" vt="this" remark="Route instance"/>
+    </fun>
+    <fun name="isClosed" vt="Boolean">
+      <param name="inst" vt="this" remark="Route instance"/>
+    </fun>
+    <fun name="setClass" vt="void">
+      <param name="inst" vt="this" remark="Route instance"/>
+      <param name="class" vt="const char*"/>
+    </fun>
+    <fun name="isState" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="state" vt="const char*" remark="State to compare with."/>
+    </fun>
     <data>
       <var name="lockedId" vt="const char*"/>
+      <var name="requestId" vt="const char*"/>
       <var name="props" vt="iONode"/>
       <var name="reverse" vt="Boolean"/>
       <var name="routeLockId" vt="char*"/>
       <var name="ctc1" vt="Boolean"/>
       <var name="ctc2" vt="Boolean"/>
       <var name="ctc3" vt="Boolean"/>
-    </data>
+      <var name="testlocked" vt="Boolean"/>
+      </data>
   </object>
 
 
-  <object name="Switch" interface="HtmlInt" use="node,mutex,thread" include="htmlint,route" remark="Switch object">
+  <object name="Switch" interface="HtmlInt" use="node,mutex,thread,list" include="htmlint,route" remark="Switch object">
     <typedef def="enum {SW_STRAIGHT=0,SW_TURNOUT,SW_LEFT,SW_RIGHT,SW_UNKNOWN} sw_state"/>
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Switch node"/>
@@ -1266,6 +1620,7 @@
       <param name="inst" vt="this" remark="Switch instance"/>
       <param name="locid" vt="const char*" remark="Unlocking locid"/>
       <param name="route" vt="iORoute" remark="Route instance"/>
+      <param name="force" vt="Boolean" remark="Force unlock."/>
     </fun>
     <fun name="cmd" vt="Boolean">
       <param name="inst" vt="this" remark="Switch instance"/>
@@ -1303,6 +1658,7 @@
       <param name="bus" vt="int" remark="Decoder bus"/>
       <param name="addr" vt="int" remark="Decoder addres"/>
       <param name="port" vt="int" remark="Port number"/>
+      <param name="type" vt="int" remark="Port type"/>
       <param name="iid" vt="const char*" remark="Interface ID"/>
     </fun>
     <fun name="event" vt="void">
@@ -1325,6 +1681,24 @@
       <param name="inst" vt="this"/>
       <param name="state" vt="const char*" remark="State to compare with."/>
     </fun>
+    <fun name="addListener" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="listener" vt="obj"/>
+    </fun>
+    <fun name="removeListener" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="listener" vt="obj"/>
+    </fun>
+    <fun name="link" vt="Boolean">
+      <param name="inst" vt="this" remark="Switch instance"/>
+      <param name="linkto" vt="int" remark="link to port"/>
+    </fun>
+    <fun name="unLink" vt="Boolean">
+      <param name="inst" vt="this" remark="Switch instance"/>
+    </fun>
+    <fun name="has2Units" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
     <data include="fback">
       <var name="id" vt="const char*"/>
       <var name="lockedId" vt="const char*"/>
@@ -1340,6 +1714,8 @@
       <var name="fbG" vt="iOFBack"/>
       <var name="fb2R" vt="iOFBack"/>
       <var name="fb2G" vt="iOFBack"/>
+      <var name="fbOcc" vt="iOFBack"/>
+      <var name="fbOcc2" vt="iOFBack"/>
       <var name="fbRinv" vt="Boolean"/>
       <var name="fbGinv" vt="Boolean"/>
       <var name="fb2Rinv" vt="Boolean"/>
@@ -1352,10 +1728,16 @@
       <var name="fieldState1" vt="int"/>
       <var name="fieldState2" vt="int"/>
       <var name="accThread" vt="iOThread"/>
+      <var name="accrun" vt="Boolean"/>
       <var name="run" vt="Boolean"/>
       <var name="ctc1" vt="Boolean"/>
       <var name="ctc2" vt="Boolean"/>
-    </data>
+      <var name="pendingflip" vt="Boolean"/>
+      <var name="listeners" vt="iOList"/>
+      <var name="testThread" vt="iOThread"/>
+      <var name="testRun" vt="Boolean"/>
+      <var name="pendingSet" vt="Boolean"/>
+      </data>
   </object>
 
 
@@ -1388,6 +1770,10 @@
     <fun name="blank" vt="void">
       <param name="inst" vt="this" remark="Signal instance"/>
     </fun>
+    <fun name="aspect" vt="void">
+      <param name="inst" vt="this" remark="Signal instance"/>
+      <param name="nr" vt="int" remark="Signal aspect number"/>
+    </fun>
     <fun name="cmd" vt="Boolean">
       <param name="inst" vt="this" remark="Signal instance"/>
       <param name="cmd" vt="iONode" remark="Command node"/>
@@ -1400,6 +1786,13 @@
     <fun name="isManualOperated" vt="Boolean">
       <param name="inst" vt="this"/>
     </fun>
+    <fun name="isResetManualOperated" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="event" vt="void">
+      <param name="inst" vt="this" remark="Signal instance"/>
+      <param name="evt" vt="iONode" remark="Event node"/>
+    </fun>
     <data>
       <var name="props" vt="iONode"/>
       <var name="isStateInverted" vt="Boolean"/>
@@ -1407,7 +1800,7 @@
   </object>
 
 
-  <object name="Output" interface="HtmlInt" use="node" include="htmlint" remark="Common Output object">
+  <object name="Output" interface="HtmlInt" use="node,list" include="htmlint" remark="Common Output object">
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Output node"/>
     </fun>
@@ -1431,6 +1824,7 @@
       <param name="bus" vt="int" remark="Decoder bus"/>
       <param name="addr" vt="int" remark="Decoder addres"/>
       <param name="port" vt="int" remark="Port number"/>
+      <param name="type" vt="int" remark="Port type"/>
       <param name="iid" vt="const char*" remark="Interface ID"/>
     </fun>
     <fun name="event" vt="void">
@@ -1446,23 +1840,39 @@
       <param name="inst" vt="this"/>
       <param name="state" vt="const char*" remark="State to compare with."/>
     </fun>
+    <fun name="addListener" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="listener" vt="obj"/>
+    </fun>
+    <fun name="removeListener" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="listener" vt="obj"/>
+    </fun>
     <data>
       <var name="props" vt="iONode"/>
       <var name="addrKey" vt="char*" remark="Address key"/>
-    </data>
+      <var name="listeners" vt="iOList"/>
+      </data>
   </object>
 
 
-  <object name="Text" interface="HtmlInt" use="node" include="htmlint" remark="Text object">
+  <object name="Text" interface="HtmlInt" use="node,map" include="htmlint" remark="Text object">
     <fun name="inst" vt="this">
-      <param name="ini" vt="iONode" remark="Output node"/>
+      <param name="ini" vt="iONode" remark="Text node"/>
     </fun>
     <fun name="getId" vt="const char*">
-      <param name="inst" vt="this" remark="Output instance"/>
+      <param name="inst" vt="this" remark="Text instance"/>
+    </fun>
+    <fun name="getText" vt="const char*">
+      <param name="inst" vt="this" remark="Text instance"/>
     </fun>
     <fun name="modify" vt="void">
-      <param name="inst" vt="this" remark="Output instance"/>
+      <param name="inst" vt="this" remark="Text instance"/>
       <param name="mod" vt="iONode" remark="Modify node"/>
+    </fun>
+    <fun name="replaceAllSubstitutions" vt="char*">
+      <param name="s" vt="const char*" remark="Input string"/>
+      <param name="map" vt="iOMap" remark="Map with replacements"/>
     </fun>
     <data>
       <var name="props" vt="iONode"/>
@@ -1520,7 +1930,9 @@
       <var name="light" vt="Boolean"/>
       <var name="triggerS1" vt="Boolean"/>
       <var name="triggerS2" vt="Boolean"/>
-      <var name="triggerSmid" vt="Boolean"/>
+      <var name="triggerSmid1" vt="Boolean"/>
+      <var name="triggerSmid2" vt="Boolean"/>
+      <var name="hasMid2" vt="Boolean"/>
       <var name="tablepos" vt="int"/>
       <var name="gotopos" vt="int"/>
       <var name="delaytick" vt="unsigned long"/>
@@ -1532,12 +1944,19 @@
       <var name="locIdGroup" vt="const char*"/>
       <var name="selectedTrack" vt="iONode"/>
       <var name="locoOnBridge" vt="Boolean"/>
-    </data>
+      <var name="f[32]" vt="Boolean"/>
+      </data>
   </object>
 
   <object name="Http" use="node,thread,socket,map,mutex" remark="HttpMonitor.">
+    <typedef def="void(*httpcon_callback)(obj,iONode)"/>
     <fun name="inst" vt="this" remark="Object creator.">
       <param name="ini" vt="iONode" remark="Http ini."/>
+      <param name="callbackfun" vt="httpcon_callback"/>
+      <param name="callbackobj" vt="obj"/>
+      <param name="imgpath" vt="const char*" remark="Image path from the server."/>
+      <param name="controlcode" vt="const char*"/>
+      <param name="slavecode" vt="const char*"/>
     </fun>
     <fun name="shutdown" vt="void" remark="Shutdown Http.">
       <param name="inst" vt="this" remark="Http instance."/>
@@ -1547,6 +1966,18 @@
     </fun>
     <fun name="deletePostDataMap" vt="void" remark="">
       <param name="postdatamap" vt="iOMap" remark=""/>
+    </fun>
+    <fun name="setCallback" vt="void">
+      <param name="inst" vt="this" remark="Http instance"/>
+      <param name="callbackfun" vt="httpcon_callback"/>
+      <param name="callbackobj" vt="obj"/>
+    </fun>
+    <fun name="broadcastEvent" vt="void">
+      <param name="inst" vt="this" remark="Http instance."/>
+      <param name="evt" vt="iONode"/>
+    </fun>
+    <fun name="isEnded" vt="Boolean">
+      <param name="inst" vt="this" remark="Http instance."/>
     </fun>
     <data>
       <var name="port" vt="int" remark="Port to service."/>
@@ -1563,6 +1994,10 @@
       <var name="shutdown" vt="Boolean" remark=""/>
       <var name="ini" vt="iONode" remark=""/>
       <var name="webclient" vt="iONode" remark=""/>
+      <var name="callback" vt="httpcon_callback"/>
+      <var name="callbackObj" vt="obj"/>
+      <var name="controlcode" vt="const char*"/>
+      <var name="slavecode" vt="const char*"/>
     </data>
   </object>
 
@@ -1596,13 +2031,25 @@
     </fun>
     <fun name="work" vt="Boolean" remark="Work slice.">
       <param name="inst" vt="this" remark="HClient instance."/>
+      <param name="event" vt="iONode" remark="Event node."/>
+      <param name="cmd" vt="char**" remark="Command XML."/>
     </fun>
     <fun name="getId" vt="const char*" remark="PClient ID.">
+      <param name="inst" vt="this" remark="PClient instance."/>
+    </fun>
+    <fun name="shutdown" vt="void" remark="PClient ID.">
       <param name="inst" vt="this" remark="PClient instance."/>
     </fun>
     <data>
       <var name="id" vt="long" remark=""/>
       <var name="cid" vt="char*" remark="Client ID"/>
+      <var name="websocketreader" vt="iOThread"/>
+      <var name="firstbyte" vt="unsigned char"/>
+      <var name="websocketavail" vt="Boolean" remark=""/>
+      <var name="websocketerror" vt="Boolean" remark=""/>
+      <var name="websocketrun" vt="Boolean" remark=""/>
+      <var name="websocket" vt="Boolean" remark=""/>
+      <var name="websocketmonitor" vt="Boolean" remark=""/>
       <var name="socket" vt="iOSocket" remark="Client socket."/>
       <var name="rcptBuffer" vt="char*" remark="Receipt buffer."/>
       <var name="rcptSize" vt="int" remark="Size of receipt."/>
@@ -1615,22 +2062,6 @@
       <var name="skip" vt="Boolean"/>
       <var name="html[256]" vt="char"/>
     </struct>
-  </object>
-
-
-  <object name="Display" use="node,js" remark="Display object for LCD">
-    <fun name="inst" vt="this">
-      <param name="ini" vt="iONode" remark="Display node"/>
-    </fun>
-    <data>
-      <var name="props" vt="iONode"/>
-      <var name="jsmap" vt="iONode"/>
-      <var name="lcd" vt="iONode"/>
-      <var name="js" vt="iOJS"/>
-      <var name="map" vt="int"/>
-      <var name="menulevel" vt="int"/>
-      <var name="menuindex[5]" vt="int"/>
-    </data>
   </object>
 
 
@@ -1689,6 +2120,8 @@
       <var name="psenState" vt="Boolean" remark="position sensor state"/>
       <var name="closereq" vt="Boolean"/>
       <var name="reverse" vt="Boolean"/>
+      <var name="fromBlockId" vt="const char*"/>
+      <var name="byRouteId" vt="const char*"/>
       <var name="unlockTick" vt="long"/>
     </data>
   </object>
@@ -1758,6 +2191,24 @@
       <param name="inst" vt="this" remark="instance"/>
       <param name="routeid" vt="const char*"/>
     </fun>
+    <fun name="mergeList" vt="void">
+      <param name="listname" vt="const char*"/>
+      <param name="model" vt="iONode"/>
+      <param name="module" vt="iONode"/>
+      <param name="level" vt="int"/>
+      <param name="r" vt="int"/>
+      <param name="cx" vt="int"/>
+      <param name="cy" vt="int"/>
+      <param name="broadcast" vt="Boolean"/>
+    </fun>
+    <fun name="mergeLocs" vt="void">
+      <param name="model" vt="iONode"/>
+      <param name="fname" vt="const char*"/>
+    </fun>
+    <fun name="saveLocs" vt="void">
+      <param name="model" vt="iONode"/>
+      <param name="fname" vt="const char*"/>
+    </fun>
     <data>
       <var name="model" vt="iONode"/>
       <var name="modplan" vt="iONode"/>
@@ -1768,6 +2219,7 @@
       <var name="blockMap" vt="iOMap"/>
       <var name="routeIdMap" vt="iOMap"/>
       <var name="mod2routeIdMap" vt="iOMap"/>
+      <var name="endmodid" vt="const char*"/>
     </data>
   </object>
 
@@ -1819,7 +2271,8 @@
     </fun>
     <fun name="tick" vt="void">
       <param name="inst" vt="this"/>
-    </fun>
+      <param name="seconds" vt="int"/>
+      </fun>
     <fun name="modify" vt="void">
       <param name="inst" vt="this" remark="Action instance"/>
       <param name="modification" vt="iONode" remark="Modification node"/>
@@ -1832,74 +2285,24 @@
       <var name="action" vt="iONode"/>
       <var name="timerthread" vt="iOThread"/>
       <var name="actionctrl" vt="iONode"/>
-      <var name="randommins" vt="int"/>
+      <var name="timer" vt="int"/>
+      <var name="randomsecs" vt="int"/>
       <var name="ticker" vt="int"/>
-    </data>
+      <var name="lastacthour" vt="int"/>
+      <var name="lastactmin" vt="int"/>
+      <var name="lastactsec" vt="int"/>
+      <var name="enabled" vt="Boolean"/>
+      </data>
   </object>
 
 
-  <object name="Traverser" interface="HtmlInt" use="node,mutex" include="htmlint,route" remark="Traverser object">
-    <fun name="inst" vt="this">
-      <param name="ini" vt="iONode" remark="traverser node"/>
-    </fun>
-    <fun name="lock" vt="Boolean">
-      <param name="inst" vt="this" remark="Switch instance"/>
-      <param name="locid" vt="const char*" remark="Locking locid"/>
-      <param name="route" vt="iORoute" remark="Route instance"/>
-    </fun>
-    <fun name="unLock" vt="Boolean">
-      <param name="inst" vt="this" remark="Switch instance"/>
-      <param name="locid" vt="const char*" remark="Unlocking locid"/>
-    </fun>
-    <fun name="cmd" vt="Boolean">
-      <param name="inst" vt="this" remark="Switch instance"/>
-      <param name="cmd" vt="iONode" remark="Command node"/>
-      <param name="update" vt="Boolean" remark="Send update events"/>
-      <param name="error" vt="int*" remark="error code"/>
-    </fun>
-    <fun name="modify" vt="void">
-      <param name="inst" vt="this" remark="Switch instance"/>
-      <param name="mod" vt="iONode" remark="Modify node"/>
-    </fun>
-    <fun name="isLocked" vt="Boolean">
-      <param name="inst" vt="this" remark="Switch instance"/>
-      <param name="locid" vt="const char*" remark="Querying locid"/>
-    </fun>
-    <fun name="reset" vt="void">
-      <param name="inst" vt="this" remark="Switch instance"/>
-    </fun>
-    <fun name="getAddrKey" vt="const char*">
-      <param name="inst" vt="this" remark="Switch instance"/>
-    </fun>
-    <fun name="createAddrKey" vt="char*">
-      <param name="bus" vt="int" remark="Decoder bus"/>
-      <param name="addr" vt="int" remark="Decoder addres"/>
-      <param name="port" vt="int" remark="Port number"/>
-      <param name="iid" vt="const char*" remark="Interface ID"/>
-    </fun>
-    <fun name="isSet" vt="Boolean" remark="true if the sensor state matches the wanted state">
-      <param name="inst" vt="this" remark="Switch instance"/>
-    </fun>
-    <fun name="isState" vt="Boolean">
-      <param name="inst" vt="this"/>
-      <param name="state" vt="const char*" remark="State to compare with."/>
-    </fun>
-    <data include="fback">
-      <var name="id" vt="const char*"/>
-      <var name="lockedId" vt="const char*"/>
-      <var name="route" vt="iORoute"/>
-      <var name="props" vt="iONode"/>
-      <var name="addrKey" vt="char*" remark="Address key"/>
-      <var name="muxLock" vt="iOMutex"/>
-      <var name="muxCmd" vt="iOMutex"/>
-      <var name="activated" vt="Boolean"/>
-    </data>
-  </object>
-
-
-  <object name="Car" interface="HtmlInt" use="node" include="htmlint" remark="Car object">
+  <object name="Car" interface="HtmlInt" use="node,map" include="htmlint" remark="Car object">
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Car node"/>
+    </fun>
+    <fun name="cmd" vt="Boolean">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="cmd" vt="iONode" remark="Command node"/>
     </fun>
     <fun name="modify" vt="void">
       <param name="inst" vt="this" remark="Car instance"/>
@@ -1909,9 +2312,70 @@
       <param name="inst" vt="this" remark="Car instance"/>
       <param name="waybill" vt="iONode" remark="Waybill node"/>
     </fun>
+    <fun name="getIdent" vt="const char*">
+      <param name="inst" vt="this" remark="Car instance"/>
+    </fun>
+    <fun name="getLen" vt="int">
+      <param name="inst" vt="this" remark="Car instance"/>
+    </fun>
+    <fun name="getWeight" vt="int">
+      <param name="inst" vt="this" remark="Car instance"/>
+    </fun>
+    <fun name="getAddress" vt="int">
+      <param name="inst" vt="this" remark="Car instance"/>
+    </fun>
+    <fun name="getFunctionStatus" vt="iONode">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="funcmd" vt="iONode" remark="function command node"/>
+    </fun>
+    <fun name="setLocality" vt="void">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="id" vt="const char*" remark="Locality ID"/>
+    </fun>
+    <fun name="getFnNrByDesc" vt="int">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="desc" vt="const char*" remark="Function description"/>
+    </fun>
+    <fun name="swapPlacing" vt="void">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="cmd" vt="iONode" remark="Optional cmd node with placing information."/>
+    </fun>
+    <fun name="getCV" vt="int">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="nr" vt="int" remark="CVByte number"/>
+    </fun>
+    <fun name="setCV" vt="void">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="nr" vt="int" remark="CVByte number"/>
+      <param name="value" vt="int" remark="CVByte value"/>
+    </fun>
+    <fun name="isCommuter" vt="Boolean">
+      <param name="inst" vt="this" remark="Car instance"/>
+    </fun>
+    <fun name="getVMax" vt="int">
+      <param name="inst" vt="this" remark="Car instance"/>
+    </fun>
+    <fun name="getLocality" vt="const char*">
+      <param name="inst" vt="this" remark="Car instance"/>
+    </fun>
     <data>
       <var name="props" vt="iONode"/>
-    </data>
+      <var name="fx[32]" vt="Boolean"/>
+      <var name="cvMap" vt="iOMap"/>
+      </data>
+  </object>
+
+
+  <object name="Dec" interface="HtmlInt" use="node,map" include="htmlint" remark="Decoder object">
+    <fun name="getCV" vt="int">
+      <param name="props" vt="iONode" remark="Dec properties"/>
+      <param name="nr" vt="int" remark="CVByte number"/>
+    </fun>
+    <fun name="setCV" vt="void">
+      <param name="props" vt="iONode" remark="Dec properties"/>
+      <param name="nr" vt="int" remark="CVByte number"/>
+      <param name="value" vt="int" remark="CVByte value"/>
+    </fun>
   </object>
 
 
@@ -1919,9 +2383,63 @@
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Operator node"/>
     </fun>
+    <fun name="cmd" vt="Boolean">
+      <param name="inst" vt="this" remark="Car instance"/>
+      <param name="cmd" vt="iONode" remark="Command node"/>
+    </fun>
     <fun name="modify" vt="void">
       <param name="inst" vt="this" remark="Operator instance"/>
       <param name="mod" vt="iONode" remark="Modify node"/>
+    </fun>
+    <fun name="getLen" vt="int">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="trainweight" vt="int*"/>
+    </fun>
+    <fun name="swapPlacing" vt="void">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="cmd" vt="iONode" remark="Optional cmd node with placing information."/>
+    </fun>
+    <fun name="hasCar" vt="Boolean">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="id" vt="const char*"/>
+    </fun>
+    <fun name="isCommuter" vt="Boolean">
+      <param name="inst" vt="this" remark="Operator instance"/>
+    </fun>
+    <fun name="getCargo" vt="const char*">
+      <param name="inst" vt="this" remark="Operator instance"/>
+    </fun>
+    <fun name="getClass" vt="const char*">
+      <param name="inst" vt="this" remark="Operator instance"/>
+    </fun>
+    <fun name="hasClass" vt="Boolean">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="class" vt="const char*"/>
+    </fun>
+    <fun name="setClass" vt="void">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="class" vt="const char*"/>
+    </fun>
+    <fun name="getVMax" vt="int">
+      <param name="inst" vt="this" remark="Operator instance"/>
+    </fun>
+    <fun name="setLocality" vt="void">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="bkid" vt="const char*" remark="Block ID"/>
+    </fun>
+    <fun name="setFnByDesc" vt="Boolean">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="desc" vt="const char*"/>
+      <param name="flip" vt="Boolean"/>
+      <param name="fon" vt="Boolean"/>
+      <param name="duration" vt="int"/>
+    </fun>
+    <fun name="matchIdent" vt="Boolean">
+      <param name="inst" vt="this" remark="Operator instance"/>
+      <param name="ident1" vt="const char*" remark="Loco ident code"/>
+      <param name="ident2" vt="const char*" remark="Loco ident code"/>
+      <param name="ident3" vt="const char*" remark="Loco ident code"/>
+      <param name="ident4" vt="const char*" remark="Loco ident code"/>
     </fun>
     <data>
       <var name="props" vt="iONode"/>
@@ -1929,7 +2447,7 @@
   </object>
 
 
-  <object name="PowerMan" interface="HtmlInt" use="node,map,thread" include="htmlint" remark="Power Manager object">
+  <object name="PowerMan" interface="HtmlInt" use="node,map,thread,mutex" include="htmlint" remark="Power Manager object">
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="The booster list"/>
     </fun>
@@ -1941,16 +2459,25 @@
       <param name="inst" vt="this" remark="PowerMan instance"/>
       <param name="mod" vt="iONode" remark="Modify node"/>
     </fun>
+    <fun name="getBooster4Block" vt="const char*">
+      <param name="inst" vt="this" remark="PowerMan instance"/>
+      <param name="blockid" vt="const char*"/>
+    </fun>
+    <fun name="hasBlockPower" vt="Boolean">
+      <param name="inst" vt="this" remark="PowerMan instance"/>
+      <param name="blockid" vt="const char*"/>
+    </fun>
     <data>
       <var name="props" vt="iONode"/>
       <var name="boostermap" vt="iOMap"/>
+      <var name="boostermapmux" vt="iOMutex"/>
       <var name="scmap" vt="iOMap"/>
       <var name="pwmap" vt="iOMap"/>
     </data>
   </object>
 
 
-  <object name="R2Rnet" use="node,map,event,mutex,list,thread,socket" remark="Rocrail to Rocrail Network object.">
+  <object name="R2Rnet" use="node,map,event,mutex,list,thread,socket" remark="FreeRail to FreeRail Network object.">
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="The setup node."/>
     </fun>
@@ -1963,11 +2490,11 @@
     </fun>
     <fun name="getBlock" vt="iONode">
       <param name="inst" vt="this" remark="R2Rnet instance"/>
-      <param name="bkid" vt="const char*" remark="Block ID with Rocrail ID as prefix."/>
+      <param name="bkid" vt="const char*" remark="Block ID with FreeRail ID as prefix."/>
     </fun>
     <fun name="reserveBlock" vt="Boolean">
       <param name="inst" vt="this" remark="R2Rnet instance"/>
-      <param name="rrid" vt="const char*" remark="Rocrail ID."/>
+      <param name="rrid" vt="const char*" remark="FreeRail ID."/>
       <param name="bkid" vt="const char*" remark="Block ID."/>
       <param name="stid" vt="const char*" remark="Net Route ID."/>
       <param name="lc" vt="iONode" remark="Loco properties"/>
@@ -1976,13 +2503,13 @@
     </fun>
     <fun name="unlockBlock" vt="Boolean">
       <param name="inst" vt="this" remark="R2Rnet instance"/>
-      <param name="rrid" vt="const char*" remark="Rocrail ID."/>
+      <param name="rrid" vt="const char*" remark="FreeRail ID."/>
       <param name="bkid" vt="const char*" remark="Block ID."/>
       <param name="lcid" vt="const char*" remark="Loco ID."/>
     </fun>
     <fun name="locoIsIn" vt="void">
       <param name="inst" vt="this" remark="R2Rnet instance"/>
-      <param name="rrid" vt="const char*" remark="Rocrail ID of remote server."/>
+      <param name="rrid" vt="const char*" remark="FreeRail ID of remote server."/>
       <param name="lcid" vt="const char*" remark="Loco ID"/>
       <param name="bkid" vt="const char*" remark="Block ID"/>
     </fun>
@@ -2025,6 +2552,11 @@
       <param name="BlockId" vt="const char*"/>
       <param name="LocoId" vt="const char*"/>
     </fun>
+    <fun name="isFree" vt="Boolean">
+      <param name="inst" vt="this" remark="BlockGroup instance"/>
+      <param name="BlockId" vt="const char*"/>
+      <param name="LocoId" vt="const char*"/>
+    </fun>
     <fun name="unlock" vt="Boolean">
       <param name="inst" vt="this" remark="BlockGroup instance"/>
       <param name="LocoId" vt="const char*"/>
@@ -2049,9 +2581,13 @@
 
 
 
-  <object name="Location" use="node,map,list" remark="Location object">
+  <object name="Location" use="node,map,list,mutex" remark="Location object">
     <fun name="inst" vt="this">
       <param name="ini" vt="iONode" remark="Location definition"/>
+    </fun>
+    <fun name="cmd" vt="Boolean">
+      <param name="inst" vt="this" remark="instance"/>
+      <param name="cmd" vt="iONode" remark="Cmd node"/>
     </fun>
     <fun name="modify" vt="void">
       <param name="inst" vt="this" remark="instance"/>
@@ -2066,6 +2602,10 @@
       <param name="locoId" vt="const char*"/>
     </fun>
     <fun name="isDepartureAllowed" vt="Boolean">
+      <param name="inst" vt="this" remark="Location instance"/>
+      <param name="LocoId" vt="const char*"/>
+    </fun>
+    <fun name="didNotDepart" vt="void">
       <param name="inst" vt="this" remark="Location instance"/>
       <param name="LocoId" vt="const char*"/>
     </fun>
@@ -2085,6 +2625,9 @@
       <var name="minocc" vt="int"/>
       <var name="fifo" vt="Boolean"/>
       <var name="arriveList" vt="iOList"/>
+      <var name="locoPending" vt="Boolean"/>
+      <var name="locoPendingID" vt="const char*"/>
+      <var name="listmux" vt="iOMutex"/>
     </data>
   </object>
 
@@ -2168,6 +2711,195 @@
     </data>
   </object>
 
+  <object name="Analyse" use="trace,node,map" include="model" remark="Track plan analyser.">
+    <const name="MINIMAL_MAX_CONNECTOR_DISTANCE" vt="int" val="10" remark="default and minimum for distance between 2 connectors"/>
+    <typedef def="enum {AN_JOB=0,AN_CLEAN,AN_HEALTH,AN_EXTCHK,AN_EXTCLEAN} an_mode"/>
+    <fun name="inst" vt="this">
+    </fun>
+    <fun name="analyse" vt="int">
+      <param name="inst" vt="this" remark="Analyse plan."/>
+    </fun>
+    <fun name="cleanup" vt="int">
+      <param name="inst" vt="this" remark="Cleanup analyse plan."/>
+    </fun>
+    <fun name="checkPlanHealth" vt="Boolean">
+      <param name="inst" vt="this" remark="Basic health check"/>
+    </fun>
+    <fun name="checkExtended" vt="Boolean">
+      <param name="inst" vt="this" remark="Check for more complex problems"/>
+    </fun>
+    <fun name="cleanExtended" vt="Boolean">
+      <param name="inst" vt="this" remark="Clean some complex problems"/>
+    </fun>
+    <data>
+      <var name="model" vt="iOModel"/>
+      <var name="plan" vt="iONode"/>
+      <var name="objectmap" vt="iOMap"/>
+      <var name="minZlevel" vt="int" remark="minimum level number in plan"/>
+      <var name="maxZlevel" vt="int" remark="maximum level number in plan"/>
+      <var name="maxConnectorDistance" vt="int" remark="distance to search between 2 connectors"/>
+      <var name="maxRecursionDepth" vt="int" remark="maximum recursion depth"/>
+      <var name="bklist" vt="iOList"/>
+      <var name="preRTlist" vt="iOList"/>
+      <var name="notRTlist" vt="iOList"/>
+      <!-- analyze -->
+      <var name="setRouteId"                    vt="Boolean" remark="Set for all automatic detected routes"/>
+      <var name="setBlockId"                    vt="Boolean" remark="Set for all blocks"/>
+      <var name="addSignalBlockAssignment"      vt="Boolean" remark="Assign signals to blocks"/>
+      <var name="addFeedbackBlockAssignment"    vt="Boolean" remark="Assign feedbacks to blocks"/>
+      <!-- clear all analyze -->
+      <var name="cleanRouteId"                  vt="Boolean" remark="Clean routeids of all automatic detected routes"/>
+      <var name="resetBlockId"                  vt="Boolean" remark="Reset blockids in whole plan"/>
+      <var name="resetSignalBlockAssignment"    vt="Boolean" remark="Reset sg assignments in all blocks"/>
+      <var name="resetFeedbackBlockAssignment"  vt="Boolean" remark="Reset fb assignments in all blocks"/>
+      <!-- extended plan check -->
+      <var name="basicCheck"                    vt="Boolean" remark="Basic checks on all items"/>
+      <var name="blockCheck"                    vt="Boolean" remark="Checks concerning blocks"/>
+      <var name="routeCheck"                    vt="Boolean" remark="Checks concerning routes"/>
+      <var name="actionCheck"                   vt="Boolean" remark="Check actions and conditions"/>
+      <!-- extended plan clean -->
+      <var name="basicClean"                    vt="Boolean" remark="Clean basic problems on all items"/>
+      <var name="blockClean"                    vt="Boolean" remark="Clean block problems"/>
+      <var name="routeClean"                    vt="Boolean" remark="Clean route problems"/>
+      <var name="actionClean"                   vt="Boolean" remark="Clean action and condition problems"/>
+   </data>
+  </object>
+
+  <object name="Script" use="list,node,thread" remark="Script interpreter.">
+    <fun name="inst" vt="this" remark="">
+      <param name="script" vt="const char*" remark="Optional script."/>
+    </fun>
+    <fun name="setScript" vt="void">
+      <param name="inst" vt="this"/>
+      <param name="script" vt="const char*"/>
+    </fun>
+    <fun name="getLine" vt="iONode">
+      <param name="inst" vt="this"/>
+      <param name="linenr" vt="int"/>
+    </fun>
+    <fun name="nextLine" vt="iONode">
+      <param name="inst" vt="this"/>
+      <param name="playpause" vt="Boolean"/>
+      </fun>
+    <fun name="parseLine" vt="iONode">
+      <param name="scriptline" vt="const char*"/>
+      <param name="playpause" vt="Boolean"/>
+      </fun>
+    <fun name="convertNode" vt="char*">
+      <param name="node" vt="iONode"/>
+      <param name="addStamp" vt="Boolean"/>
+      </fun>
+    <fun name="setRecording" vt="void">
+      <param name="inst" vt="this"/>
+      <param name="recording" vt="Boolean"/>
+      <param name="addStamp" vt="Boolean"/>
+      </fun>
+    <fun name="recordNode" vt="void">
+      <param name="inst" vt="this"/>
+      <param name="node" vt="iONode"/>
+    </fun>
+    <fun name="isRecording" vt="Boolean">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="isPlaying" vt="Boolean">
+      <param name="inst" vt="this"/>
+      <param name="linenr" vt="int*"/>
+    </fun>
+    <fun name="Play" vt="void">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="Stop" vt="void">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="Pause" vt="void">
+      <param name="inst" vt="this"/>
+    </fun>
+    <fun name="setCallback" vt="void">
+      <param name="inst" vt="this"/>
+      <param name="callback" vt="obj"/>
+    </fun>
+    <data>
+      <var name="linenr" vt="int"/>
+      <var name="pline" vt="const char*"/>
+      <var name="nrlines" vt="int"/>
+      <var name="script" vt="const char*"/>
+      <var name="record" vt="char*"/>
+      <var name="recording" vt="Boolean"/>
+      <var name="playing" vt="Boolean"/>
+      <var name="pause" vt="Boolean"/>
+      <var name="player" vt="iOThread"/>
+      <var name="run" vt="Boolean"/>
+      <var name="prevtime" vt="long"/>
+      <var name="callback" vt="obj"/>
+      <var name="stamp" vt="Boolean"/>
+    </data>
+  </object>
+  
+  <object name="Var" use="node,map" include="htmlint" remark="Decoder object">
+    <fun name="checkActions" vt="void">
+      <param name="var" vt="iONode" remark="Variable properties"/>
+    </fun>
+    <fun name="getText" vt="char*">
+      <param name="valStr" vt="const char*" remark="Value string."/>
+      <param name="map" vt="iOMap" remark="Map with replacements. (optional)"/>
+      <param name="separator" vt="char" remark="List separator"/>
+    </fun>
+    <fun name="getValue" vt="int">
+      <param name="valStr" vt="const char*" remark="Value string."/>
+      <param name="map" vt="iOMap" remark="Map with replacements. (optional)"/>
+    </fun>
+    <fun name="setRandom" vt="Boolean">
+      <param name="var" vt="iONode"/>
+    </fun>
+  </object>
+
+
+  <object name="Weather" use="node,map,list,mutex,thread" remark="Weather object">
+    <fun name="inst" vt="this">
+      <param name="ini" vt="iONode" remark="Weather definition"/>
+    </fun>
+    <fun name="halt">
+      <param name="inst" vt="this" remark="Weather instance"/>
+    </fun>
+    <fun name="setWeather" vt="void">
+      <param name="inst" vt="this" remark="Weather instance"/>
+      <param name="id" vt="const char*" remark="Weather ID."/>
+      <param name="param" vt="const char*" remark="Weather parameters."/>
+    </fun>
+    <fun name="setTheme" vt="void">
+      <param name="inst" vt="this" remark="Weather instance"/>
+      <param name="id" vt="const char*" remark="Theme ID."/>
+    </fun>
+    <fun name="isWeather" vt="Boolean">
+      <param name="inst" vt="this" remark="Weather instance"/>
+      <param name="id" vt="const char*" remark="Weather ID."/>
+    </fun>
+    <data>
+      <var name="props" vt="iONode"/>
+      <var name="run" vt="Boolean"/>
+      <var name="makeWeather" vt="iOThread"/>
+      <var name="theme" vt="iONode"/>
+      <var name="themeduration" vt="int"/>
+      <var name="themedim" vt="int"/>
+      <var name="themetimer1" vt="int"/>
+      <var name="themetimerrand" vt="int"/>
+      <var name="themestartup" vt="Boolean"/>
+      <var name="themeshutdown" vt="Boolean"/>
+      <var name="requestedTheme" vt="char*"/>
+      <var name="themesoundtimer" vt="int"/>
+      <var name="themedimtimer" vt="int"/>
+      <var name="starthour" vt="int"/>
+      <var name="startminute" vt="int"/>
+      <var name="ebreak" vt="Boolean"/>
+    </data>
+  </object>
+  
+  <object name="XmlScript" use="node,map" include="htmlint" remark="XmlScript Helper">
+    <fun name="run" vt="void">
+      <param name="xmlscript" vt="const char*"/>
+      <param name="map" vt="iOMap"/>
+    </fun>
+  </object>
 
 
 </Project>

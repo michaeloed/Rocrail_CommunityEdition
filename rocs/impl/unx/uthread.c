@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -29,6 +32,7 @@
 
 #include <pthread.h>
 #include <sched.h>
+#include <unistd.h>
 
 
 #ifndef __ROCS_THREAD__
@@ -38,9 +42,10 @@
 static void* rocs_thread_wrapper( void* inst ) {
 #ifdef __ROCS_THREAD__
   iOThreadData o = Data(inst);
-  o->id = pthread_self();
+  o->id = (long)pthread_self();
   o->run( inst );
 #endif
+  return NULL;
 }
 
 Boolean rocs_thread_start( iOThread inst ) {
@@ -90,7 +95,7 @@ void rocs_thread_sleep( const int ms ) {
 
 unsigned long rocs_thread_id(void) {
 #ifdef __ROCS_THREAD__
-  return pthread_self();
+  return (long)pthread_self();
 #else
   return 0;
 #endif
@@ -100,7 +105,7 @@ void rocs_thread_kill( iOThread inst ) {
 #ifdef __ROCS_THREAD__
   iOThreadData o = Data(inst);
   /*pthread_kill( o->handle, SIGABRT );*/
-  pthread_cancel( o->handle );
+  pthread_cancel( (pthread_t)o->handle );
 #endif
 }
 
@@ -144,7 +149,7 @@ Boolean rocs_thread_join( iOThread inst ) {
   iOThreadData o = Data(inst);
   int rc = 0;
   if( o != NULL && o->handle != 0 )
-    rc = pthread_join( o->handle, NULL );
+    rc = pthread_join( (pthread_t)o->handle, NULL );
   if( rc == ESRCH )
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "pthread_join rc=%d", rc );
   else if( rc != 0 )

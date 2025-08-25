@@ -1,7 +1,10 @@
  /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -18,10 +21,10 @@
  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-/* PROTOCOL
+/* PROTOCOL 1.5
  * ------------------------------------------------------------
-Nach dem Einschalten des RC-Link befindet sich dieser in einem Schlafmodus. Um den RC-Link zu aktivieren reicht es,
-ein beliebiges Kommando, ausser E0, zu senden.
+Nach dem Einschalten des RC-Link befindet sich dieser in einem Schlafmodus.
+Um den RC-Link zu aktivieren reicht es, ein beliebiges Kommando, ausser E0, zu senden.
 
 RC-Talk-Meldungen:
 
@@ -35,15 +38,19 @@ Adressmeldung:
 
 0xFC DD* A1* A2* 0xFF
 
-DD = Detektoradresse (0x01 - 0x18)
-A1 = Adressteil 1 higher byte (bei langer DCC-Adresse ist Bit 7 gesetzt!)
+DD = Detektoradresse (0x01 - 0xEF)
+A1 = Adressteil 1 higher byte**
 A2 = Adressteil 2 lower byte
 *Werte im Hex-Format
+** Je nach Aufgleisrichtung ist Bit7 des Adressteil 1 gesetzt oder geloescht
 
-Eine Adressmeldung wird einmal generiert sobald ein Detektorabschnitt die Daten eines RailCom-Senders empfaengt
-und wenn der Abschnitt frei ist (dann werden 00 00 fuer A1 und A2 gesendet). Bei der Inbetriebnahme werden die
-Stati aller Detektoren einmal gesendet.
+Eine Adressmeldung wird einmal generiert sobald ein Detektorabschnitt die Daten eines RailCom-Senders
+empfaengt und wenn der Abschnitt frei ist (dann werden 00 00 fuer A1 und A2 gesendet).
+Bei der Inbetriebnahme werden die Stati aller Detektoren einmal gesendet.
 Ferner kann eine Adressmeldung mittels eines RC-Talk-Kommandos aus dem PC fuer einen Detektor angefordert werden.
+
+Ab Version 1.5 werden auch reine Belegtmeldungen an den PC gesendet.
+Der Adressteil (sowohl A1 wie auch A2) wird dann auf 0x77 gestezt und so an die Sofware weiter geleitet.
 
 CV-Meldung:
 
@@ -78,8 +85,7 @@ System-Aus-Meldung:
 Diese Meldung wird generiert, wenn der RC-Link deaktiviert wird, z.B. durch das Kommando E0 oder durch ein ungueltiges Kommando.
 
 
-Eine Systemmeldung wird durch ein RC-Talk-Kommando initiiert und enthaelt Informationen ueber die Hard-bzw.
-Software des RC-Link
+Eine Systemmeldung wird durch ein RC-Talk-Kommando initiiert und enthaelt Informationen ueber die Hard-bzw. Software des RC-Link
 
 RC-Talk-Kommandos:
 
@@ -87,8 +93,8 @@ Grundsaetzlich ist ein RC-Talk-Kommando 1 Byte gross und erlaubt, verschiedene F
 
 0x20 = Initialisiere alle:
 
-Wird der Wert 0x20 an den RC-Link gesendet werden alle Detektoren initialisiert und die Adressdaten
-aller Detektoren gesendet (entspricht funktional einem Reset)
+Wird der Wert 0x20 an den RC-Link gesendet werden alle Detektoren initialisiert und die A
+dressdaten aller Detektoren gesendet (entspricht funktional einem Reset)
 
 0x40 + DD = Abfrage explizit
 
@@ -99,14 +105,12 @@ Adressmeldung fuer diesen Detektor generiert. Z.B. wird ueber 0x42 der Detektor 
 
 0x60 = Sende Info
 
-Auf dieses Kommando erfolgt eine Systemmeldung, mit deren Hilfe die Softwareversion und die Seriennummer
-abgefragt werden kann
+Auf dieses Kommando erfolgt eine Systemmeldung, mit deren Hilfe die Softwareversion und die Seriennummer abgefragt werden kann
 
 0x80 + DD = Programmiere Detektor
 
-Wird der Hexwert 0x80, addiert mit der gewuenschten Detektoradresse, an das RC-Talk-Modul gesendet wird dem am
-Bus angeschlossenen Detektor, welcher vorher via Steckbruecke in den Programmiermodus versetzt wurde,
-die Detektoradresse DD zugewiesen.
+Wird der Hexwert 0x80, addiert mit der gewuenschten Detektoradresse, an das RC-Talk-Modul gesendet wird
+dem am Bus angeschlossenen Detektor, welcher vorher via Steckbruecke in den Programmiermodus versetzt wurde, die Detektoradresse DD zugewiesen.
 
 0xA0 + DD = Anforderung Diagnosedaten
 
@@ -135,6 +139,7 @@ Der RC-Link wird damit quasi ausser Betrieb gesetzt und kann mit jedem anderen K
 
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocrail/wrapper/public/SysCmd.h"
+#include "rocrail/wrapper/public/ModelCmd.h"
 #include "rocrail/wrapper/public/Feedback.h"
 #include "rocrail/wrapper/public/Program.h"
 
@@ -197,15 +202,40 @@ static void* __event( void* inst, const void* evt ) {
 
 
 /**  */
-static iONode _cmd( obj inst ,const iONode cmd ) {
+static iONode _cmd( obj inst ,const iONode node ) {
+  iORcLinkData data = Data(inst);
   /* Cleanup cmd node to avoid memory leak. */
-  cmd->base.del(cmd);
+  /* System command. */
+  if( StrOp.equals( NodeOp.getName( node ), wSysCmd.name() ) ) {
+    if( StrOp.equals( wSysCmd.sod, wSysCmd.getcmd(node) ) ) {
+      byte cmd = 0x20;
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Start of Day" );
+      SerialOp.write(data->serial, (char*)&cmd, 1);
+    }
+    if( StrOp.equals( wSysCmd.slots, wSysCmd.getcmd(node) ) ) {
+      int  rcd = 1;
+      byte cmd = 0xA0;
+      for( rcd = 1; rcd < 25; rcd++) {
+        cmd = 0xA0 + rcd;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "query RCD %d", rcd );
+        SerialOp.write(data->serial, (char*)&cmd, 1);
+        ThreadOp.sleep(100);
+      }
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "command not supported: %s:%s", NodeOp.getName(node), wSysCmd.getcmd(node) );
+    }
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "command not supported: %s:%s", NodeOp.getName(node), wSysCmd.getcmd(node) );
+  }
+  node->base.del(node);
   return NULL;
 }
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iORcLinkData data = Data(inst);
   data->run = False;
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
@@ -248,44 +278,10 @@ static Boolean _supportPT( obj inst ) {
   return 0;
 }
 
-
-static void __RcLinkTicker( void* threadinst ) {
-  iOThread th = (iOThread)threadinst;
-  iORcLink inst = (iORcLink)ThreadOp.getParm( th );
-  iORcLinkData data = Data(inst);
-  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "RcLink ticker started." );
-  ThreadOp.sleep(1000);
-
-  while( data->run ) {
-    int i = 0;
-    for( i = 0; i < 24; i++ ) {
-      if( data->readerTick[i] > 0 && (SystemOp.getTick() - data->readerTick[i]) > 250 ) {
-        iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-        wFeedback.setstate( evt, False );
-        wFeedback.setaddr( evt, i + 1 + data->fboffset );
-        wFeedback.setbus( evt, wFeedback.fbtype_railcom );
-        wFeedback.setidentifier( evt, 0 );
-        if( data->iid != NULL )
-          wFeedback.setiid( evt, data->iid );
-
-        data->listenerFun( data->listenerObj, evt, TRCLEVEL_INFO );
-
-        data->readerTick[i] = 0;
-        ThreadOp.sleep( 100 );
-      }
-    }
-
-    ThreadOp.sleep( 100 );
-  };
-
-  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "RcLink ticker ended." );
-}
-
-
 static void __evaluateRC(iORcLink inst, byte* packet, int idx) {
   iORcLinkData data = Data(inst);
 
-  TraceOp.dump( NULL, TRCLEVEL_BYTE, packet, idx );
+  TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)packet, idx );
 
   switch( packet[0] ) {
   case 0xD1:
@@ -293,43 +289,81 @@ static void __evaluateRC(iORcLink inst, byte* packet, int idx) {
       Diagnosemeldung:
       0xD1 A1 A2 0xD2 V1 V2 0xD3 SB AB 0xD4 OSCCAL 0xFF
       A1, A2 = Adressbyte 1 und 2 (bestaetigt)
+               Ab Version 1.5 werden auch reine Belegtmeldungen an den PC gesendet.
+               Der Adressteil (sowohl A1 wie auch A2) wird dann auf 0x77 gestezt und so an die Sofware weiter geleitet.
       V1, V2 = Vergleichsbytes 1 und 2 (gemeldete, unbestaetigte Adressen)
       SB = Statusbyte
       AB = Alivebyte
       OSCCAL = Kallibrierwert fuer internen Oszillator
+
+      D1 FF FF D2 FF FF D3 00 FF D4 49 FF
+      D1 89 68 D2 89 68 D3 00 03 D4 49 FF
      */
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "diagnose:" );
-    TraceOp.dump ( name, TRCLEVEL_MONITOR, (char*)packet, idx );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "diagnose: addr=%d status=%d alive=%d cal=%d",
+        ((packet[1]&0x7F)<<8)+packet[2], packet[7], packet[8], packet[10] );
     break;
   case 0xFA:
     /* off */
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "system off" );
     break;
   case 0xFC:
-    /* Address report */
-  {
-    iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+    /* Address report
+     * FC 01 89 68 FF
+     * FC 01 09 68 FF
+     */
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "detector [%02d] report", packet[1]);
+    if((packet[1] == 0) || (packet[1] > 24)) {
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "detector [%02d] out of range", packet[1]);
+      break;
+    }
     /*
      * Bit7=0 Lok nach rechts
      * Bit7=1 Lok nach links
      */
+    int sensor = packet[1];
+    int addr = ((packet[2] & 0x7F) << 8) + packet[3];
     Boolean direction = (packet[2] & 0x80) ? False:True;
+    Boolean state = addr > 0;
+    char ident[32] = {'\0'};
+
+    if( packet[2] == 0x77 && packet[3] == 0x77 ) {
+      addr = 0;
+      state = True;
+      if( data->ident[sensor] > 0 ) {
+        /* Do not report twice. */
+        TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "detector [%02d] already reported address %d; skip current detection", addr);
+        break;
+      }
+    }
+
+    if( !state ) {
+      data->ident[sensor] = 0;
+    }
+    else if( state && addr > 0 ) {
+      if( data->ident[sensor] == addr ) {
+        /* Do not report twice. */
+        TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "detector [%02d] already reported address %d", addr);
+        break;
+      }
+      data->ident[sensor] = addr;
+    }
+
+    iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
 
     wFeedback.setaddr( evt, packet[1] );
-    wFeedback.setbus( evt, wFeedback.fbtype_railcom );
+    wFeedback.setfbtype( evt, wFeedback.fbtype_railcom );
     wFeedback.setdirection( evt, direction );
-    wFeedback.setidentifier( evt, (packet[2] & 0x7F)*256 + packet[3] );
-    wFeedback.setstate( evt, wFeedback.getidentifier(evt) > 0 ? True:False );
+    StrOp.fmtb(ident, "%d", data->ident[sensor]);
+    wFeedback.setidentifier(evt,ident);
+    wFeedback.setstate(evt, state );
     if( data->iid != NULL )
       wFeedback.setiid( evt, data->iid );
 
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "detector [%d] reported address [%d] state [%s] direction [%s]",
-        packet[1], wFeedback.getidentifier(evt), wFeedback.isstate( evt)?"on":"off", direction?"right":"left" );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "detector [%02d] reported address [%05d] state [%s] direction [%s]",
+        packet[1], addr, state?"on ":"off", direction?"fwd":"rev" );
 
     data->listenerFun( data->listenerObj, evt, TRCLEVEL_INFO );
 
-    data->readerTick[packet[1]] = SystemOp.getTick();
-  }
     break;
   case 0xFD:
     /* System report
@@ -343,7 +377,7 @@ static void __evaluateRC(iORcLink inst, byte* packet, int idx) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "SN=%d Software=%.1f Hardware=%.1f", packet[1]*256 + packet[2],
         ((float)packet[3])/10.0, ((float)packet[4])/10.0 );
-    SerialOp.write(data->serial, &cmd, 1);
+    SerialOp.write(data->serial, (char*)&cmd, 1);
   }
   break;
   case 0xFE:
@@ -405,7 +439,7 @@ static void __RcLinkReader( void* threadinst ) {
   TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "RcLink reader started." );
   ThreadOp.sleep(500);
   packet[0] = 0x60;
-  SerialOp.write(data->serial, packet, 1);
+  SerialOp.write(data->serial, (char*)packet, 1);
 
   ThreadOp.sleep(100);
 
@@ -422,8 +456,8 @@ static void __RcLinkReader( void* threadinst ) {
 
     while (bAvail > 0) {
       byte c;
-      SerialOp.read( data->serial, &c, 1 );
-      TraceOp.dump( NULL, TRCLEVEL_BYTE, &c, 1 );
+      SerialOp.read( data->serial, (char*)&c, 1 );
+      TraceOp.dump( NULL, TRCLEVEL_DEBUG, (char*)&c, 1 );
       if( !packetStart && __isStartByte( c, &datalen ) ) {
         TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "STX 0x%02X datalen=%d", c, datalen );
         /* STX */
@@ -523,9 +557,6 @@ static struct ORcLink* _inst( const iONode ini ,const iOTrace trc ) {
   data->bps      = wDigInt.getbps(ini);
   data->fboffset = wDigInt.getfboffset( ini );
 
-  MemOp.set( data->readerTick, 0, sizeof(data->readerTick) );
-
-
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "RcLink %d.%d.%d", vmajor, vminor, patch );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
@@ -537,7 +568,7 @@ static struct ORcLink* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
   data->serial = SerialOp.inst( data->device );
-  SerialOp.setFlow( data->serial, StrOp.equals( wDigInt.cts, wDigInt.getflow( data->ini ) ) ? cts:none );
+  SerialOp.setFlow( data->serial, StrOp.equals( wDigInt.cts, wDigInt.getflow( data->ini ) ) ? cts:0 );
   SerialOp.setLine( data->serial, data->bps, 8, 1, none, wDigInt.isrtsdisabled( ini ) );
   data->serialOK = SerialOp.open( data->serial );
 
@@ -552,13 +583,6 @@ static struct ORcLink* _inst( const iONode ini ,const iOTrace trc ) {
     data->reader = ThreadOp.inst( thname, &__RcLinkReader, __RcLink );
     StrOp.free(thname),
     ThreadOp.start( data->reader );
-
-    /*
-    thname = StrOp.fmt("rclinktick%X", __RcLink);
-    data->ticker = ThreadOp.inst( thname, &__RcLinkTicker, __RcLink );
-    StrOp.free(thname),
-    ThreadOp.start( data->ticker );
-    */
   }
   else
     TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Could not init rclink port!" );

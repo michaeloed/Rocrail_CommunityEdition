@@ -1,1 +1,2 @@
-wxDEFAULT_FRAME ICON "xpm/rocrail.ico"
+#include "wx/msw/wx.rc"
+wxDEFAULT_FRAME ICON "icons/freerail.ico"

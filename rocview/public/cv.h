@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -107,6 +110,7 @@ private:
     void initPresets( int nr, const char* val );
     void readAll();
     void writeAll();
+    void updateCV(int cv, int value);
 
     void onDecConfig();
     void onDecFX();
@@ -140,6 +144,7 @@ private:
     int m_CVcountAll;
     int m_CVidxAll;
     Boolean m_bPOM;
+    Boolean m_bAcc;
     Boolean m_bDirect;
     bool m_bSpeedCurve;
     int m_CVoperation;
@@ -167,7 +172,8 @@ private:
     wxPanel* m_ItemPanel;
     wxBoxSizer* m_PanelMainBox;
     wxBoxSizer* m_LocBox;
-    wxBoxSizer* m_TableBox;
+    wxBoxSizer* m_OptionBox;
+    wxFlexGridSizer* m_TableBox;
     wxFlexGridSizer* m_FlexGrid;
 
     wxStaticText* m_labelCVaddress;
@@ -213,7 +219,7 @@ private:
     wxButton* m_Set;
     wxToggleButton* m_PTonoff;
     wxStaticText* m_labIID;
-    wxComboBox* m_IID;
+    wxTextCtrl* m_IID;
 
     wxButton* m_saveCVs;
     wxButton* m_saveAllCVs;
@@ -240,10 +246,12 @@ private:
     wxButton* m_CopyFrom;
     wxButton* m_WriteAll;
     wxButton* m_ReadAll;
+    wxButton* m_CVHelp;
 
     wxStaticText* m_labTable;
     wxGrid*       m_CVTable;
     wxCheckBox*   m_POM;
+    wxCheckBox*   m_Acc;
     wxCheckBox*   m_Direct;
     wxStaticText* m_labLoc;
     wxComboBox*   m_LcList;

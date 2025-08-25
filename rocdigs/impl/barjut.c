@@ -1,6 +1,11 @@
 /*
  Rocrail - Model Railroad Software
 
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+
  Copyright (C) 2006-2007 - Ralf Tralow
 
  This program is free software; you can redistribute it and/or
@@ -35,6 +40,7 @@
 #include "rocrail/wrapper/public/CustomCmd.h"
 #include "rocrail/wrapper/public/Block.h"
 #include "rocrail/wrapper/public/Feedback.h"
+#include "rocrail/wrapper/public/Loc.h"
 
 
 #define STX	0x02
@@ -174,8 +180,7 @@ static iONode _cmd(	obj inst,	const iONode cmd ) {
 
 /**  */
 static void
-_halt(
-	obj inst, Boolean poweroff )
+_halt( obj inst, Boolean poweroff, Boolean shutdown )
 {
 	iOBarjutData    data = Data( inst );
 
@@ -348,12 +353,12 @@ __sendCommand(
 	{
 		if( i < sizeof ( sendData ) )
 		{
-			SerialOp.read( o->serial, sendData, i );
+			SerialOp.read( o->serial, (char*)sendData, i );
 			break;
 		}
 		else
 		{
-			if( !SerialOp.read( o->serial, sendData, sizeof ( sendData ) ) )
+			if( !SerialOp.read( o->serial, (char*)sendData, sizeof ( sendData ) ) )
 				break;
 		}
 		i -= sizeof ( sendData );
@@ -379,7 +384,7 @@ __sendCommand(
 	//  if( CheckCTS( o ) )
 	//  {
 	// Send start
-	ok = SerialOp.write( o->serial, &sendData[0], 1 );
+	ok = SerialOp.write( o->serial, (char*)&sendData[0], 1 );
 	if( !ok )
 		return False;
 	// Send command and data with converting with special character
@@ -388,11 +393,11 @@ __sendCommand(
 		if( ( sendData[i] == STX ) || ( sendData[i] == DLE ) )
 		{
 			ch = DLE;
-			ok = SerialOp.write( o->serial, &ch, 1 );
+			ok = SerialOp.write( o->serial, (char*)&ch, 1 );
 			if( !ok )
 				return False;
 		}
-		ok = SerialOp.write( o->serial, &sendData[i], 1 );
+		ok = SerialOp.write( o->serial, (char*)&sendData[i], 1 );
 		if( !ok )
 			return False;
 	}
@@ -436,7 +441,7 @@ __receiveData(
 				if( !SerialOp.available( o->serial ) )
 					break;
 			}
-			if( !SerialOp.read( o->serial, &c, 1 ) )
+			if( !SerialOp.read( o->serial, (char*)&c, 1 ) )
 				break;
 
 			//TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "%x", c);
@@ -642,6 +647,7 @@ __getBarjutData(
 	unsigned short  lastTime;
 	unsigned char   data[260];
 	int             i;
+  char            ident[64];
 
 	/*
 	   already sended RIF's
@@ -699,34 +705,27 @@ __getBarjutData(
 								 */
 								//           if( MapOp.get( map, key ) == NULL )
 								{
-									iONode          evt =
-										NodeOp.inst( wFeedback.name(  ), NULL,
-														 ELEMENT_NODE );
+									iONode evt   = NodeOp.inst( wFeedback.name(  ), NULL, ELEMENT_NODE );
+                  iONode nodeC = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
 
 									MapOp.put( map, key, ( obj ) "RFI" );
 
 									wFeedback.setstate( evt, True );
 									wFeedback.setaddr( evt, address );
-                  wFeedback.setbus( evt, 3 );
-									wFeedback.setidentifier( evt, barcode );
+                  wFeedback.setfbtype( evt, wFeedback.fbtype_barcode );
+                  StrOp.fmtb(ident, "%d", barcode);
+									wFeedback.setidentifier( evt, ident );
 									if( o->iid != NULL )
 										wFeedback.setiid( evt, o->iid );
+									o->listenerFun( o->listenerObj, evt, TRCLEVEL_INFO );
 
-//                   iONode          evt =
-//                      NodeOp.inst( wBlock.name(  ), NULL, ELEMENT_NODE );
-//                   MapOp.put( map, key, ( obj ) "RFI" );
-//
-//                   wBlock.setaddr( evt, address );
-//                   wBlock.setport( evt, address );
-//                   wBlock.setid( evt, "Test" );
-//                   wBlock.setlocid( evt, "Mein Test" );
-//                   wBlock.setfba( evt, "-" );
-//                   wBlock.setfbb( evt, "-" );
-//                   if( o->iid != NULL )
-//                      wBlock.setiid( evt, o->iid );
+						      wLoc.setidentifier( nodeC, ident );
+						      wLoc.setV_realkmh( nodeC, speed );
+						      wLoc.setcmd( nodeC, wLoc.bidikmh );
+                  if( o->iid != NULL )
+                    wLoc.setiid( nodeC, o->iid );
+						      o->listenerFun( o->listenerObj, nodeC, TRCLEVEL_INFO );
 
-									o->listenerFun( o->listenerObj, evt,
-														 TRCLEVEL_INFO );
 
 								}
 								//           else {

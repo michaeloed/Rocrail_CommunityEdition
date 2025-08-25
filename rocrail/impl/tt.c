@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -25,6 +28,10 @@
 #include "rocrail/public/app.h"
 #include "rocrail/public/model.h"
 #include "rocrail/public/switch.h"
+#include "rocrail/public/action.h"
+
+#include "rocrail/wrapper/public/Action.h"
+#include "rocrail/wrapper/public/ActionCtrl.h"
 
 #include "rocs/public/doc.h"
 #include "rocs/public/trace.h"
@@ -45,6 +52,7 @@
 #include "rocrail/wrapper/public/ModelCmd.h"
 #include "rocrail/wrapper/public/Block.h"
 #include "rocrail/wrapper/public/Route.h"
+#include "rocrail/wrapper/public/SwitchCmd.h"
 #include "rocrail/wrapper/public/Item.h"
 
 static int instCnt = 0;
@@ -54,7 +62,10 @@ static int __getOppositeTrack( iOTT inst, int tracknr );
 static int __getNextTrack( iOTT inst, int tracknr );
 static int __getPrevTrack( iOTT inst, int tracknr );
 static void __polarize(obj inst, int pos, Boolean polarization);
-
+static void __sortTracks(iOTT tt);
+static void __cpFn2Node( iOTT inst, iONode fcmd );
+static Boolean __isElectricallyFree( iOTT inst );
+static int __getOppositeTrackNr(int pos);
 
 /*
  ***** OBase functions.
@@ -112,6 +123,48 @@ static void _depart(iIBlockBase inst) {
 }
 
 
+static void __checkAction( iOTT inst, const char* cmd ) {
+
+  iOTTData data     = Data(inst);
+  iOModel  model    = AppOp.getModel();
+  iONode   ttaction = wTurntable.getactionctrl( data->props );
+
+  while( ttaction != NULL) {
+    if( StrOp.len( wActionCtrl.getstate(ttaction) ) == 0 ||
+        StrOp.equals(wActionCtrl.getstate(ttaction), cmd ) )
+    {
+      iOAction action = ModelOp.getAction( AppOp.getModel(), wActionCtrl.getid( ttaction ));
+      if( action != NULL ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "turntable action: %s", wActionCtrl.getid( ttaction ));
+
+        if( wAction.getoid( ttaction) == NULL || StrOp.len(wAction.getoid( ttaction)) == 0 ) {
+          wActionCtrl.setlcid( ttaction, data->lockedId );
+          if(data->lockedId != NULL && StrOp.len(data->lockedId) > 0 ) {
+            iOLoc lc = ModelOp.getLoc( AppOp.getModel(), data->lockedId, NULL, False );
+            if( lc != NULL ) {
+              wActionCtrl.setlcclass(ttaction, LocOp.getClass(lc));
+            }
+          }
+        }
+
+        wActionCtrl.setbkid(ttaction, wTurntable.getid( data->props ));
+
+        ActionOp.exec(action, ttaction);
+      }
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "%s action state does not match: [%s-%s]",
+          wTurntable.getid(data->props), wActionCtrl.getstate( ttaction ), cmd );
+    }
+    ttaction = wTurntable.nextactionctrl( data->props, ttaction );
+  } /* end loop */
+
+  ttaction = NULL;
+
+}
+
+
+
 /**
  * Checks for property changes.
  * todo: Range checking?
@@ -136,13 +189,17 @@ static void _modify( iOTT inst, iONode props ) {
     cnt = NodeOp.getChildCnt( o->props );
     while( cnt > 0 ) {
       iONode child = NodeOp.getChild( o->props, 0 );
-      NodeOp.removeChild( o->props, child );
+      iONode removedChild = NodeOp.removeChild( o->props, child );
+      if( removedChild != NULL) {
+        NodeOp.base.del(removedChild);
+      }
       cnt = NodeOp.getChildCnt( o->props );
     }
     cnt = NodeOp.getChildCnt( props );
     for( i = 0; i < cnt; i++ ) {
       iONode child = NodeOp.getChild( props, i );
       NodeOp.addChild( o->props, (iONode)NodeOp.base.clone(child) );
+      __sortTracks(inst);
     }
   }
   else {
@@ -152,6 +209,8 @@ static void _modify( iOTT inst, iONode props ) {
   /* Broadcast to clients. */
   {
     iONode clone = (iONode)NodeOp.base.clone( o->props );
+    if( o->lockedId != NULL )
+      wTurntable.setlocid( clone, o->lockedId );
     AppOp.broadcastEvent( clone );
   }
   props->base.del(props);
@@ -182,15 +241,30 @@ static iONode __getTrackNode( iOTT inst, int tracknr ) {
  */
 static const Boolean CCW = True;
 static const Boolean CW  = False;
-static Boolean __bridgeDir( iOTT inst, int destpos, Boolean* ttdir ) {
+static Boolean __bridgeDir( iOTT inst, int destpos, Boolean* ttdir, Boolean byroute ) {
   iOTTData data = Data(inst);
   Boolean swap = wTurntable.isswaprotation(data->props);
+  Boolean move4opp = wTurntable.ismove4opp(data->props);
+
+  data->lcdir = True;
+
+  if( !byroute ) {
+    byroute = move4opp;
+  }
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "from track[%d] to track[%d]", data->tablepos, destpos );
 
   if( data->tablepos == destpos ) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "wanted destination position[%d] equals the table position[%d]", destpos, data->tablepos );
+    return False;
+  }
+
+  if( !byroute && ((data->tablepos + 24 == destpos) || (destpos + 24 == data->tablepos)) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "wanted destination position[%d] is the opposite of the table position[%d]", destpos, data->tablepos );
+    if( destpos != data->tablepos )
+      data->lcdir = False;
     return False;
   }
 
@@ -250,11 +324,15 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
     port = DIGITALBAHN_STEP;
     cmdstr = wSwitch.straight;
     data->pending = True;
+    /* set gotopos for previous track */
+    data->gotopos = __getNextTrack(inst, wTurntable.getbridgepos( data->props));
   }
   else if( StrOp.equals( wTurntable.prev, cmdStr ) ) {
     port = DIGITALBAHN_STEP;
     cmdstr = wSwitch.turnout;
     data->pending = True;
+    /* set gotopos for previous track */
+    data->gotopos = __getPrevTrack(inst, wTurntable.getbridgepos( data->props));
   }
   else if( StrOp.equals( wTurntable.turn180, cmdStr ) ) {
     port = DIGITALBAHN_TURN;
@@ -270,13 +348,17 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
     port = DIGITALBAHN_LIGHT;
     cmdstr = wSwitch.turnout;
   }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+  }
   else {
     /* Tracknumber */
     int tracknr = atoi( cmdStr );
     /* DA Save tracknumber for 180 degrees turn */
     int orig_tracknr = tracknr;
 
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d", tracknr, data->tablepos );
@@ -288,16 +370,6 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
 
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Goto decoder track [%d] in direction [%s]", tracknr, ttdir ? "CCW":"CW" );
       data->pending = True;
-
-      /* Broadcast to clients. */
-      {
-        iONode event = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
-        wTurntable.setid( event, wTurntable.getid( data->props ) );
-        wTurntable.setbridgepos( event, tracknr );
-        if( wTurntable.getiid( data->props ) != NULL )
-          wTurntable.setiid( event, wTurntable.getiid( data->props ) );
-        AppOp.broadcastEvent( event );
-      }
 
       doDirCmd = True;
 
@@ -331,6 +403,43 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
     }
   }
 
+ /* Broadcast to clients. */
+  if (port == DIGITALBAHN_STEP || port >= DIGITALBAHN_POS)
+  {
+    iONode track = wTurntable.gettrack( data->props );
+    while ( track != NULL ) {
+      if  ( wTTTrack.getnr( track ) == data->gotopos){
+        if ( (( wTTTrack.getposfb( track) == NULL) || StrOp.equals( wTTTrack.getposfb( track), "\0"))
+        && (( wTurntable.getpsen( data->props ) == NULL) || StrOp.equals( wTurntable.getpsen( data->props ), "\0")))
+        {
+          /* Only if no fb for track or position reached is defined */
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "draw bridge position %d", data->gotopos );
+          iONode event = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
+          wTurntable.setid( event, wTurntable.getid( data->props ) );
+          wTurntable.setbridgepos( event, data->gotopos );
+          if( data->lockedId != NULL )
+            wTurntable.setlocid( event, data->lockedId );
+          if( wTurntable.getiid( data->props ) != NULL )
+            wTurntable.setiid( event, wTurntable.getiid( data->props ) );
+          AppOp.broadcastEvent( event );
+        }
+        else
+        {
+          /* Delete position if fb for track or bridge in position available to improve visual feedback on display*/
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position deleted waiting for fb event" );
+          iONode event = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
+          wTurntable.setid( event, wTurntable.getid( data->props ) );
+          wTurntable.setbridgepos( event, -1 );
+          if( data->lockedId != NULL )
+            wTurntable.setlocid( event, data->lockedId );
+          if( wTurntable.getiid( data->props ) != NULL )
+            wTurntable.setiid( event, wTurntable.getiid( data->props ) );
+          AppOp.broadcastEvent( event );
+        }
+      }
+      track = wTurntable.nexttrack( data->props, track );
+    }
+  }
 
   if( cmdstr != NULL && control != NULL )
   {
@@ -343,10 +452,14 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
       if( iid != NULL )
         wSwitch.setiid( cmd, iid );
 
+      wOutput.setbus( cmd, wTurntable.getbus( data->props ) );
+      wOutput.setaccessory( cmd, True );
+      wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set direction address=%d, port=%d, gate=%s",
           addr, DIGITALBAHN_DIR, ttdir ? DIGITALBAHN_DIR_CCW:DIGITALBAHN_DIR_CW );
-      int addrCmd = (addr + DIGITALBAHN_DIR) / 4 + 1;
-      int portCmd = (addr + DIGITALBAHN_DIR) % 4 + 1;
+      int addrCmd = (addr-1 + DIGITALBAHN_DIR) / 4 + 1; /* address bug correction */
+      int portCmd = (addr-1 + DIGITALBAHN_DIR) % 4 + 1; /* address bug correction */
       wSwitch.setaddr1( cmd, addrCmd );
       wSwitch.setport1( cmd, portCmd );
       wSwitch.setcmd  ( cmd, ttdir ? DIGITALBAHN_DIR_CCW:DIGITALBAHN_DIR_CW );
@@ -369,12 +482,15 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
     if( iid != NULL )
       wSwitch.setiid( cmd, iid );
 
+    wOutput.setbus( cmd, wTurntable.getbus( data->props ) );
+    wOutput.setaccessory( cmd, True );
+    wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set position address=%d, port=%d, gate=%s",
         addr, port, cmdstr );
 
-    int addrCmd = (addr + port) / 4 + 1;
-    int portCmd = (addr + port) % 4 + 1;
+    int addrCmd = (addr-1 + port) / 4 + 1; /* address bug correction */
+    int portCmd = (addr-1 + port) % 4 + 1; /* address bug correction */
     wSwitch.setaddr1( cmd, addrCmd );
     wSwitch.setport1( cmd, portCmd );
     wSwitch.setcmd  ( cmd, cmdstr );
@@ -391,10 +507,9 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
     while ( track != NULL ) {
       if ( ( wTTTrack.getnr( track ) == data->gotopos)
         && ( ( wTTTrack.getposfb( track) == NULL) || StrOp.equals( wTTTrack.getposfb( track), "\0"))) {
+        data->tablepos = data->gotopos; /* lines switched in order to get correct trace */
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set optimistic tablepos %d", data->tablepos ); /* lines switched in order to get correct trace */
 
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set optimistic tablepos %d", data->tablepos );
-
-        data->tablepos = data->gotopos;
         wTurntable.setbridgepos( data->props, data->tablepos );
       }
       track = wTurntable.nexttrack( data->props, track );
@@ -402,6 +517,130 @@ static Boolean __cmd_digitalbahn( iOTT inst, iONode nodeA ) {
   }
   else {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "no command sent" );
+  }
+
+  /* Cleanup Node1 */
+  nodeA->base.del(nodeA);
+  return ok;
+}
+
+
+static Boolean __cmd_dsm( iOTT inst, iONode nodeA ) {
+  iOTTData data = Data(inst);
+  Boolean ok = True;
+  iOControl control = AppOp.getControl();
+  const char* cmdStr = wTurntable.getcmd( nodeA );
+  Boolean ttdir = True;
+  Boolean doDirCmd = False;
+  int port = -1;
+  int tracknr = -1;
+  iONode cmd = NULL;
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "TT command = [%s]", cmdStr );
+
+
+  if( StrOp.equals( wTurntable.next, cmdStr ) ) {
+    port = 1;
+  }
+  else if( StrOp.equals( wTurntable.prev, cmdStr ) ) {
+    port = 2;
+  }
+  else if( StrOp.equals( wTurntable.turn180, cmdStr ) ) {
+    port = ttdir?3:4;
+  }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+  }
+  else {
+    /* Tracknumber */
+    tracknr = atoi( cmdStr );
+  }
+
+  if( port != -1 ) {
+    cmd = NodeOp.inst( wOutput.name(), NULL, ELEMENT_NODE );
+    wOutput.setbus( cmd, wTurntable.getbus( data->props ) );
+    wItem.setuidname( cmd, wItem.getuidname(data->props) );
+    wOutput.setaddr( cmd, wTurntable.getaddr( data->props ) );
+
+    wOutput.setport( cmd, 8 );
+    wOutput.setcmd( cmd, wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, 7 );
+    wOutput.setcmd( cmd, wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep( 100 );
+
+
+    wOutput.setport( cmd, port );
+    wOutput.setcmd( cmd, wOutput.on );
+
+    const char* iid = wTurntable.getiid( data->props );
+    if( iid != NULL )
+      wOutput.setiid( cmd, iid );
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dsm (%s): sending output command [%d,%d,%s]",
+        cmdStr, wOutput.getaddr(cmd), wOutput.getport(cmd), wOutput.getcmd(cmd) );
+
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    ThreadOp.sleep( 500 );
+    wOutput.setcmd( cmd, wOutput.off );
+    ControlOp.cmd( control, cmd, NULL );
+  }
+
+  else if( tracknr != -1 ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dsm: goto track %d", tracknr );
+    data->gotopos = tracknr;
+
+    tracknr = __getMappedTrack( inst, tracknr );
+
+    cmd = NodeOp.inst( wOutput.name(), NULL, ELEMENT_NODE );
+    wOutput.setbus( cmd, wTurntable.getbus( data->props ) );
+    wItem.setuidname( cmd, wItem.getuidname(data->props) );
+    wOutput.setaddr( cmd, wTurntable.getaddr( data->props ) );
+    const char* iid = wTurntable.getiid( data->props );
+    if( iid != NULL )
+      wOutput.setiid( cmd, iid );
+
+    wOutput.setport( cmd, 8 );
+    wOutput.setcmd( cmd, wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, 7 );
+    wOutput.setcmd( cmd, wOutput.on );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+
+    ThreadOp.sleep( 100 );
+    wOutput.setport( cmd, 1 );
+    wOutput.setcmd( cmd, (tracknr&0x01) ? wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, 2 );
+    wOutput.setcmd( cmd, (tracknr&0x02) ? wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, 3 );
+    wOutput.setcmd( cmd, (tracknr&0x04) ? wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, 4 );
+    wOutput.setcmd( cmd, (tracknr&0x08) ? wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, 5 );
+    wOutput.setcmd( cmd, (tracknr&0x10) ? wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+    wOutput.setport( cmd, 6 );
+    wOutput.setcmd( cmd, (tracknr&0x20) ? wOutput.on:wOutput.off );
+    ControlOp.cmd( control, (iONode)NodeOp.base.clone(cmd), NULL );
+
+    ThreadOp.sleep( 100 );
+    data->pending = True;
+    wOutput.setport( cmd, 8 );
+    wOutput.setcmd( cmd, wOutput.on );
+    ControlOp.cmd( control, cmd, NULL );
+
+    /* ToDo: Get reported position. */
+    wTurntable.setbridgepos( data->props, tracknr );
+
   }
 
   /* Cleanup Node1 */
@@ -447,22 +686,36 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
   Boolean doDirCmd = False;
   int port = 0;
   const char* cmdstr = NULL;
+  Boolean inv = wSwitch.isinv( data->props );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "TT command = [%s]", cmdStr );
   if( StrOp.equals( wTurntable.next, cmdStr ) ) {
     port = TTDEC_STEP;
-    cmdstr = wSwitch.straight;
+    cmdstr = inv?wSwitch.turnout:wSwitch.straight;
     data->pending = True;
+    /* set gotopos for next track */
+    data->gotopos = __getNextTrack(inst, wTurntable.getbridgepos( data->props));
   }
   else if( StrOp.equals( wTurntable.prev, cmdStr ) ) {
     port = TTDEC_STEP;
-    cmdstr = wSwitch.turnout;
+    cmdstr = inv?wSwitch.straight:wSwitch.turnout;
     data->pending = True;
+    /* set gotopos for previous track */
+    data->gotopos = __getPrevTrack(inst, wTurntable.getbridgepos( data->props));
   }
   else if( StrOp.equals( wTurntable.turn180, cmdStr ) ) {
     port = TTDEC_TURN;
-    cmdstr = wSwitch.turnout;
+    cmdstr = inv?wSwitch.turnout:wSwitch.straight;
+    data->gotopos = __getOppositeTrackNr(data->tablepos);
     data->pending = True;
+  }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
   }
   else {
     /* Tracknumber */
@@ -470,7 +723,7 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
     /* DA Save tracknumber for 180 degrees turn */
     int orig_tracknr = tracknr;
 
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d", tracknr, data->tablepos );
@@ -483,23 +736,13 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Goto decoder track [%d] in direction [%s]", tracknr, ttdir ? "CCW":"CW" );
       data->pending = True;
 
-      /* Broadcast to clients. */
-      {
-        iONode event = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
-        wTurntable.setid( event, wTurntable.getid( data->props ) );
-        wTurntable.setbridgepos( event, tracknr );
-        if( wTurntable.getiid( data->props ) != NULL )
-          wTurntable.setiid( event, wTurntable.getiid( data->props ) );
-        AppOp.broadcastEvent( event );
-      }
-
       doDirCmd = True;
 
       port = TTDEC_POS + ((tracknr-1)/2);
       if( (tracknr-1) % 2 == 0 )
-        cmdstr = wSwitch.straight;
+        cmdstr = inv?wSwitch.straight:wSwitch.turnout;
       else
-        cmdstr = wSwitch.turnout;
+        cmdstr = inv?wSwitch.turnout:wSwitch.straight;
 
       /* DA check whether 180 degrees turn is required */
       if( (data->tablepos-orig_tracknr) == 24)
@@ -507,14 +750,14 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
             "Turn 180 ---> Goto track [%d], current pos=[%d]", tracknr, data->tablepos );
         port   = TTDEC_TURN;
-        cmdstr = wSwitch.turnout;
+        cmdstr = inv?wSwitch.turnout:wSwitch.straight;
       }
       else if( (data->tablepos-orig_tracknr) == -24)
       {
         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
             "Turn 180 ---> Goto track [%d], current pos=[%d]", tracknr, data->tablepos );
         port   = TTDEC_TURN;
-        cmdstr = wSwitch.turnout;
+        cmdstr = inv?wSwitch.turnout:wSwitch.straight;
       }
       /* DA check whether 180 degrees turn is required */
 
@@ -524,6 +767,45 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
       __polarize((obj)inst, tracknr, False);
     }
   }
+
+  /* Broadcast to clients. */
+  if (port == TTDEC_STEP || port >= TTDEC_POS)
+  {
+    iONode track = wTurntable.gettrack( data->props );
+    while ( track != NULL ) {
+      if  ( wTTTrack.getnr( track ) == data->gotopos){
+        if ( (( wTTTrack.getposfb( track) == NULL) || StrOp.equals( wTTTrack.getposfb( track), "\0"))
+        && (( wTurntable.getpsen( data->props ) == NULL) || StrOp.equals( wTurntable.getpsen( data->props ), "\0")))
+        {
+          /* Only if no fb for track or position reached is defined */
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "draw bridge position %d", data->gotopos );
+          iONode event = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
+          wTurntable.setid( event, wTurntable.getid( data->props ) );
+          wTurntable.setbridgepos( event, data->gotopos );
+          if( data->lockedId != NULL )
+            wTurntable.setlocid( event, data->lockedId );
+          if( wTurntable.getiid( data->props ) != NULL )
+            wTurntable.setiid( event, wTurntable.getiid( data->props ) );
+          AppOp.broadcastEvent( event );
+        }
+        else
+        {
+          /* Delete position if fb for track or bridge in position available to improve visual feedback on display*/
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position deleted waiting for fb event" );
+          iONode event = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
+          wTurntable.setid( event, wTurntable.getid( data->props ) );
+          wTurntable.setbridgepos( event, -1 );
+          if( data->lockedId != NULL )
+            wTurntable.setlocid( event, data->lockedId );
+          if( wTurntable.getiid( data->props ) != NULL )
+            wTurntable.setiid( event, wTurntable.getiid( data->props ) );
+          AppOp.broadcastEvent( event );
+        }
+      }
+      track = wTurntable.nexttrack( data->props, track );
+    }
+  }
+
 
   if( cmdstr != NULL && control != NULL )
   {
@@ -538,8 +820,8 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
 
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set direction address=%d, port=%d, gate=%s",
           addr, TTDEC_DIR, ttdir ? TTDEC_DIR_CCW:TTDEC_DIR_CW );
-      int addrCmd = (addr + TTDEC_DIR) / 4 + 1;
-      int portCmd = (addr + TTDEC_DIR) % 4 + 1;
+      int addrCmd = (addr-1 + TTDEC_DIR) / 4 + 1; /*address bug correction */
+      int portCmd = (addr-1 + TTDEC_DIR) % 4 + 1; /*address bug correction */
       wSwitch.setaddr1( cmd, addrCmd );
       wSwitch.setport1( cmd, portCmd );
       wSwitch.setcmd  ( cmd, ttdir ? TTDEC_DIR_CCW:TTDEC_DIR_CW );
@@ -566,8 +848,8 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set position address=%d, port=%d, gate=%s",
         addr, port, cmdstr );
 
-    int addrCmd = (addr + port) / 4 + 1;
-    int portCmd = (addr + port) % 4 + 1;
+    int addrCmd = (addr-1 + port) / 4 + 1; /*address bug correction */
+    int portCmd = (addr-1 + port) % 4 + 1; /*address bug correction */
     wSwitch.setaddr1( cmd, addrCmd );
     wSwitch.setport1( cmd, portCmd );
     wSwitch.setcmd  ( cmd, cmdstr );
@@ -585,9 +867,9 @@ static Boolean __cmd_ttdec( iOTT inst, iONode nodeA ) {
       if ( ( wTTTrack.getnr( track ) == data->gotopos)
         && ( ( wTTTrack.getposfb( track) == NULL) || StrOp.equals( wTTTrack.getposfb( track), "\0"))) {
 
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set optimistic tablepos %d", data->tablepos );
+        data->tablepos = data->gotopos; /* lines switched in order to get correct trace */
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set optimistic tablepos %d", data->tablepos ); /* lines switched in order to get correct trace */
 
-        data->tablepos = data->gotopos;
         wTurntable.setbridgepos( data->props, data->tablepos );
       }
       track = wTurntable.nexttrack( data->props, track );
@@ -637,10 +919,7 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
     tracknr = __getOppositeTrack( inst, data->tablepos );
 
     if( tracknr == -1 ) {
-      if( data->tablepos <= 24 )
-        data->gotopos = data->tablepos + 24;
-      else
-        data->gotopos = data->tablepos - 24;
+      data->gotopos = __getOppositeTrackNr(data->tablepos);
       tracknr = data->gotopos;
     }
     else {
@@ -648,10 +927,20 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
     }
     data->skippos = -1;
   }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+    tracknr = 0x3F;
+    cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+  }
   else {
     /* Tracknumber */
     tracknr = atoi( cmdStr );
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d", tracknr, data->tablepos );
@@ -681,15 +970,19 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
     data->pending = True;
 
     if( StrOp.equals( wTurntable.prot_MP, wTurntable.getprot(data->props) ) ) {
+      Boolean ttdir = True;
+      Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
       /* rename node to program */
       NodeOp.setName( cmd, wProgram.name() );
       /* set type to multiport */
+      wProgram.setiid( cmd, wTurntable.getiid(data->props) );
       wProgram.setlntype( cmd, wProgram.lntype_mp );
       wProgram.setcmd( cmd, wProgram.lncvset );
       wProgram.setaddr( cmd, wTurntable.getaddr0(data->props) );
       wProgram.setmodid( cmd, wTurntable.getaddr1(data->props) );
       wProgram.setcv( cmd, 0x000F ); /* mask */
       wProgram.setvalue( cmd, tracknr ); /* value */
+      wProgram.setval1( cmd, ttdir?1:2 ); /* direction */
       ControlOp.cmd( control, cmd, NULL );
 
     }
@@ -700,15 +993,21 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
 
       NodeOp.setName( cmd, wSwitch.name() );
 
+      wSwitch.setiid( cmd, wTurntable.getiid(data->props) );
+      wSwitch.setbus( cmd, wTurntable.getbus(data->props) );
       /* set the protocol */
       wSwitch.setprot( cmd, wTurntable.getprot(data->props) );
+      wSwitch.setsinglegate( cmd, wTurntable.issinglegatepos(data->props) );
 
       /* signal new position will be set: */
       wSwitch.setaddr1( cmd, wTurntable.getaddr5(data->props) );
       wSwitch.setport1( cmd, wTurntable.getport5(data->props) );
-      wOutput.setcmd( cmd, invnew ? wSwitch.straight:wSwitch.turnout );
+      wSwitch.setcmd( cmd, invnew ? wSwitch.straight:wSwitch.turnout );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "reset position flag %d:%d:%d %s",
+          wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
+      ThreadOp.sleep(10);
 
       wSwitch.setaddr1( cmd, wTurntable.getaddr0(data->props) );
       wSwitch.setport1( cmd, wTurntable.getport0(data->props) );
@@ -716,8 +1015,11 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
         wSwitch.setcmd( cmd, tracknr & 0x01 ? wSwitch.straight:wSwitch.turnout );
       else
         wSwitch.setcmd( cmd, tracknr & 0x01 ? wSwitch.turnout:wSwitch.straight );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position 0 %d:%d:%d %s",
+          wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
+      ThreadOp.sleep(10);
 
       wSwitch.setaddr1( cmd, wTurntable.getaddr1(data->props) );
       wSwitch.setport1( cmd, wTurntable.getport1(data->props) );
@@ -725,8 +1027,11 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
         wSwitch.setcmd( cmd, tracknr & 0x02 ? wSwitch.straight:wSwitch.turnout );
       else
         wSwitch.setcmd( cmd, tracknr & 0x02 ? wSwitch.turnout:wSwitch.straight );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position 1 %d:%d:%d %s",
+          wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
+      ThreadOp.sleep(10);
 
       wSwitch.setaddr1( cmd, wTurntable.getaddr2(data->props) );
       wSwitch.setport1( cmd, wTurntable.getport2(data->props) );
@@ -734,8 +1039,11 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
         wSwitch.setcmd( cmd, tracknr & 0x04 ? wSwitch.straight:wSwitch.turnout );
       else
         wSwitch.setcmd( cmd, tracknr & 0x04 ? wSwitch.turnout:wSwitch.straight );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position 2 %d:%d:%d %s",
+          wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
+      ThreadOp.sleep(10);
 
       wSwitch.setaddr1( cmd, wTurntable.getaddr3(data->props) );
       wSwitch.setport1( cmd, wTurntable.getport3(data->props) );
@@ -744,7 +1052,10 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
       else
         wSwitch.setcmd( cmd, tracknr & 0x08 ? wSwitch.turnout:wSwitch.straight );
       lcmd = (iONode)NodeOp.base.clone(cmd);
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position 3 %d:%d:%d %s",
+          wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
       ControlOp.cmd( control, lcmd, NULL );
+      ThreadOp.sleep(10);
 
       wSwitch.setaddr1( cmd, wTurntable.getaddr4(data->props) );
       wSwitch.setport1( cmd, wTurntable.getport4(data->props) );
@@ -752,21 +1063,40 @@ static Boolean __cmd_multiport( iOTT inst, iONode nodeA ) {
         wSwitch.setcmd( cmd, tracknr & 0x10 ? wSwitch.straight:wSwitch.turnout );
       else
         wSwitch.setcmd( cmd, tracknr & 0x10 ? wSwitch.turnout:wSwitch.straight );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position 4 %d:%d:%d %s",
+          wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
+      ThreadOp.sleep(10);
+
+      if( wTurntable.getaddr6(data->props) > 0 || wTurntable.getport6(data->props) > 0 ) {
+        wSwitch.setaddr1( cmd, wTurntable.getaddr6(data->props) );
+        wSwitch.setport1( cmd, wTurntable.getport6(data->props) );
+        if( invpos )
+          wSwitch.setcmd( cmd, tracknr & 0x20 ? wSwitch.straight:wSwitch.turnout );
+        else
+          wSwitch.setcmd( cmd, tracknr & 0x20 ? wSwitch.turnout:wSwitch.straight );
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "position 5 %d:%d:%d %s",
+            wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
+        lcmd = (iONode)NodeOp.base.clone(cmd);
+        ControlOp.cmd( control, lcmd, NULL );
+        ThreadOp.sleep(10);
+      }
 
       /* signal new position is set: */
       wSwitch.setaddr1( cmd, wTurntable.getaddr5(data->props) );
       wSwitch.setport1( cmd, wTurntable.getport5(data->props) );
+      wSwitch.setsinglegate( cmd, wTurntable.issinglegatenew(data->props) );
       wOutput.setcmd( cmd, invnew ? wSwitch.turnout:wSwitch.straight );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set position flag %d:%d:%d %s",
+          wSwitch.getbus(cmd), wSwitch.getaddr1(cmd), wSwitch.getport1(data->props), wSwitch.getcmd(cmd) );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
+      ThreadOp.sleep(10);
 
     }
 
     data->dir = ttdir;
-
-    ControlOp.cmd( control, cmd, NULL );
   }
 
 
@@ -811,10 +1141,7 @@ static Boolean __cmd_f6915( iOTT inst, iONode nodeA ) {
     tracknr = __getOppositeTrack( inst, data->tablepos );
 
     if( tracknr == -1 ) {
-      if( data->tablepos <= 24 )
-        data->gotopos = data->tablepos + 24;
-      else
-        data->gotopos = data->tablepos - 24;
+      data->gotopos = __getOppositeTrackNr(data->tablepos);
       tracknr = data->gotopos;
     }
     else {
@@ -822,10 +1149,18 @@ static Boolean __cmd_f6915( iOTT inst, iONode nodeA ) {
     }
     data->skippos = -1;
   }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+  }
   else {
     /* Tracknumber */
     tracknr = atoi( cmdStr );
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d", tracknr, data->tablepos );
@@ -856,6 +1191,10 @@ static Boolean __cmd_f6915( iOTT inst, iONode nodeA ) {
       iONode event = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
       wTurntable.setid( event, wTurntable.getid( data->props ) );
       wTurntable.setbridgepos( event, rrtracknr );
+      wTurntable.setstate1( event, wTurntable.isstate1(data->props) );
+      wTurntable.setstate2( event, wTurntable.isstate2(data->props) );
+      if( data->lockedId != NULL )
+        wTurntable.setlocid( event, data->lockedId );
       if( wTurntable.getiid( data->props ) != NULL )
         wTurntable.setiid( event, wTurntable.getiid( data->props ) );
       AppOp.broadcastEvent( event );
@@ -940,10 +1279,7 @@ static Boolean __cmd_muet( iOTT inst, iONode nodeA ) {
     tracknr = __getOppositeTrack( inst, data->tablepos );
 
     if( tracknr == -1 ) {
-      if( data->tablepos <= 24 )
-        data->gotopos = data->tablepos + 24;
-      else
-        data->gotopos = data->tablepos - 24;
+      data->gotopos = __getOppositeTrackNr(data->tablepos);
       tracknr = data->gotopos;
     }
     else {
@@ -951,10 +1287,18 @@ static Boolean __cmd_muet( iOTT inst, iONode nodeA ) {
     }
     data->skippos = -1;
   }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+  }
   else {
     /* Tracknumber */
     tracknr = atoi( cmdStr );
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d", tracknr, data->tablepos );
@@ -1053,10 +1397,7 @@ static Boolean __cmd_slx815( iOTT inst, iONode nodeA ) {
     tracknr = __getOppositeTrack( inst, data->tablepos );
 
     if( tracknr == -1 ) {
-      if( data->tablepos <= 24 )
-        data->gotopos = data->tablepos + 24;
-      else
-        data->gotopos = data->tablepos - 24;
+      data->gotopos = __getOppositeTrackNr(data->tablepos);
       tracknr = data->gotopos;
     }
     else {
@@ -1064,10 +1405,18 @@ static Boolean __cmd_slx815( iOTT inst, iONode nodeA ) {
     }
     data->skippos = -1;
   }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+  }
   else {
     /* Tracknumber */
     tracknr = atoi( cmdStr );
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d", tracknr, data->tablepos );
@@ -1146,13 +1495,21 @@ static Boolean __cmd_accdec( iOTT inst, iONode nodeA ) {
   }
   else if( StrOp.equals( wTurntable.turn180, cmdStr ) ) {
     swcmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
-    data->gotopos = data->tablepos;
+    data->gotopos = __getOppositeTrackNr(data->tablepos);
     data->skippos = data->tablepos;
+  }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
   }
   else {
     /* Tracknumber */
     int tracknr = atoi( cmdStr );
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d direction=%s", tracknr, data->tablepos, ttdir?"CCW":"CW" );
@@ -1200,6 +1557,171 @@ static Boolean __cmd_accdec( iOTT inst, iONode nodeA ) {
 }
 
 
+static Boolean __cmd_d15( iOTT inst, iONode nodeA ) {
+  iOTTData data = Data(inst);
+  Boolean ok = True;
+  iOControl control = AppOp.getControl();
+  const char* cmdStr = wTurntable.getcmd( nodeA );
+  Boolean ttdir = True;
+  iONode cmd = NULL;
+  int tracknr = 0;
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "draai15: %s", cmdStr );
+
+  if( StrOp.equals( wTurntable.next, cmdStr ) ) {
+    tracknr = __getNextTrack(inst, data->tablepos );
+    if( tracknr != -1 ) {
+      cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+      data->gotopos = tracknr;
+      data->skippos = -1;
+    }
+  }
+  else if( StrOp.equals( wTurntable.prev, cmdStr ) ) {
+    tracknr = __getPrevTrack(inst, data->tablepos );
+    if( tracknr != -1 ) {
+      cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+      data->gotopos = tracknr;
+      data->skippos = -1;
+    }
+  }
+  else if( StrOp.equals( wTurntable.turn180, cmdStr ) ) {
+    /* turn command */
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "new position" );
+    cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+    wSwitch.setaddr1( cmd, wTurntable.getaddr5(data->props) );
+    wSwitch.setport1( cmd, wTurntable.getport5(data->props) );
+    wSwitch.setcmd  ( cmd, data->dir ? wSwitch.straight:wSwitch.turnout );
+    wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+    ControlOp.cmd( control, cmd, NULL );
+    ThreadOp.sleep(2000);
+    cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+    wSwitch.setaddr1( cmd, wTurntable.getaddr5(data->props) );
+    wSwitch.setport1( cmd, wTurntable.getport5(data->props) );
+    wSwitch.setcmd  ( cmd, data->dir ? wSwitch.straight:wSwitch.turnout );
+    wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+    ControlOp.cmd( control, cmd, NULL );
+    data->gotopos = __getOppositeTrackNr(data->tablepos);
+    data->pending = True;
+    cmd = NULL;
+  }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+  }
+  else {
+    /* Tracknumber */
+    tracknr = atoi( cmdStr );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "Goto track %d, current pos=%d", tracknr, data->tablepos );
+
+    if( move ) {
+      data->gotopos = tracknr;
+      cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bridge already at track %d", tracknr );
+      __polarize((obj)inst, tracknr, False);
+    }
+
+  }
+
+  if( cmd != NULL && control != NULL )
+  {
+    const char* iid = wTurntable.getiid( data->props );
+    if( iid != NULL )
+      wTurntable.setiid( cmd, iid );
+
+    tracknr = __getMappedTrack( inst, tracknr );
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "goto track[%d], mapped=[%d], mask=[0x%02X]", data->gotopos, tracknr, tracknr );
+
+    /* pending move operation */
+    data->pending = True;
+
+
+    /* reset */
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "reset" );
+    wSwitch.setaddr1( cmd, wTurntable.getresetaddr(data->props) );
+    wSwitch.setport1( cmd, wTurntable.getresetport(data->props) );
+    wSwitch.setcmd  ( cmd, wTurntable.getresetbitcmd(data->props) == 0 ? wSwitch.straight:wSwitch.turnout );
+    wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+    ControlOp.cmd( control, cmd, NULL );
+    ThreadOp.sleep( wTurntable.getmotoroffdelay( data->props ) );
+
+    if( tracknr&0x01 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bit 0" );
+      cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+      wSwitch.setaddr1( cmd, wTurntable.getaddr0(data->props) );
+      wSwitch.setport1( cmd, wTurntable.getport0(data->props) );
+      wSwitch.setcmd  ( cmd, wTurntable.getbit0cmd(data->props) == 0 ? wSwitch.straight:wSwitch.turnout );
+      wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+      ControlOp.cmd( control, cmd, NULL );
+      ThreadOp.sleep( wTurntable.getmotoroffdelay( data->props ) );
+    }
+
+    if( tracknr&0x02 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bit 1" );
+      cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+      wSwitch.setaddr1( cmd, wTurntable.getaddr1(data->props) );
+      wSwitch.setport1( cmd, wTurntable.getport1(data->props) );
+      wSwitch.setcmd  ( cmd, wTurntable.getbit1cmd(data->props) == 0 ? wSwitch.straight:wSwitch.turnout );
+      wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+      ControlOp.cmd( control, cmd, NULL );
+      ThreadOp.sleep( wTurntable.getmotoroffdelay( data->props ) );
+    }
+
+    if( tracknr&0x04 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bit 2" );
+      cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+      wSwitch.setaddr1( cmd, wTurntable.getaddr2(data->props) );
+      wSwitch.setport1( cmd, wTurntable.getport2(data->props) );
+      wSwitch.setcmd  ( cmd, wTurntable.getbit2cmd(data->props) == 0 ? wSwitch.straight:wSwitch.turnout );
+      wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+      ControlOp.cmd( control, cmd, NULL );
+      ThreadOp.sleep( wTurntable.getmotoroffdelay( data->props ) );
+    }
+
+    if( tracknr&0x08 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bit 3" );
+      cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+      wSwitch.setaddr1( cmd, wTurntable.getaddr3(data->props) );
+      wSwitch.setport1( cmd, wTurntable.getport3(data->props) );
+      wSwitch.setcmd  ( cmd, wTurntable.getbit3cmd(data->props) == 0 ? wSwitch.straight:wSwitch.turnout );
+      wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+      ControlOp.cmd( control, cmd, NULL );
+      ThreadOp.sleep( wTurntable.getmotoroffdelay( data->props ) );
+    }
+
+    /* turn command */
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "new position" );
+    cmd = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+    wSwitch.setaddr1( cmd, wTurntable.getaddr5(data->props) );
+    wSwitch.setport1( cmd, wTurntable.getport5(data->props) );
+    wSwitch.setcmd  ( cmd,ttdir ? wSwitch.straight:wSwitch.turnout );
+    wSwitch.setprot( cmd, wTurntable.getprot( data->props ) );
+    ControlOp.cmd( control, cmd, NULL );
+
+    data->dir = ttdir;
+
+  }
+
+
+
+  /* Cleanup Node1 */
+  nodeA->base.del(nodeA);
+
+
+  return ok;
+}
+
+
 static Boolean __cmd_locdec( iOTT inst, iONode nodeA ) {
   iOTTData data = Data(inst);
   Boolean ok = True;
@@ -1225,13 +1747,58 @@ static Boolean __cmd_locdec( iOTT inst, iONode nodeA ) {
   }
   else if( StrOp.equals( wTurntable.turn180, cmdStr ) ) {
     vcmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-    data->gotopos = data->tablepos;
+    data->gotopos = __getOppositeTrackNr(data->tablepos);
     data->skippos = data->tablepos;
+  }
+  else if( StrOp.equals( wTurntable.calibrate, cmdStr ) ) {
+  }
+  else if( StrOp.equals( wTurntable.lighton, cmdStr ) ) {
+    int f = wTurntable.getlightsfn( data->props );
+    iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+    if( wTurntable.getiid(data->props) != NULL )
+      wTurntable.setiid( fcmd, wTurntable.getiid(data->props) );
+    wFunCmd.setid( fcmd, wTurntable.getid( data->props ) );
+    wFunCmd.setaddr( fcmd, wTurntable.getaddr( data->props ) );
+    wFunCmd.setfnchanged( fcmd, f);
+    data->f[f] = True;
+    __cpFn2Node( (iOTT)inst, fcmd );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "turn lights on");
+    ControlOp.cmd( control, fcmd, NULL );
+    return ok;
+  }
+  else if( StrOp.equals( wTurntable.lightoff, cmdStr ) ) {
+    int f = wTurntable.getlightsfn( data->props );
+    iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+    if( wTurntable.getiid(data->props) != NULL )
+      wTurntable.setiid( fcmd, wTurntable.getiid(data->props) );
+    wFunCmd.setid( fcmd, wTurntable.getid( data->props ) );
+    wFunCmd.setaddr( fcmd, wTurntable.getaddr( data->props ) );
+    wFunCmd.setfnchanged( fcmd, f);
+    data->f[f] = False;
+    __cpFn2Node( (iOTT)inst, fcmd );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "turn lights off");
+    ControlOp.cmd( control, fcmd, NULL );
+    return ok;
+  }
+  else if( StrOp.equals(wTurntable.fon, cmdStr ) || StrOp.equals( wTurntable.foff, cmdStr )) {
+    int f = wTurntable.getfun(nodeA);
+    iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+    if( wTurntable.getiid(data->props) != NULL )
+      wTurntable.setiid( fcmd, wTurntable.getiid(data->props) );
+    wFunCmd.setid( fcmd, wTurntable.getid( data->props ) );
+    wFunCmd.setaddr( fcmd, wTurntable.getaddr( data->props ) );
+    wFunCmd.setfnchanged( fcmd, f);
+    data->f[f] = StrOp.equals( wTurntable.getcmd(nodeA), wTurntable.fon );
+    __cpFn2Node( (iOTT)inst, fcmd );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "turn function %d %s", f, StrOp.equals( wTurntable.getcmd(nodeA), wAction.fun_on )?"on":"off" );
+    ControlOp.cmd( control, fcmd, NULL );
+    return ok;
   }
   else {
     /* Tracknumber */
     int tracknr = atoi( cmdStr );
-    Boolean move = __bridgeDir(inst, tracknr, &ttdir );
+    Boolean move = __bridgeDir(inst, tracknr, &ttdir, wTurntable.iscmdbyroute(nodeA) );
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "Goto track %d, current pos=%d", tracknr, data->tablepos );
@@ -1257,6 +1824,7 @@ static Boolean __cmd_locdec( iOTT inst, iONode nodeA ) {
     /* pending move operation */
     data->pending = True;
 
+    wLoc.setid( vcmd, wTurntable.getid( data->props ) );
     wLoc.setaddr( vcmd, wTurntable.getaddr( data->props ) );
 
     /* Using the Loc wrapper for the other parameters: */
@@ -1273,9 +1841,11 @@ static Boolean __cmd_locdec( iOTT inst, iONode nodeA ) {
       iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
       if( iid != NULL )
         wTurntable.setiid( fcmd, iid );
+      wFunCmd.setid( fcmd, wTurntable.getid( data->props ) );
       wFunCmd.setaddr( fcmd, wTurntable.getaddr( data->props ) );
       wFunCmd.setfnchanged( fcmd, wTurntable.getactfn( data->props ));
-      __setLocDecFn( fcmd, wTurntable.getactfn( data->props ), True );
+      data->f[wTurntable.getactfn( data->props )] = True;
+      __cpFn2Node( inst, fcmd );
 
       wLoc.setV_mode( fcmd, wLoc.V_mode_percent );
       wLoc.setV( fcmd, wTurntable.getV( data->props ) );
@@ -1306,9 +1876,19 @@ static Boolean _setListener( iOTT inst, obj listenerObj, const tt_listener liste
   return True;
 }
 
+static void __cpFn2Node( iOTT inst, iONode fcmd ) {
+  iOTTData data = Data(inst);
+  int i = 0;
+  for( i = 0; i < 28; i++ ) {
+    __setLocDecFn( fcmd, i, data->f[i] );
+  }
+}
+
+
 static Boolean _cmd( iIBlockBase inst, iONode nodeA ) {
   iOTTData data = Data(inst);
   iOModel model = AppOp.getModel();
+  iOControl control = AppOp.getControl();
 
   const char* locid = wTurntable.getlocid( nodeA );
   const char* state = wTurntable.getstate( nodeA );
@@ -1318,7 +1898,7 @@ static Boolean _cmd( iIBlockBase inst, iONode nodeA ) {
     if( locid != NULL ) {
       if( StrOp.len(locid) == 0 && data->lockedId != NULL && StrOp.len(data->lockedId) > 0 ) {
         /* inform loc */
-        iOLoc loc = ModelOp.getLoc( model, data->lockedId );
+        iOLoc loc = ModelOp.getLoc( model, data->lockedId, NULL, False );
         if( loc != NULL ) {
           LocOp.setCurBlock( loc, NULL );
         }
@@ -1337,6 +1917,8 @@ static Boolean _cmd( iIBlockBase inst, iONode nodeA ) {
 
     /* Broadcast to clients. */
     NodeOp.setName(nodeA, wTurntable.name());
+    if( data->lockedId != NULL )
+      wTurntable.setlocid( nodeA, data->lockedId );
     AppOp.broadcastEvent( (iONode)NodeOp.base.clone(nodeA) );
   }
 
@@ -1347,8 +1929,25 @@ static Boolean _cmd( iIBlockBase inst, iONode nodeA ) {
     return False;
   }
 
+  if( atoi(wTurntable.getcmd( nodeA )) > 0 || StrOp.equals( wTurntable.getcmd(nodeA), "0" ) ) {
+    if( atoi(wTurntable.getcmd( nodeA )) == 180 ) {
+      wTurntable.setcmd( nodeA, wTurntable.turn180 );
+      __checkAction( (iOTT)inst, wTurntable.turn180);
+    }
+    else {
+      char l_cmd[64] = {'\0'};
+      __checkAction( (iOTT)inst, "goto");
+      StrOp.fmtb( l_cmd, "goto %s", wTurntable.getcmd( nodeA ) );
+      __checkAction( (iOTT)inst, l_cmd);
+    }
+  }
+  else {
+    __checkAction( (iOTT)inst, wTurntable.getcmd( nodeA ));
+  }
+
+
   if( StrOp.equals( wTurntable.getcmd(nodeA), wSwitch.unlock ) ) {
-    TTOp.unLock( inst, data->lockedId );
+    TTOp.unLock( inst, data->lockedId, NULL );
   }
   else if( StrOp.equals( wTurntable.gettype( data->props ), wTurntable.locdec ) )
     return __cmd_locdec( (iOTT)inst, nodeA );
@@ -1366,6 +1965,10 @@ static Boolean _cmd( iIBlockBase inst, iONode nodeA ) {
     return __cmd_slx815( (iOTT)inst, nodeA );
   else if( StrOp.equals( wTurntable.gettype( data->props ), wTurntable.ttdec ) )
     return __cmd_ttdec( (iOTT)inst, nodeA );
+  else if( StrOp.equals( wTurntable.gettype( data->props ), wTurntable.d15 ) )
+    return __cmd_d15( (iOTT)inst, nodeA );
+  else if( StrOp.equals( wTurntable.gettype( data->props ), wTurntable.dsm ) )
+    return __cmd_dsm( (iOTT)inst, nodeA );
   else {
     TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
                  "Unknown turntable type [%s] for [%s]",
@@ -1423,6 +2026,14 @@ static int __getMappedTrack( iOTT inst, int tracknr ) {
   }
 
   return tracknr;
+}
+
+
+static int __getOppositeTrackNr(int pos) {
+  int opp = pos + 24;
+  if( opp >= 48 )
+    opp -= 48;
+  return opp;
 }
 
 
@@ -1492,9 +2103,10 @@ static int __getPrevTrack( iOTT inst, int tracknr ) {
 }
 
 
-static void __fbPositionEvent( obj inst, Boolean puls, const char* id, int ident, int val, int wheelcount ) {
+static void __fbPositionEvent( obj inst, Boolean puls, const char* id, const char* ident, const char* ident2, const char* ident3, const char* ident4, int val, int wheelcount, Boolean dir ) {
   iOTTData data = Data(inst);
   iOControl control = AppOp.getControl();
+  char l_cmd[64] = {'\0'};
   /* TODO: evaluate position event */
 
   if( puls ) {
@@ -1514,6 +2126,8 @@ static void __fbPositionEvent( obj inst, Boolean puls, const char* id, int ident
       wTurntable.setbridgepos( event, data->tablepos );
       wTurntable.setstate1( event, wTurntable.isstate1(data->props) );
       wTurntable.setstate2( event, wTurntable.isstate2(data->props) );
+      if( data->lockedId != NULL )
+        wTurntable.setlocid( event, data->lockedId );
       if( wTurntable.getiid( data->props ) != NULL )
         wTurntable.setiid( event, wTurntable.getiid( data->props ) );
       AppOp.broadcastEvent( event );
@@ -1525,6 +2139,10 @@ static void __fbPositionEvent( obj inst, Boolean puls, const char* id, int ident
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
         "bridge at position pos=%d ", data->tablepos );
     wTurntable.setbridgepos( data->props, data->tablepos );
+
+    __checkAction( (iOTT)inst, "atposition");
+    StrOp.fmtb( l_cmd, "atposition %d", data->tablepos );
+    __checkAction( (iOTT)inst, l_cmd);
 
     if( wTurntable.getdelay( data->props) > 0 ) {
       data->delaytick = SystemOp.getTick();
@@ -1541,6 +2159,7 @@ static void __fbPositionEvent( obj inst, Boolean puls, const char* id, int ident
       if( iid != NULL )
         wTurntable.setiid( cmd, iid );
 
+      wLoc.setid( cmd, wTurntable.getid( data->props ) );
       wLoc.setaddr( cmd, wTurntable.getaddr( data->props ) );
 
       /* Using the Loc wrapper for the other parameters: */
@@ -1553,9 +2172,11 @@ static void __fbPositionEvent( obj inst, Boolean puls, const char* id, int ident
         iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
         if( iid != NULL )
           wTurntable.setiid( fcmd, iid );
+        wFunCmd.setid( fcmd, wTurntable.getid( data->props ) );
         wFunCmd.setaddr( fcmd, wTurntable.getaddr( data->props ) );
         wFunCmd.setfnchanged( fcmd, wTurntable.getactfn( data->props ));
-        __setLocDecFn( fcmd, wTurntable.getactfn( data->props ), False );
+        data->f[wTurntable.getactfn( data->props )] = False;
+        __cpFn2Node( (iOTT)inst, fcmd );
 
         wLoc.setV_mode( fcmd, wLoc.V_mode_percent );
         wLoc.setV( fcmd, wTurntable.getV( data->props ) );
@@ -1591,17 +2212,8 @@ static void __fbPositionEvent( obj inst, Boolean puls, const char* id, int ident
       /* check if the loco is on the bridge and let it roll to the selected block. */
       if( data->locoOnBridge ) {
         iOModel model = AppOp.getModel();
-        iOLoc loc = ModelOp.getLoc( model, data->lockedId );
+        iOLoc loc = ModelOp.getLoc( model, data->lockedId, NULL, False );
         TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loco %s in on the bridge of managed TT %s", data->lockedId, TTOp.base.id(inst) );
-        if( loc != NULL ) {
-          /* V_min: TODO: The block must inform the TT when the loco is IN. */
-          iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-          wLoc.setV_hint( cmd, wBlock.min );
-          wLoc.setdir( cmd, LocOp.getDir( loc) );
-          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "run loco %s to block %s from managed TT %s",
-              data->lockedId, wTTTrack.getbkid(data->selectedTrack), TTOp.base.id(inst) );
-          LocOp.cmd( loc, cmd );
-        }
       }
     }
 
@@ -1610,12 +2222,13 @@ static void __fbPositionEvent( obj inst, Boolean puls, const char* id, int ident
 }
 
 
-static void __fbBridgeEvent( obj inst, Boolean puls, const char* id, int ident, int val, int wheelcount ) {
+static void __fbBridgeEvent( obj inst, Boolean puls, const char* id, const char* ident, const char* ident2, const char* ident3, const char* ident4, int val, int wheelcount, Boolean dir ) {
   iOTTData data = Data(inst);
   const char* event = NULL;
   Boolean state1 = wTurntable.isstate1( data->props );
   Boolean state2 = wTurntable.isstate2( data->props );
-  Boolean stateMid = wTurntable.isstateMid( data->props );
+  Boolean stateMid1 = wTurntable.isstateMid( data->props );
+  Boolean stateMid2 = wTurntable.isstateMid2( data->props );
 
   TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "Turntable:%s: fbid=%s state=%s ident=%d",
                  inst->id(inst), id, puls?"true":"false", ident );
@@ -1663,10 +2276,19 @@ static void __fbBridgeEvent( obj inst, Boolean puls, const char* id, int ident, 
 
   /* sMid */
   else if( StrOp.equals( id, wTurntable.getsMid( data->props ) ) ) {
-    stateMid = puls;
-    if( !data->triggerSmid ) {
+    stateMid1 = puls;
+    if( (data->triggerSmid2 && !data->triggerSmid1) || (!data->hasMid2 && !data->triggerSmid1) ) {
       /* enter event */
-      data->triggerSmid = True;
+      data->triggerSmid1 = True;
+      event = wFeedbackEvent.pre2in_event;
+    }
+  }
+
+  else if( StrOp.equals( id, wTurntable.getsMid2( data->props ) ) ) {
+    stateMid2 = puls;
+    if( data->triggerSmid1 && !data->triggerSmid2 ) {
+      /* enter event */
+      data->triggerSmid2 = True;
       event = wFeedbackEvent.pre2in_event;
     }
   }
@@ -1675,44 +2297,9 @@ static void __fbBridgeEvent( obj inst, Boolean puls, const char* id, int ident, 
   if(wTurntable.isembeddedblock(data->props)) {
     if( data->lockedId != NULL && StrOp.len( data->lockedId ) > 0 ) {
       iOModel model = AppOp.getModel();
-      iOLoc loc = ModelOp.getLoc( model, data->lockedId );
+      iOLoc loc = ModelOp.getLoc( model, data->lockedId, NULL, False );
       if( loc != NULL ) {
-        /* check managed TT */
-        if( wTurntable.ismanager(data->props) ) {
-          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "handle bridge event on managed TT %s", TTOp.base.id(inst) );
-          /* V_min for enter and V_0 for in */
-          if( event == wFeedbackEvent.enter_event ) {
-            iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-            wLoc.setV_hint( cmd, wBlock.min );
-            wLoc.setdir( cmd, LocOp.getDir( loc) );
-            TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "enter bridge event on managed TT %s", TTOp.base.id(inst) );
-            LocOp.cmd( loc, cmd );
-          }
-          else if( event == wFeedbackEvent.in_event ||
-              event == wFeedbackEvent.pre2in_event && wLoc.isinatpre2in(LocOp.base.properties(loc)))
-          {
-            iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-            wLoc.setV( cmd, 0 );
-            wLoc.setdir( cmd, LocOp.getDir( loc) );
-            TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "in bridge event on managed TT %s", TTOp.base.id(inst) );
-            LocOp.cmd( loc, cmd );
-
-            data->locoOnBridge = True;
-
-            /* Bring the bridge into place for the selected track block. */
-            if( data->selectedTrack != NULL ) {
-              int pos = wTTTrack.getnr(data->selectedTrack);
-              iONode cmd = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
-              TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "command the bridge to track %s %d", wTTTrack.getdesc(data->selectedTrack), pos );
-              wTurntable.setcmd( cmd, NodeOp.getStr(data->selectedTrack, "nr", "0"));
-              TTOp.cmd( (iIBlockBase)inst, cmd);
-            }
-          }
-
-        }
-        else {
-          LocOp.event( loc, inst, BlockOp.getEventCode(event), 0, False );
-        }
+        LocOp.event( loc, inst, BlockOp.getEventCode(NULL, event), 0, False, NULL );
       }
     }
   }
@@ -1723,6 +2310,8 @@ static void __fbBridgeEvent( obj inst, Boolean puls, const char* id, int ident, 
 
   wTurntable.setstate1( data->props, state1 );
   wTurntable.setstate2( data->props, state2 );
+  wTurntable.setstateMid( data->props, stateMid1 );
+  wTurntable.setstateMid2( data->props, stateMid2 );
 
   /* Broadcast to clients. */
   {
@@ -1730,7 +2319,10 @@ static void __fbBridgeEvent( obj inst, Boolean puls, const char* id, int ident, 
     wTurntable.setid( node, inst->id(inst) );
     wTurntable.setstate1( node, state1 );
     wTurntable.setstate2( node, state2 );
+    wTurntable.setstateMid( node, stateMid1 | stateMid2 );
     wTurntable.setbridgepos( node, wTurntable.getbridgepos( data->props) );
+    if( data->lockedId != NULL )
+      wTurntable.setlocid( node, data->lockedId );
     if( wTurntable.getiid( data->props ) != NULL )
       wTurntable.setiid( node, wTurntable.getiid( data->props ) );
     AppOp.broadcastEvent( node );
@@ -1743,6 +2335,10 @@ static void __polarize(obj inst, int pos, Boolean polarization) {
   iOTTData data = Data(inst);
   iOControl control = AppOp.getControl();
 
+  if( !data->lcdir ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "skipping bridge polarization for opposite position" );
+    return;
+  }
 
   if( pos != -1 ) {
     iONode track = wTurntable.gettrack( data->props );
@@ -1791,24 +2387,26 @@ static void __polarize(obj inst, int pos, Boolean polarization) {
 }
 
 
-static void __fbEvent( obj inst, Boolean puls, const char* id, int identifier, int val, int wheelcount ) {
+static void __fbEvent( obj inst, Boolean puls, const char* id, const char* identifier, const char* identifier2, const char* identifier3, const char* identifier4, int val, int wheelcount, Boolean dir ) {
   iOTTData data = Data(inst);
   iOControl control = AppOp.getControl();
   int prevpos = data->tablepos;
   Boolean polarization;
-  int pos = __evaluatePos( (iOTT)inst, puls, id, &polarization );
+  int pos = data->tablepos;
   Boolean stop = False;
+
+  if( !puls ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "OFF events are not used..." );
+    return;
+  }
+
+  pos = __evaluatePos( (iOTT)inst, puls, id, &polarization );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbEvent for Turntable [%s] fb=[%s] val=[%d] pos=[%d] polarization=[%d] ",
       inst->id(inst), id, val, pos, polarization );
 
   if( control == NULL ) {
     TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "controller is not initialized..." );
-    return;
-  }
-
-  if( !puls ) {
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "OFF events are not used..." );
     return;
   }
 
@@ -1819,6 +2417,8 @@ static void __fbEvent( obj inst, Boolean puls, const char* id, int identifier, i
     wTurntable.setbridgepos( event, pos );
     wTurntable.setstate1( event, wTurntable.isstate1(data->props) );
     wTurntable.setstate2( event, wTurntable.isstate2(data->props) );
+    if( data->lockedId != NULL )
+      wTurntable.setlocid( event, data->lockedId );
     if( wTurntable.getiid( data->props ) != NULL )
       wTurntable.setiid( event, wTurntable.getiid( data->props ) );
     AppOp.broadcastEvent( event );
@@ -1838,10 +2438,15 @@ static void __fbEvent( obj inst, Boolean puls, const char* id, int identifier, i
     stop = True;
 
   if( stop ) {
+    char l_cmd[64] = {'\0'};
     /* bridge is in position */
     data->pending = False;
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-        "bridge at position pos=%d ", pos );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bridge at position pos=%d ", pos );
+
+    __checkAction( (iOTT)inst, "atposition");
+    StrOp.fmtb( l_cmd, "atposition %d", data->tablepos );
+    __checkAction( (iOTT)inst, l_cmd);
+
     wTurntable.setbridgepos( data->props, pos );
 
     if( wTurntable.getdelay( data->props) > 0 ) {
@@ -1859,6 +2464,8 @@ static void __fbEvent( obj inst, Boolean puls, const char* id, int identifier, i
     if( iid != NULL )
       wTurntable.setiid( cmd, iid );
 
+    wLoc.setprot( cmd, wTurntable.getprot( data->props ) );
+    wLoc.setid( cmd, wTurntable.getid( data->props ) );
     wLoc.setaddr( cmd, wTurntable.getaddr( data->props ) );
 
     /* Using the Loc wrapper for the other parameters: */
@@ -1871,9 +2478,11 @@ static void __fbEvent( obj inst, Boolean puls, const char* id, int identifier, i
       iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
       if( iid != NULL )
         wTurntable.setiid( fcmd, iid );
+      wFunCmd.setid( fcmd, wTurntable.getid( data->props ) );
       wFunCmd.setaddr( fcmd, wTurntable.getaddr( data->props ) );
       wFunCmd.setfnchanged( fcmd, wTurntable.getactfn( data->props ));
-      __setLocDecFn( fcmd, wTurntable.getactfn( data->props ), False );
+      data->f[wTurntable.getactfn( data->props )] = False;
+      __cpFn2Node( (iOTT)inst, fcmd );
 
       wLoc.setV_mode( fcmd, wLoc.V_mode_percent );
       wLoc.setV( fcmd, wTurntable.getV( data->props ) );
@@ -1915,32 +2524,124 @@ static void __fbEvent( obj inst, Boolean puls, const char* id, int identifier, i
 static void __initTTTrack(iOTT inst, iONode track) {
   iOModel model = AppOp.getModel();
   iONode route = NodeOp.inst(wRoute.name(), NULL, ELEMENT_NODE);
+  iONode swcmd = NodeOp.inst(wSwitchCmd.name(), NULL, ELEMENT_NODE);
+
   wItem.setgenerated( route, True );
 
   wRoute.setbka( route, wTTTrack.getbkid(track) );
+  wRoute.setbkaside( route, False );
   wRoute.setbkb( route, TTOp.base.id(inst) );
+  wRoute.setbkbside( route, True );
   wRoute.setspeed( route, wBlock.min );
   wRoute.setdesc( route, "TT Manager generated route.");
 
-  char* routeId = StrOp.fmt( "autogen-[%s%s]-[%s%s]", wRoute.getbka(route), "+", wRoute.getbkb(route), "-" );
+  /* Add TT command */
+  wSwitchCmd.setid( swcmd, TTOp.base.id(inst) );
+  wSwitchCmd.setcmd( swcmd, wSwitchCmd.cmd_track );
+  wSwitchCmd.settrack( swcmd, wTTTrack.getnr(track) );
+  NodeOp.addChild( route, swcmd );
+
+  char* routeId = StrOp.fmt( "autogen-[%s%s]-[%s%s]",
+      wRoute.getbka(route), wRoute.isbkaside(route)?"+":"-", wRoute.getbkb(route), wRoute.isbkbside(route)?"+":"-" );
   wRoute.setid(route, routeId );
   StrOp.free(routeId);
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "TTTrack route added: %s", wRoute.getid(route) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "TTTrack route added: %s", wRoute.getid(route) );
 
   ModelOp.addItem(model, route);
+  NodeOp.base.del(route);
+
+  route = NodeOp.inst(wRoute.name(), NULL, ELEMENT_NODE);
+  swcmd = NodeOp.inst(wSwitchCmd.name(), NULL, ELEMENT_NODE);
+
+  wItem.setgenerated( route, True );
+
+  wRoute.setbka( route, TTOp.base.id(inst) );
+  wRoute.setbkaside( route, True );
+  wRoute.setbkb( route, wTTTrack.getbkid(track) );
+  wRoute.setbkbside( route, False );
+  wRoute.setspeed( route, wBlock.min );
+  wRoute.setdesc( route, "TT Manager generated route.");
+
+  /* Add TT command */
+  wSwitchCmd.setid( swcmd, TTOp.base.id(inst) );
+  wSwitchCmd.setcmd( swcmd, wSwitchCmd.cmd_track );
+  wSwitchCmd.settrack( swcmd, wTTTrack.getnr(track) );
+  NodeOp.addChild( route, swcmd );
+
+  routeId = StrOp.fmt( "autogen-[%s%s]-[%s%s]",
+      wRoute.getbka(route), wRoute.isbkaside(route)?"+":"-", wRoute.getbkb(route), wRoute.isbkbside(route)?"+":"-" );
+  wRoute.setid(route, routeId );
+  StrOp.free(routeId);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "TTTrack route added: %s", wRoute.getid(route) );
+
+  ModelOp.addItem(model, route);
+  NodeOp.base.del(route);
+
 }
 
+
+static Boolean __isElectricallyFree( iOTT inst ) {
+  iOTTData data = Data(inst);
+  iOModel model = AppOp.getModel();
+  iONode track = wTurntable.gettrack( data->props );
+
+  const char* s1    = wTurntable.gets1( data->props );
+  const char* s2    = wTurntable.gets2( data->props );
+  const char* sMid  = wTurntable.getsMid( data->props );
+  const char* sMid2 = wTurntable.getsMid2( data->props );
+
+  if( s1 != NULL && StrOp.len( s1 ) > 0 ) {
+    iOFBack fb = ModelOp.getFBack( model, s1 );
+    if( fb != NULL && FBackOp.getState(fb) ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+                     "TT [%s] is electrically occupied by sensor [%s]", TTOp.base.id(inst), FBackOp.getId(fb) );
+      return False;
+    }
+  }
+
+  if( s2 != NULL && StrOp.len( s2 ) > 0 ) {
+    iOFBack fb = ModelOp.getFBack( model, s2 );
+    if( fb != NULL && FBackOp.getState(fb) ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+                     "TT [%s] is electrically occupied by sensor [%s]", TTOp.base.id(inst), FBackOp.getId(fb) );
+      return False;
+    }
+  }
+
+  if( sMid != NULL && StrOp.len( sMid ) > 0 ) {
+    iOFBack fb = ModelOp.getFBack( model, sMid );
+    if( fb != NULL && FBackOp.getState(fb) ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+                     "TT [%s] is electrically occupied by sensor [%s]", TTOp.base.id(inst), FBackOp.getId(fb) );
+      return False;
+    }
+  }
+
+  if( sMid2 != NULL && StrOp.len( sMid2 ) > 0 ) {
+    iOFBack fb = ModelOp.getFBack( model, sMid2 );
+    if( fb != NULL && FBackOp.getState(fb) ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+                     "TT [%s] is electrically occupied by sensor [%s]", TTOp.base.id(inst), FBackOp.getId(fb) );
+      return False;
+    }
+  }
+
+
+  return True;
+}
 
 static void __initCallback( iOTT inst ) {
   iOTTData data = Data(inst);
   iOModel model = AppOp.getModel();
   iONode track = wTurntable.gettrack( data->props );
 
-  const char* s1   = wTurntable.gets1( data->props );
-  const char* s2   = wTurntable.gets2( data->props );
-  const char* sMid = wTurntable.getsMid( data->props );
-  const char* psen = wTurntable.getpsen( data->props );
+  const char* s1    = wTurntable.gets1( data->props );
+  const char* s2    = wTurntable.gets2( data->props );
+  const char* sMid  = wTurntable.getsMid( data->props );
+  const char* sMid2 = wTurntable.getsMid2( data->props );
+  const char* psen  = wTurntable.getpsen( data->props );
 
+  data->hasMid2 = False;
 
   if( s1 != NULL && StrOp.len( s1 ) > 0 ) {
     iOFBack bridgefb = ModelOp.getFBack( model, s1 );
@@ -1967,6 +2668,17 @@ static void __initCallback( iOTT inst ) {
     if( bridgefb != NULL ) {
       TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Setting bridge listener [%s]", sMid );
       FBackOp.setListener( bridgefb, (obj)inst, &__fbBridgeEvent );
+    }
+    else
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "bridge sMid [%s] not found!", sMid );
+  }
+
+  if( sMid2 != NULL && StrOp.len( sMid2 ) > 0 ) {
+    iOFBack bridgefb = ModelOp.getFBack( model, sMid2 );
+    if( bridgefb != NULL ) {
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Setting bridge listener [%s]", sMid2 );
+      FBackOp.setListener( bridgefb, (obj)inst, &__fbBridgeEvent );
+      data->hasMid2 = True;
     }
     else
       TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "bridge sMid [%s] not found!", sMid );
@@ -2019,6 +2731,7 @@ static iONode __findFreeTrack(iIBlockBase inst, const char* locId) {
   iOTTData data = Data(inst);
   iOModel model = AppOp.getModel();
   iONode track = wTurntable.gettrack( data->props );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "find free Turntable %s block...", wTurntable.getid(data->props));
   while( track != NULL ) {
     const char* bkid = wTTTrack.getbkid( track );
     iIBlockBase block = ModelOp.getBlock(model, bkid );
@@ -2035,38 +2748,26 @@ static iONode __findFreeTrack(iIBlockBase inst, const char* locId) {
 /**
  * Lock the bridge block and also lock a free track block in case the manager option is activated.
  */
-static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, const char* routeid, Boolean crossing, Boolean reset, Boolean reverse, int indelay ) {
+static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, const char* routeid, Boolean crossing, Boolean reset, Boolean reverse, int indelay, const char* masterId, Boolean force ) {
   iOTTData data = Data(inst);
   Boolean ok = False;
+  iOControl control = AppOp.getControl();
+
+  if( !ControlOp.hasBlockPower(control, wTurntable.getid(data->props)) ) {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "turntable [%s] has no power; locking is rejected", wTurntable.getid(data->props) );
+    return False;
+  }
 
   /* wait only 10ms for getting the mutex: */
   if( !MutexOp.trywait( data->muxLock, 10 ) ) {
     return False;
   }
 
-  if( data->lockedId == NULL || StrOp.len(data->lockedId ) == 0 || StrOp.equals( id, data->lockedId ) ) {
+  if( TTOp.isFree(inst, id) ) {
     data->lockedId = id;
     ok = True;
 
     data->selectedTrack = NULL;
-
-    if( wTurntable.ismanager( data->props ) ) {
-      /* find a free track block */
-      iOModel model = AppOp.getModel();
-      iONode track = __findFreeTrack(inst, id);
-      if( track != NULL ) {
-        iIBlockBase block = ModelOp.getBlock(model, wTTTrack.getbkid(track));
-        if( block != NULL ) {
-          ok = block->lock( block, id, blockid, routeid, crossing, reset, reverse, indelay);
-          if( ok ) {
-            data->selectedTrack = track;
-          }
-        }
-      }
-      else {
-        ok = False;
-      }
-    }
 
     /* Broadcast to clients. Node6 */
     if( ok ) {
@@ -2079,6 +2780,7 @@ static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, con
         wTurntable.setlocid( nodeF, data->lockedId );
       if( wTurntable.getiid( data->props ) != NULL )
         wTurntable.setiid( nodeF, wTurntable.getiid( data->props ) );
+      ModelOp.setBlockOccupancy( AppOp.getModel(), TTOp.base.id(inst), data->lockedId, False, 0, 0, NULL );
       AppOp.broadcastEvent( nodeF );
     }
 
@@ -2091,7 +2793,7 @@ static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, con
 }
 
 
-static Boolean _setLocSchedule( iIBlockBase inst, const char* scid ) {
+static Boolean _setLocSchedule( iIBlockBase inst, const char* scid, Boolean manual ) {
   Boolean ok = False;
   if( inst != NULL && scid != NULL ) {
     iOTTData data = Data(inst);
@@ -2100,26 +2802,44 @@ static Boolean _setLocSchedule( iIBlockBase inst, const char* scid ) {
 }
 
 
+static Boolean _setLocTour( iIBlockBase inst, const char* tourid, Boolean manual ) {
+  Boolean ok = False;
+  if( inst != NULL && tourid != NULL ) {
+    iOTTData data = Data(inst);
+  }
+  return ok;
+}
 
-static Boolean _unLock( iIBlockBase inst, const char* id ) {
+
+
+static Boolean _unLock( iIBlockBase inst, const char* id, const char* routeid ) {
   iOTTData data = Data(inst);
+
+  if( wTurntable.isembeddedblock(data->props) && routeid != NULL ) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "ignore unlock turntable %s by route %s", inst->base.id(inst), routeid==NULL?"-":routeid );
+    return True;
+  }
+
   if( StrOp.equals( id, data->lockedId ) ) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "unlock turntable %s by [%s] route=%s", inst->base.id(inst), data->lockedId, routeid==NULL?"-":routeid );
     data->lockedId = NULL;
     /* Broadcast to clients. Node6 */
     {
       iONode nodeF = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
-      wTurntable.setid( nodeF, inst->base.id(inst) );
+      wTurntable.setid( nodeF, TTOp.base.id(inst) );
       wTurntable.setbridgepos( nodeF, wTurntable.getbridgepos( data->props) );
       wTurntable.setlocid( nodeF, NULL );
       wTurntable.setstate1( nodeF, wTurntable.isstate1(data->props) );
       wTurntable.setstate2( nodeF, wTurntable.isstate2(data->props) );
       if( wTurntable.getiid( data->props ) != NULL )
         wTurntable.setiid( nodeF, wTurntable.getiid( data->props ) );
+      ModelOp.setBlockOccupancy( AppOp.getModel(), TTOp.base.id(inst), "", False, 0, 0, NULL );
       AppOp.broadcastEvent( nodeF );
     }
     data->triggerS1 = False;
     data->triggerS2 = False;
-    data->triggerSmid = False;
+    data->triggerSmid1 = False;
+    data->triggerSmid2 = False;
     data->locoOnBridge = False;
     return True;
   }
@@ -2165,11 +2885,46 @@ static Boolean _getRunDir( iOTT inst ) {
 }
 
 
-static void _reset( iIBlockBase inst ) {
+static void _reset( iIBlockBase inst, Boolean saveCurBlock ) {
   iOTTData data = Data(inst);
   TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
              "reset turntable [%s]", inst->base.id(inst) );
-  TTOp.unLock( inst, data->lockedId );
+  TTOp.unLock( inst, data->lockedId, NULL );
+}
+
+
+static int __compTrackNr(obj* _a, obj* _b)
+{
+    iONode a = (iONode)*_a;
+    iONode b = (iONode)*_b;
+    int nrA = wTTTrack.getnr( a );
+    int nrB = wTTTrack.getnr( b );
+    if( nrA == nrB )
+      return 0;
+    if( nrA > nrB )
+      return 1;
+    return -1;
+}
+
+
+static void __sortTracks(iOTT tt) {
+  iOTTData data = Data(tt);
+  iOList list = ListOp.inst();
+
+  iONode track = wTurntable.gettrack( data->props );
+  while( track != NULL ) {
+    ListOp.add(list, (obj)track );
+    NodeOp.removeChild( data->props, track);
+    track = wTurntable.gettrack( data->props );
+  }
+
+  ListOp.sort(list, &__compTrackNr);
+  int i = 0;
+  for( i = 0; i < ListOp.size(list); i++) {
+    NodeOp.addChild(data->props, (iONode)ListOp.get( list, i));
+  }
+
+  ListOp.base.del(list);
 }
 
 
@@ -2182,6 +2937,11 @@ static iOTT _inst( iONode props ) {
 
   data->props = props;
   data->muxLock = MutexOp.inst( NULL, True );
+
+  if( wTurntable.ismanager(data->props) ) {
+    wTurntable.setembeddedblock(data->props, True);
+  }
+
   __initCallback( tt );
   data->tablepos = wTurntable.getbridgepos(data->props);
   data->gotopos = -1;
@@ -2189,8 +2949,13 @@ static iOTT _inst( iONode props ) {
 
   NodeOp.removeAttrByName(data->props, "cmd");
 
+  __sortTracks(tt);
+
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
       "turntable [%s] initialized at position [%d]", tt->base.id(tt), data->tablepos );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+      "turntable [%s] manager=%s embeddedblock=%s", tt->base.id(tt),
+      wTurntable.ismanager(data->props)?"yes":"no", wTurntable.isembeddedblock(data->props)?"yes":"no" );
 
   instCnt++;
 
@@ -2215,9 +2980,10 @@ static const char* _getInLoc( iIBlockBase inst ) {
   return "";
 }
 
-static void _event( iIBlockBase inst, Boolean puls, const char* id, long ident, int val, int wheelcount, iONode fbevt ) {
+static Boolean _event( iIBlockBase inst, Boolean puls, const char* id, const char* ident, const char* ident2, const char* ident3, const char* ident4, int val, int wheelcount, iONode fbevt, Boolean dir ) {
   iOTTData data = Data(inst);
   /* TODO: dispatch to active tracke block */
+  return False;
 }
 
 static const char* _getFromBlockId( iIBlockBase inst ) {
@@ -2272,11 +3038,18 @@ static void _enterBlock( iIBlockBase inst, const char* id ) {
       iONode nodeD = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
       wTurntable.setid( nodeD, wTurntable.getid(data->props) );
       wTurntable.setentering( nodeD, True );
-      wTurntable.setlocid( nodeD, id );
+      data->lockedId = id;
+      wTurntable.setlocid( nodeD, data->lockedId );
+      if( wTurntable.getiid( data->props ) != NULL )
+        wTurntable.setiid( nodeD, wTurntable.getiid( data->props ) );
       AppOp.broadcastEvent( nodeD );
     }
   }
 }
+
+static void _exitBlock( iIBlockBase inst, const char* id, Boolean unexpected ) {
+}
+
 
 static const char* _getVelocity( iIBlockBase inst, int* percent, Boolean onexit, Boolean reverse, Boolean onstop ) {
   iOTTData data = Data(inst);
@@ -2284,15 +3057,23 @@ static const char* _getVelocity( iIBlockBase inst, int* percent, Boolean onexit,
 }
 
 
+static int _getDepartDelay( iIBlockBase inst ) {
+  return 0;
+}
+
+static float _getmvspeed( iIBlockBase inst ) {
+  return 0;
+}
+
 static int _getMaxKmh( iIBlockBase inst ) {
   return 0;
 }
 
 
-static int _getWait( iIBlockBase inst, iOLoc loc, Boolean reverse ) {
+static int _getWait( iIBlockBase inst, iOLoc loc, Boolean reverse, int* oppwait ) {
   iOTTData data = Data(inst);
-  /* TODO: dispatch to active tracke block */
-  return 0;
+  *oppwait = 1;
+  return 1; /* always wait on the bridge */
 }
 
 static Boolean _green( iIBlockBase inst, Boolean distant, Boolean reverse ) {
@@ -2350,7 +3131,10 @@ static void _inBlock( iIBlockBase inst, const char* id ) {
       iONode nodeD = NodeOp.inst( wTurntable.name(), NULL, ELEMENT_NODE );
       wTurntable.setid( nodeD, wTurntable.getid(data->props) );
       wTurntable.setentering( nodeD, False );
-      wTurntable.setlocid( nodeD, id );
+      data->lockedId = id;
+      wTurntable.setlocid( nodeD, data->lockedId );
+      if( wTurntable.getiid( data->props ) != NULL )
+        wTurntable.setiid( nodeD, wTurntable.getiid( data->props ) );
       AppOp.broadcastEvent( nodeD );
     }
   }
@@ -2451,11 +3235,13 @@ static void _resetTrigs( iIBlockBase inst ) {
   iOModel model = AppOp.getModel();
   data->triggerS1 = False;
   data->triggerS2 = False;
-  data->triggerSmid = False;
+  data->triggerSmid1 = False;
+  data->triggerSmid2 = False;
 
   if( wTurntable.ismanager(data->props) ) {
     /* dispatch to all track blocks */
     iONode pos = wTurntable.gettrack( data->props );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Reset Turntable %s blocks...", wTurntable.getid(data->props));
     while( pos != NULL ) {
       iIBlockBase block = ModelOp.getBlock( model, wTTTrack.getbkid(pos) );
       if( block != NULL ) {
@@ -2491,13 +3277,18 @@ static iIBlockBase __getBlock4Loc(iIBlockBase inst, const char* locid) {
 }
 
 
-static Boolean _wait( iIBlockBase inst, iOLoc loc, Boolean reverse ) {
+static Boolean _wait( iIBlockBase inst, iOLoc loc, Boolean reverse, Boolean* oppwait ) {
   iOTTData data = Data(inst);
+
+  if( wTurntable.isembeddedblock(data->props) ) {
+    return True;
+  }
 
   if( wTurntable.ismanager(data->props) ) {
     iIBlockBase block = __getBlock4Loc(inst, LocOp.getId(loc));
-    return block != NULL ? block->wait( block, loc, reverse ) : False;
+    return block != NULL ? block->wait( block, loc, reverse, oppwait ) : False;
   }
+
   return False;
 }
 
@@ -2512,7 +3303,7 @@ static void _init( iIBlockBase inst ) {
     data->lockedId = wTurntable.getlocid( data->props );
 
     if( data->lockedId != NULL && StrOp.len( data->lockedId ) > 0 ) {
-      iOLoc loc = ModelOp.getLoc( model, data->lockedId );
+      iOLoc loc = ModelOp.getLoc( model, data->lockedId, NULL, False );
       if( loc != NULL ) {
         LocOp.setCurBlock( loc, wTurntable.getid(data->props) );
         /* overwrite data->locId with the static id from the loc object: */
@@ -2528,7 +3319,7 @@ static void _init( iIBlockBase inst ) {
   }
 
   if( wTurntable.ismanager(data->props) ) {
-    /* TODO: init all track blocks */
+    /* All blocks are initialized by the Model. */
   }
 }
 
@@ -2540,9 +3331,21 @@ static Boolean _isReady( iIBlockBase inst ) {
 }
 
 
-static Boolean _hasExtStop( iIBlockBase inst ) {
+static Boolean _isFreeBlockOnEnter( iIBlockBase inst ) {
+  iOTTData data = Data(inst);
   return False;
 }
+
+
+static Boolean _hasExtStop( iIBlockBase inst, const char* locoid ) {
+  return False;
+}
+
+static Boolean _allowBBT( iIBlockBase inst ) {
+  iOTTData data = Data(inst);
+  return False;
+}
+
 
 
 static void _setManager( iIBlockBase inst, iIBlockBase manager ) {
@@ -2560,6 +3363,18 @@ static Boolean _isState( iIBlockBase inst, const char* state ) {
   return False;
 }
 
+static Boolean _isTTBlock( iIBlockBase inst ) {
+  return True;
+}
+
+static Boolean _isTD( iIBlockBase inst ) {
+  return False;
+}
+
+static void _resetTD( iIBlockBase inst ) {
+}
+
+
 /*
  * Check for a free track block in case of an activated manager.
  */
@@ -2567,18 +3382,25 @@ static Boolean _isFree( iIBlockBase inst, const char* locId ) {
   iOTTData data = Data(inst);
   iOModel model = AppOp.getModel();
 
-  if( data->lockedId == NULL || StrOp.len( data->lockedId ) == 0 || StrOp.equals( locId, data->lockedId ) ) {
+  if( data->lockedId == NULL || StrOp.len( data->lockedId ) == 0 || StrOp.equals( locId, data->lockedId ) )
+  {
     if( wTurntable.ismanager(data->props) ) {
+      if( !__isElectricallyFree((iOTT)inst) ) {
+        return False;
+      }
       /* check if a track block is available */
       return __findFreeTrack(inst, locId) != NULL ? True:False ;
     }
+    else {
+      return True;
+    }
   }
 
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "turntable is locked by [%s]", data->lockedId );
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "turntable is already locked by [%s]", data->lockedId );
   return False;
 }
 
-static int _isSuited( iIBlockBase inst, iOLoc loc ) {
+static int _isSuited( iIBlockBase inst, iOLoc loc, int* restlen, Boolean checkprev ) {
   iOTTData data = Data(inst);
   return 1;
 }
@@ -2597,6 +3419,10 @@ static int _getWheelCount( iIBlockBase inst ) {
   return 0;
 }
 
+static int _getRandomRate( iIBlockBase inst, const char* lcid ) {
+  iOTTData data = Data(inst);
+  return wTurntable.getrandomrate(data->props);
+}
 
 static void _setCarCount( iIBlockBase inst, int count ) {
 }
@@ -2604,9 +3430,30 @@ static void _setCarCount( iIBlockBase inst, int count ) {
 static void _acceptIdent( iIBlockBase inst, Boolean accept ) {
 }
 
-static Boolean _isDepartureAllowed( iIBlockBase inst, const char* id ) {
+static void _didNotDepart( iIBlockBase inst, const char* id ) {
+}
+
+static Boolean _isDepartureAllowed( iIBlockBase inst, const char* id, Boolean force ) {
   return True;
 }
+
+static void _setTempWait(iIBlockBase inst, Boolean wait) {
+}
+
+static void _setGhostDetected(iIBlockBase inst, const char* key, const char* ident) {
+  iOTTData data = Data(inst);
+}
+
+static void _setClass( iIBlockBase inst, const char* p_Class ) {
+}
+
+static Boolean _hasClass( iIBlockBase inst, const char* class ) {
+  return False;
+}
+
+static void _setMasterID( iIBlockBase inst, const char* masterid ) {
+}
+
 
 /* ----- DO NOT REMOVE OR EDIT THIS INCLUDE LINE! -----*/
 #include "rocrail/impl/tt.fm"

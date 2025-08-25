@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -30,8 +33,9 @@
 
 ////@begin includes
 #include "wx/notebook.h"
-#include "wx/statline.h"
+#include "wx/listctrl.h"
 #include "wx/spinctrl.h"
+#include "wx/statline.h"
 ////@end includes
 
 #include "basedlg.h"
@@ -44,6 +48,7 @@
 
 ////@begin forward declarations
 class wxNotebook;
+class wxListCtrl;
 class wxSpinCtrl;
 ////@end forward declarations
 
@@ -55,7 +60,7 @@ class wxSpinCtrl;
 #define ID_DIALOG_SIGNAL 10081
 #define ID_NOTEBOOK_SG 10045
 #define ID_PANEL_SG_INDEX 10005
-#define ID_LISTBOX_SG 10006
+#define ID_LISTCTRLINDEX_SG 10408
 #define ID_BUTTON_SG_NEW 10007
 #define ID_BUTTON_SG_DELETE 10008
 #define ID_BUTTON_SG_DOC 10373
@@ -68,6 +73,7 @@ class wxSpinCtrl;
 #define ID_COMBOBOX_SG_BLOCKID 10171
 #define wxID_STATIC_SG_STATE 10014
 #define ID_TEXTCTRL_SG_STATE 10015
+#define ID_SIGNAL_MANUAL 10450
 #define ID_SIGNAL_ACTIONS 10198
 #define ID_PANEL_SG_LOCATION 10018
 #define wxID_STATIC_SG_X 10019
@@ -85,8 +91,8 @@ class wxSpinCtrl;
 #define ID_TEXTCTRL_SG_BUS 10257
 #define wxID_STATIC_SG_PROT 10184
 #define ID_CHOICE_SG_PROT 10183
-#define ID_CHECKBOX_SG_PAIRGATES 10418
 #define ID_SIGNALCONTROL 10393
+#define ID_CHECKBOX_SG_PAIRGATES 10418
 #define ID_PANEL_SG_PROPS 10208
 #define ID_RADIOBOX_SG_TYPE 10215
 #define ID_RADIOBOX_SG_SGTYPE 10216
@@ -127,7 +133,7 @@ class SignalDialog: public wxDialog, public BaseDialog
     DECLARE_EVENT_TABLE()
 
   void initLabels();
-  void initIndex();
+  bool initIndex();
   void initValues();
   bool evaluate();
   int m_TabAlign;
@@ -147,8 +153,11 @@ public:
 
 ////@begin SignalDialog event handler declarations
 
-    /// wxEVT_COMMAND_LISTBOX_SELECTED event handler for ID_LISTBOX_SG
-    void OnListboxSgSelected( wxCommandEvent& event );
+    /// wxEVT_COMMAND_LIST_ITEM_SELECTED event handler for ID_LISTCTRLINDEX_SG
+    void OnListctrlindexSgSelected( wxListEvent& event );
+
+    /// wxEVT_COMMAND_LIST_COL_CLICK event handler for ID_LISTCTRLINDEX_SG
+    void OnListctrlindexSgColLeftClick( wxListEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_SG_NEW
     void OnButtonSgNewClick( wxCommandEvent& event );
@@ -159,14 +168,20 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_SG_DOC
     void OnButtonSgDocClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_CHECKBOX_CLICKED event handler for ID_SIGNAL_MANUAL
+    void OnSignalManualClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_SIGNAL_ACTIONS
     void OnSignalActionsClick( wxCommandEvent& event );
 
-    /// wxEVT_COMMAND_CHECKBOX_CLICKED event handler for ID_CHECKBOX_SG_PAIRGATES
-    void OnCheckboxSgPairgatesClick( wxCommandEvent& event );
-
     /// wxEVT_COMMAND_RADIOBOX_SELECTED event handler for ID_SIGNALCONTROL
     void OnSignalcontrolSelected( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_CHECKBOX_CLICKED event handler for wxID_ANY
+    void onAccessory( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_CHECKBOX_CLICKED event handler for ID_CHECKBOX_SG_PAIRGATES
+    void OnCheckboxSgPairgatesClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
@@ -176,6 +191,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_APPLY
     void OnApplyClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end SignalDialog event handler declarations
 
@@ -197,7 +215,7 @@ public:
 ////@begin SignalDialog member variables
     wxNotebook* m_Notebook;
     wxPanel* m_IndexPanel;
-    wxListBox* m_List;
+    wxListCtrl* m_List2;
     wxButton* m_New;
     wxButton* m_Delete;
     wxButton* m_Doc;
@@ -213,6 +231,7 @@ public:
     wxStaticText* m_LabelState;
     wxTextCtrl* m_State;
     wxCheckBox* m_Manual;
+    wxCheckBox* m_ResetManual;
     wxCheckBox* m_Road;
     wxButton* m_Actions;
     wxPanel* m_LocationPanel;
@@ -225,22 +244,22 @@ public:
     wxRadioBox* m_ori;
     wxPanel* m_InterfacePanel;
     wxStaticText* m_Labeliid;
-    wxTextCtrl* m_iid;
+    wxComboBox* m_iid;
     wxStaticText* m_Label_Bus;
     wxTextCtrl* m_Bus;
-    wxStaticText* m_LabelProt;
-    wxChoice* m_Prot;
+    wxStaticText* m_labUIDName;
+    wxTextCtrl* m_UIDName;
     wxStaticBox* m_RedBox;
     wxStaticText* m_labAddress;
     wxStaticText* m_labPort;
     wxTextCtrl* m_Address;
     wxTextCtrl* m_Port;
     wxRadioBox* m_Gate1;
-    wxStaticBox* m_YellowBox;
+    wxStaticBox* m_GreenBox;
     wxTextCtrl* m_Address2;
     wxTextCtrl* m_Port2;
     wxRadioBox* m_Gate2;
-    wxStaticBox* m_GreenBox;
+    wxStaticBox* m_YellowBox;
     wxTextCtrl* m_Address3;
     wxTextCtrl* m_Port3;
     wxRadioBox* m_Gate3;
@@ -248,15 +267,26 @@ public:
     wxTextCtrl* m_Address4;
     wxTextCtrl* m_Port4;
     wxRadioBox* m_Gate4;
+    wxStaticText* m_LabelProt;
+    wxChoice* m_Prot;
+    wxRadioBox* m_SignalControl;
+    wxCheckBox* m_Accessory;
+    wxRadioBox* m_PortType;
     wxCheckBox* m_Invert;
     wxCheckBox* m_PairGates;
     wxCheckBox* m_AsSwitch;
-    wxRadioBox* m_SignalControl;
+    wxStaticText* m_labCmdTime;
+    wxSpinCtrl* m_CmdTime;
     wxPanel* m_PropsPanel;
     wxRadioBox* m_Type;
     wxRadioBox* m_Signal;
-    wxRadioBox* m_Aspects;
+    wxStaticText* m_labAspects;
+    wxSpinCtrl* m_Aspects;
+    wxStaticText* m_labSymbolPrefix;
+    wxTextCtrl* m_SymbolPrefix;
     wxCheckBox* m_Dwarf;
+    wxCheckBox* m_UseSymbolPrefix;
+    wxStaticText* m_labSignalPatterns;
     wxStaticText* m_labAspect;
     wxStaticText* m_labPatternAddr1;
     wxStaticText* m_labPatternAddr2;
@@ -281,6 +311,8 @@ public:
     wxRadioBox* m_Blank1;
     wxRadioBox* m_Blank2;
     wxSpinCtrl* m_BlankNr;
+    wxStaticText* m_labAspectNames;
+    wxTextCtrl* m_AspectNames;
     wxButton* m_Cancel;
     wxButton* m_OK;
     wxButton* m_Apply;

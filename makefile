@@ -1,4 +1,7 @@
-#    Rocrail Copyright (C) 2002 - 2007 Rob Versluis 
+#    Copyright (C) 2002-2012 Rob Versluis, Rocrail.net
+#
+#    Without an official permission commercial use is not permitted.
+#    Forking this project is not permitted.  
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -29,6 +32,7 @@ REMOVE=rm -f
 GENSUFFIX=
 QUOT="
 MAKE ?= make
+WXCONFIG=wx-config
 
 ifeq ($(NATIVE),WIN32)
 	FS=$\\
@@ -39,22 +43,23 @@ ifeq ($(NATIVE),WIN32)
 	QUOT=
 endif
 
-
-
 PLATFORM=LINUX
 ARCH=
 
-offlineall: version
-	cd rocrail$(CS) $(MAKE) rocrail TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
-
 all: version
-	cd rocrail$(CS) $(MAKE) rocrail TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+	cd rocrail$(CS) $(MAKE) rocrail TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) WXCONFIG=$(WXCONFIG)
+
+server: version
+	cd rocrail$(CS) $(MAKE) server TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) WXCONFIG=$(WXCONFIG)
+
+offline: versionoffline
+	cd rocrail$(CS) $(MAKE) fromtar TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) WXCONFIG=$(WXCONFIG)
 
 fromtar: version
-	cd rocrail$(CS) $(MAKE) fromtar TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+	cd rocrail$(CS) $(MAKE) fromtar TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) WXCONFIG=$(WXCONFIG)
 
 release: version
-	cd rocrail$(CS) $(MAKE) rocrail TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) DEBUG=
+	cd rocrail$(CS) $(MAKE) rocrail TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) ARCH=$(ARCH) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) WXCONFIG=$(WXCONFIG) DEBUG= 
 	
 install:
 	cd rocrail$(CS) $(MAKE) install_all
@@ -64,7 +69,16 @@ uninstall:
 
 
 version:
-	echo $(QUOT)const int bzr = $(QUOT) > common$(FS)version.h
-	bzr revno >> common$(FS)version.h
-	echo $(QUOT);$(QUOT) >> common$(FS)version.h
+	@echo $(QUOT)const int revisionnr = $(QUOT) > common$(FS)version.h
+	git rev-list --count HEAD >> common$(FS)version.h
+	@echo $(QUOT);$(QUOT) >> common$(FS)version.h
+	@echo $(QUOT)const char* commithash = $(QUOT) >> common$(FS)version.h
+	git log -n 1 --pretty=format:\"%H\" >> common$(FS)version.h
+	@echo $(QUOT);$(QUOT) >> common$(FS)version.h
+
+versionoffline:
+	@echo $(QUOT)const int revisionnr = 0$(QUOT) > common$(FS)version.h
+	@echo $(QUOT);$(QUOT) >> common$(FS)version.h
+	@echo $(QUOT)const char* commithash = 0$(QUOT) >> common$(FS)version.h
+	@echo $(QUOT);$(QUOT) >> common$(FS)version.h
 

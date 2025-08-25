@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -40,6 +43,7 @@
 
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocview/public/guiapp.h"
+#include "rocs/public/strtok.h"
 
 ////@begin XPM images
 ////@end XPM images
@@ -58,9 +62,8 @@ BEGIN_EVENT_TABLE( BarJuTCntrlDlg, wxDialog )
 
 ////@begin BarJuTCntrlDlg event table entries
     EVT_BUTTON( wxID_OK, BarJuTCntrlDlg::OnOKClick )
-
     EVT_BUTTON( wxID_CANCEL, BarJuTCntrlDlg::OnCANCELClick )
-
+    EVT_BUTTON( wxID_HELP, BarJuTCntrlDlg::OnHelpClick )
 ////@end BarJuTCntrlDlg event table entries
 
 END_EVENT_TABLE()
@@ -73,28 +76,30 @@ BarJuTCntrlDlg::BarJuTCntrlDlg()
 {
 }
 
-BarJuTCntrlDlg::BarJuTCntrlDlg( wxWindow* parent, iONode props )
+BarJuTCntrlDlg::BarJuTCntrlDlg( wxWindow* parent, iONode props, const char* devices )
 {
+  int isBARJUT  = StrOp.equals( wDigInt.barjut, wDigInt.getlib(props) );
   int isSPROGII = StrOp.equals( wDigInt.sprog, wDigInt.getlib(props) );
   int isDCC232  = StrOp.equals( wDigInt.dcc232, wDigInt.getlib(props) );
-  Create(parent, -1, isSPROGII ? _T("SPROG II"):(isDCC232?_T("DCC232"):_T("BarJut")));
+  int isDMX4ALL = StrOp.equals( wDigInt.dmx4all, wDigInt.getlib(props) );
+  Create(parent, -1, wxString::From8BitData(wDigInt.getlib(props)).Upper() );
   m_Props = props;
+  m_Devices = devices;
   initLabels();
-  initValues();
 
-  m_labPolling->Enable(!isSPROGII && !isDCC232);
-  m_Polling->Enable(!isSPROGII && !isDCC232);
-
+  GetSizer()->Layout();
   GetSizer()->Fit(this);
   GetSizer()->SetSizeHints(this);
 
-  GetSizer()->Layout();
-
+  initValues();
+  m_Polling->Enable(isBARJUT);
+  m_labPolling->Enable(isBARJUT);
 }
 
 void BarJuTCntrlDlg::initLabels() {
   m_labIID->SetLabel( wxGetApp().getMsg( "iid" ) );
-  m_labDevice->SetLabel( wxGetApp().getMsg( "port" ) );
+  m_labDevice->SetLabel( wxGetApp().getMsg( "device" ) );
+  m_labPolling->SetLabel( wxGetApp().getMsg( "pollingrate" ) );
 }
 
 void BarJuTCntrlDlg::initValues() {
@@ -103,10 +108,15 @@ void BarJuTCntrlDlg::initValues() {
 
   m_IID->SetValue( wxString( wDigInt.getiid( m_Props ), wxConvUTF8 ) );
   m_Device->SetValue( wxString( wDigInt.getdevice( m_Props ), wxConvUTF8 ) );
+  if( m_Devices != NULL ) {
+    iOStrTok tok = StrTokOp.inst(m_Devices, ',');
+    while( StrTokOp.hasMoreTokens(tok) ) {
+      m_Device->Append( wxString( StrTokOp.nextToken(tok), wxConvUTF8 ) );
+    }
+    StrTokOp.base.del(tok);
+  }
 
-  char* val = StrOp.fmt( "%d", wDigInt.gettimeout( m_Props ) );
-  m_Polling->SetValue( wxString( val, wxConvUTF8 ) );
-  StrOp.free( val );
+  m_Polling->SetValue( wDigInt.gettimeout( m_Props ) );
 }
 
 
@@ -115,7 +125,7 @@ void BarJuTCntrlDlg::evaluate() {
     return;
   wDigInt.setiid( m_Props, m_IID->GetValue().mb_str(wxConvUTF8) );
   wDigInt.setdevice( m_Props, m_Device->GetValue().mb_str(wxConvUTF8) );
-  wDigInt.settimeout( m_Props, atoi( m_Polling->GetValue().mb_str(wxConvUTF8) ) );
+  wDigInt.settimeout( m_Props, m_Polling->GetValue() );
 }
 
 
@@ -160,44 +170,43 @@ void BarJuTCntrlDlg::CreateControls()
     wxBoxSizer* itemBoxSizer2 = new wxBoxSizer(wxVERTICAL);
     itemDialog1->SetSizer(itemBoxSizer2);
 
-    wxPanel* itemPanel3 = new wxPanel( itemDialog1, ID_PANEL_BARJUT, wxDefaultPosition, wxDefaultSize, wxSUNKEN_BORDER|wxTAB_TRAVERSAL );
-    itemBoxSizer2->Add(itemPanel3, 0, wxALIGN_CENTER_HORIZONTAL|wxALL, 5);
+    wxFlexGridSizer* itemFlexGridSizer3 = new wxFlexGridSizer(0, 2, 0, 0);
+    itemBoxSizer2->Add(itemFlexGridSizer3, 0, wxGROW|wxALL, 5);
 
-    wxBoxSizer* itemBoxSizer4 = new wxBoxSizer(wxVERTICAL);
-    itemPanel3->SetSizer(itemBoxSizer4);
+    m_labIID = new wxStaticText( itemDialog1, ID_STATICTEXT_BARJUT_IID, _("IID"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemFlexGridSizer3->Add(m_labIID, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    wxFlexGridSizer* itemFlexGridSizer5 = new wxFlexGridSizer(0, 2, 0, 0);
-    itemFlexGridSizer5->AddGrowableCol(1);
-    itemBoxSizer4->Add(itemFlexGridSizer5, 0, wxALIGN_CENTER_HORIZONTAL|wxALL, 5);
+    m_IID = new wxTextCtrl( itemDialog1, ID_TEXTCTRL_BARJUT_IID, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
+    itemFlexGridSizer3->Add(m_IID, 0, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_labIID = new wxStaticText( itemPanel3, ID_STATICTEXT_BARJUT_IID, _("IID"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer5->Add(m_labIID, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+    m_labDevice = new wxStaticText( itemDialog1, ID_STATICTEXT_BARJUT_DEVICE, _("Device"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemFlexGridSizer3->Add(m_labDevice, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_IID = new wxTextCtrl( itemPanel3, ID_TEXTCTRL_BARJUT_IID, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer5->Add(m_IID, 1, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+    wxArrayString m_DeviceStrings;
+    m_Device = new wxComboBox( itemDialog1, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(200, -1), m_DeviceStrings, wxCB_DROPDOWN );
+    itemFlexGridSizer3->Add(m_Device, 0, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_labDevice = new wxStaticText( itemPanel3, ID_STATICTEXT_BARJUT_DEVICE, _("Device"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer5->Add(m_labDevice, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+    m_labPolling = new wxStaticText( itemDialog1, ID_STATICTEXT_BARJUT_POLLING, _("Pollingrate"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemFlexGridSizer3->Add(m_labPolling, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_Device = new wxTextCtrl( itemPanel3, ID_TEXTCTRL_BARJUT_DEVICE, wxEmptyString, wxDefaultPosition, wxSize(120, -1), 0 );
-    itemFlexGridSizer5->Add(m_Device, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+    m_Polling = new wxSpinCtrl( itemDialog1, wxID_ANY, _T("0"), wxDefaultPosition, wxSize(100, -1), wxSP_ARROW_KEYS, 0, 10000, 0 );
+    itemFlexGridSizer3->Add(m_Polling, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_labPolling = new wxStaticText( itemPanel3, ID_STATICTEXT_BARJUT_POLLING, _("Pollingrate"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer5->Add(m_labPolling, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+    itemFlexGridSizer3->AddGrowableCol(1);
 
-    m_Polling = new wxTextCtrl( itemPanel3, ID_TEXTCTRL_BARJUT_POLLING, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer5->Add(m_Polling, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+    wxStdDialogButtonSizer* itemStdDialogButtonSizer10 = new wxStdDialogButtonSizer;
 
-    wxStdDialogButtonSizer* itemStdDialogButtonSizer12 = new wxStdDialogButtonSizer;
+    itemBoxSizer2->Add(itemStdDialogButtonSizer10, 0, wxGROW|wxALL, 5);
+    wxButton* itemButton11 = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer10->AddButton(itemButton11);
 
-    itemBoxSizer2->Add(itemStdDialogButtonSizer12, 0, wxALIGN_RIGHT|wxALL, 5);
-    wxButton* itemButton13 = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemStdDialogButtonSizer12->AddButton(itemButton13);
+    wxButton* itemButton12 = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer10->AddButton(itemButton12);
 
-    wxButton* itemButton14 = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemStdDialogButtonSizer12->AddButton(itemButton14);
+    wxButton* itemButton13 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer10->AddButton(itemButton13);
 
-    itemStdDialogButtonSizer12->Realize();
+    itemStdDialogButtonSizer10->Realize();
 
 ////@end BarJuTCntrlDlg content construction
 }
@@ -256,4 +265,23 @@ wxIcon BarJuTCntrlDlg::GetIconResource( const wxString& name )
 }
 
 
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void BarJuTCntrlDlg::OnHelpClick( wxCommandEvent& event )
+{
+  if( StrOp.equals( wDigInt.barjut, wDigInt.getlib( m_Props ) ) )
+    wxGetApp().openLink( "barjut" );
+  else if( StrOp.equals( wDigInt.sprog, wDigInt.getlib( m_Props ) ) )
+    wxGetApp().openLink( "sprog" );
+  else if( StrOp.equals( wDigInt.dmx4all, wDigInt.getlib( m_Props ) ) )
+    wxGetApp().openLink( "dmx:dmx4all" );
+  else if( StrOp.equals( wDigInt.dmxeurolite, wDigInt.getlib( m_Props ) ) )
+    wxGetApp().openLink( "dmx:dmxeurolite" );
+  else if( StrOp.equals( wDigInt.raptor, wDigInt.getlib( m_Props ) ) )
+    wxGetApp().openLink( "raptor:raptor" );
+}
 

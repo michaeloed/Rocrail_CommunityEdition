@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -54,9 +57,9 @@ class wxSpinCtrl;
 #define ID_STATICTEXT 10001
 #define ID_TEXTCTRL 10002
 #define ID_STATICTEXT1 10003
-#define ID_TEXTCTRL1 10004
 #define ID_RADIOBOX 10011
 #define ID_RADIOBOX1 10019
+#define ID_BUTTON_SET_FBADDR 10012
 #define SYMBOL_GENERICCTRLDLG_STYLE wxCAPTION|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCLOSE_BOX
 #define SYMBOL_GENERICCTRLDLG_TITLE _("P50/P50x")
 #define SYMBOL_GENERICCTRLDLG_IDNAME ID_DIALOG_GEN_SETTINGS
@@ -88,7 +91,7 @@ class GenericCtrlDlg: public wxDialog
 public:
     /// Constructors
     GenericCtrlDlg( );
-    GenericCtrlDlg( wxWindow* parent, iONode props, const char* controllername, int bps=0, const char* hs=NULL );
+    GenericCtrlDlg( wxWindow* parent, iONode props, const char* controllername, int bps=0, const char* hs=NULL, const char* devices=NULL );
 
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_GENERICCTRLDLG_IDNAME, const wxString& caption = SYMBOL_GENERICCTRLDLG_TITLE, const wxPoint& pos = SYMBOL_GENERICCTRLDLG_POSITION, const wxSize& size = SYMBOL_GENERICCTRLDLG_SIZE, long style = SYMBOL_GENERICCTRLDLG_STYLE );
@@ -98,11 +101,17 @@ public:
 
 ////@begin GenericCtrlDlg event handler declarations
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_SET_FBADDR
+    void OnButtonSetFbaddrClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_OK
     void OnOkClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end GenericCtrlDlg event handler declarations
 
@@ -123,7 +132,7 @@ public:
     wxStaticText* m_labIID;
     wxTextCtrl* m_IID;
     wxStaticText* m_labDevice;
-    wxTextCtrl* m_Device;
+    wxComboBox* m_Device;
     wxStaticText* m_labLib;
     wxTextCtrl* m_Lib;
     wxRadioBox* m_Baudrate;
@@ -136,15 +145,29 @@ public:
     wxSpinCtrl* m_FbMod;
     wxStaticText* m_labFbOffset;
     wxSpinCtrl* m_FbOffset;
+    wxStaticText* m_labPollSleep;
+    wxSpinCtrl* m_PollSleep;
+    wxButton* m_SertFbAddr;
+    wxSpinCtrl* m_FbAddr;
     wxCheckBox* m_FbPoll;
     wxCheckBox* m_FbReset;
+    wxCheckBox* m_Bidi;
     wxStaticBox* m_OptionsBox;
     wxCheckBox* m_PTSupport;
     wxCheckBox* m_SystemInfo;
+    wxCheckBox* m_LocoList;
+    wxCheckBox* m_SwitchList;
+    wxCheckBox* m_Overrule;
+    wxCheckBox* m_V0onEbreak;
+    wxStaticText* m_labVersion;
+    wxSpinCtrl* m_Version;
+    wxStaticText* m_labSwTime;
+    wxSpinCtrl* m_SwTime;
     wxButton* m_OK;
     wxButton* m_Cancel;
 ////@end GenericCtrlDlg member variables
     iONode m_Props;
+    const char* m_Devices;
 };
 
 #endif

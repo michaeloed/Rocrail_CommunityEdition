@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -42,17 +45,25 @@
 void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
   iOLcDriverData data = Data(inst);
   int indelay = 0;
+  Boolean oppwait = True;
 
   /* Signal of destination block; wait or search for next destination? (_event) */
-  iONode bkprops = (iONode)data->curBlock->base.properties( data->curBlock );
+  iONode bkprops = NULL;
   iONode lcprops = (iONode)data->loc->base.properties( data->loc );
-
-  if( data->next1Block == NULL ) {
-    TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
+  if( data->curBlock == NULL ) {
+    TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 4001,
         "Unexpected enter event for \"%s\" state=%d run=%d", data->loc->getId( data->loc ), data->state, data->run );
     data->state = LC_IDLE;
-    data->loc->setMode(data->loc, wLoc.mode_idle);
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    return;
+  }
+  bkprops = (iONode)data->curBlock->base.properties( data->curBlock );
+
+  if( data->next1Block == NULL ) {
+    TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 4001,
+        "Unexpected enter event for \"%s\" state=%d run=%d", data->loc->getId( data->loc ), data->state, data->run );
+    data->state = LC_IDLE;
+    data->loc->setMode(data->loc, wLoc.mode_idle, wLoc.modereason_unexpectedenter);
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "Setting state for \"%s\" from %s to LC_IDLE.",
                    data->loc->getId( data->loc ), re_enter?"LC_RE_ENTERBLOCK":"LC_ENTERBLOCK" );
     return;
@@ -62,9 +73,20 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
   data->curBlock->red( data->curBlock, True, !data->next1RouteFromTo );
   data->curBlock->red( data->curBlock, False, !data->next1RouteFromTo );
   */
-  data->next1Block->enterBlock( data->next1Block, data->loc->getId( data->loc ) );
 
-  if( !data->next1Block->wait( data->next1Block, data->loc, !data->next1RouteFromTo ) &&
+  /* Set the blockside before checking the block wait to get the right manual operated signal. (moved from line 392 on 03-09-2014) */
+  if( !re_enter ) {
+    if( data->next1Block != NULL ) {
+      if( StrOp.equals(data->next1Block->base.id(data->next1Block), data->next1Route->getToBlock(data->next1Route)) )
+        data->loc->setBlockEnterSide(data->loc, data->next1Route->getToBlockSide(data->next1Route), data->next1Route->getToBlock(data->next1Route));
+      else
+        data->loc->setBlockEnterSide(data->loc, data->next1Route->getFromBlockSide(data->next1Route), data->next1Route->getFromBlock(data->next1Route));
+    }
+    data->next1Block->enterBlock( data->next1Block, data->loc->getId( data->loc ) );
+  }
+
+
+  if( !data->next1Block->wait( data->next1Block, data->loc, !data->next1RouteFromTo, &oppwait ) &&
       data->run &&
       !data->reqstop &&
       !data->next1Block->isTerminalStation(data->next1Block) )
@@ -73,13 +95,11 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
     /* Find and lock next destination block and street... */
     if( data->schedule == NULL || StrOp.len( data->schedule ) == 0 ) {
       if( data->next2Block == NULL ) {
+        data->loc->resetPrevBlock(data->loc);
         data->next2Block = data->model->findDest( data->model, data->next1Block->base.id( data->next1Block ),
                                               data->next1Route->base.id( data->next1Route ),
                                               data->loc, &data->next2Route, data->gotoBlock,
-                                              wLoc.istrysamedir( data->loc->base.properties( data->loc ) ),
-                                              wLoc.istryoppositedir( data->loc->base.properties( data->loc ) ),
-                wLoc.isforcesamedir( data->loc->base.properties( data->loc ) ),
-                      data->next1Route->isSwapPost( data->next1Route ) );
+                                              data->next1Route->isSwapPost( data->next1Route ), False, False, False );
       }
       else {
         /* next2Block already locked */
@@ -94,14 +114,14 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
                                                                data->schedule, &data->scheduleIdx,
                                                                data->next1Block->base.id( data->next1Block ),
                                                                data->next1Route != NULL ? data->next1Route->base.id( data->next1Route ):NULL,
-                                                               data->loc, False,
+                                                               data->loc,
                                                                data->next1Route->isSwapPost( data->next1Route ),
-                                                               &indelay);
+                                                               &indelay, False);
       }
       else {
         /* next2Route already locked by second next option; adjust the schedule index... */
         data->scheduleIdx += 1;
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "adjust the schedule index to %d for second next option", data->scheduleIdx );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "adjust the schedule index to %d for second next option", data->scheduleIdx );
       }
 
       if( wLoc.isusescheduletime( data->loc->base.properties( data->loc ) ) &&
@@ -110,7 +130,7 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
         wait = True;
 
         if( scheduleIdx != data->scheduleIdx ) {
-          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
               "schedule index changed from %d to %d", scheduleIdx, data->scheduleIdx );
           data->prewaitScheduleIdx = scheduleIdx;
         }
@@ -119,33 +139,35 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
         data->prewaitScheduleIdx = -1;
       }
 
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "checkScheduleEntryActions for entry %d...", scheduleIdx );
+      if( checkScheduleEntryActions(inst, scheduleIdx, (wait || data->next2Route == NULL) ) ) {
+        /* wait in block if we have to swap placing... */
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201, "Wait in block because the schedule entry wants a swap placing..." );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "reset next2Block" );
+        resetNext2( (iOLcDriver)inst, True );
+        data->pendingSwap = True;
+        wait = True;
+      }
+
       if( !wait && data->next2Route != NULL ) {
         /* evaluate direction */
         if( StrOp.equals( data->next2Route->getToBlock( data->next2Route ), data->next1Block->base.id(data->next1Block) ) )
           data->next2Block = data->model->getBlock( data->model, data->next1Route->getFromBlock( data->next2Route ) );
         else
           data->next2Block = data->model->getBlock( data->model, data->next2Route->getToBlock( data->next2Route ) );
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "checkScheduleEntryActions..." );
-        if( checkScheduleEntryActions(inst, scheduleIdx) ) {
-          /* wait in block if we have to swap placing... */
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Wait in block because the schedule entry wants a swap placing..." );
-          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reset next2Block" );
-          resetNext2( (iOLcDriver)inst, True );
-          wait = True;
-        }
       }
       else if( wait ) {
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reset next2Block" );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "reset next2Block" );
         resetNext2( (iOLcDriver)inst, True );
       }
       else {
         if( isScheduleEnd(inst) ) {
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "End of schedule: STOP." );
-          checkScheduleEntryActions(inst, -1);
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201, "End of schedule: STOP." );
+          checkScheduleEntryActions(inst, -1, False);
           checkScheduleActions(inst, LC_ENTERBLOCK);
         }
         else {
-          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reset next2Block" );
+          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "reset next2Block" );
           resetNext2( (iOLcDriver)inst, True );
         }
 
@@ -158,35 +180,70 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
                         data->next1Block->base.id(data->next1Block),
                 &data->next2RouteFromTo );
       Boolean swapDir = False;
+      Boolean dirOK = True;
+      Boolean speedAdjusted = False;
+
+      if(re_enter) {
+        data->loc->resetBBT(data->loc);
+      }
+
       if( data->next2RouteFromTo )
         swapDir = data->next2Route->isSwapPost( data->next2Route ) ? data->next2RouteFromTo : !data->next2RouteFromTo;
       else
         swapDir = data->next2Route->isSwapPost( data->next2Route ) ? !data->next2RouteFromTo : data->next2RouteFromTo;
       swapDir = dir ? swapDir:!swapDir;
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
           "loco direction for [%s] is [%s], route direction [%s]",
                      data->loc->getId( data->loc ), dir?"forwards":"reverse", data->next1RouteFromTo?"fromTo":"toFrom" );
 
       if( data->loc->getDir( data->loc ) != ( data->next1Route->isSwapPost( data->next1Route ) ? !dir : dir ) ) {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Destination is in opposite direction while running: Reject and wait in block." );
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201, "Destination is in opposite direction while running: Reject and wait in block." );
 
         if( data->next2Route != NULL && data->scheduleIdx > 0 ) {
           /* go one move back in the schedule */
           data->scheduleIdx--;
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Set schedule index back to [%d].", data->scheduleIdx );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201, "Set schedule index back to [%d].", data->scheduleIdx );
         }
 
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reset next2Block  ***** test with unlock flag *****" );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "reset next2Block  ***** test with unlock flag *****" );
         resetNext2( (iOLcDriver)inst, True );
+        dirOK = False;
       }
-      else if( initializeDestination( (iOLcDriver)inst,
+
+      /* Adjust speed in case it should slow down. */
+      if( !data->gomanual && !re_enter && data->loc->getV(data->loc) > 0 ) {
+        iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+        if( wBlock.getincline( bkprops ) == wBlock.incline_up &&
+            data->direction == LC_DIR_FORWARDS &&
+            !wLoc.isregulated( data->loc->base.properties( data->loc ) ) ) {
+          wLoc.setV_hint( cmd, wLoc.climb );
+        }
+        else {
+          int maxkmh = 0;
+          wLoc.setV_hint( cmd, getBlockV_hint(inst, data->next1Block, False, data->next1Route, !data->next1RouteFromTo, &maxkmh ) );
+          wLoc.setV_maxkmh(cmd, maxkmh);
+        }
+        wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
+
+        if( data->loc->compareVhint(data->loc, wLoc.getV_hint(cmd) ) < 0 ) {
+          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "adjust loco speed before setting the route..." );
+          data->loc->cmd( data->loc, cmd );
+          speedAdjusted = True;
+        }
+        else {
+          NodeOp.base.del(cmd);
+        }
+      }
+
+
+      /* Initialize destination. */
+      if( dirOK && initializeDestination( (iOLcDriver)inst,
                        data->next2Block,
                        data->next2Route,
                        data->next1Block,
-                       swapDir, indelay ) &&
-               initializeSwap( (iOLcDriver)inst, data->next2Route) )
+                       swapDir, indelay ) )
       {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201,
             "Found destination for \"%s\": \"%s\" (from %s)",
             data->loc->getId( data->loc ), data->next2Block->base.id( data->next2Block ),
             data->next1Block->base.id( data->next1Block ) );
@@ -196,12 +253,12 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
         data->eventTimeout = 0;
         data->signalReset  = 0;
 
-        data->loc->setMode(data->loc, wLoc.mode_wait);
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+        data->loc->setMode(data->loc, wLoc.mode_auto, wLoc.modereason_destfound);
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                        "Setting state for \"%s\" from %s to LC_WAIT4EVENT.",
                        data->loc->getId( data->loc ), re_enter?"LC_RE_ENTERBLOCK":"LC_ENTERBLOCK" );
 
-        if( !data->gomanual && !re_enter ) {
+        if( !data->gomanual && !re_enter && !speedAdjusted ) {
           iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
           if( wBlock.getincline( bkprops ) == wBlock.incline_up &&
               data->direction == LC_DIR_FORWARDS &&
@@ -212,28 +269,56 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
             int maxkmh = 0;
             wLoc.setV_hint( cmd, getBlockV_hint(inst, data->next1Block, False, data->next1Route, !data->next1RouteFromTo, &maxkmh ) );
             wLoc.setV_maxkmh(cmd, maxkmh);
+
           }
+
+          if( data->loc->isReduceSpeedAtEnter( data->loc) ) {
+            if( !StrOp.equals( wLoc.getV_hint( cmd), wLoc.min ) && data->next2Route->hasThrownSwitch(data->next2Route) ) {
+              TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reduce speed at enter for thrown switches");
+              if( data->loc->compareVhint( data->loc, wLoc.mid) <= 0 || data->loc->getV( data->loc ) == 0 ) {
+                wLoc.setV_hint( cmd, wLoc.mid );
+                data->didReduceSpeedAtEnter = True;
+              }
+            }
+          }
+
           wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
           data->loc->cmd( data->loc, cmd );
         }
 
       }
       else {
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reset next2Block" );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "reset next2Block" );
         resetNext2( (iOLcDriver)inst, False );
       }
     }
   }
   else {
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reset next2Block" );
+    if( data->schedule != NULL && StrOp.len( data->schedule ) > 1 ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "checkScheduleEntryActions for entry %d...", data->scheduleIdx );
+      if( checkScheduleEntryActions(inst, data->scheduleIdx, False) ) {
+        /* wait in block if we have to swap placing... */
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201, "the schedule entry wants a swap placing..." );
+        data->pendingSwap = True;
+      }
+    }
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "reset next2Block" );
     resetNext2( (iOLcDriver)inst, True );
   }
 
   /* Wait in block or no new destination found. */
   if( data->next2Block == NULL ) {
 
-    if( data->next1Block->hasExtStop(data->next1Block) ) {
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+    data->state = LC_WAIT4EVENT;
+    data->eventTimeout = 0;
+    data->signalReset  = 0;
+    data->loc->setMode(data->loc, wLoc.mode_wait, wLoc.modereason_waitforevent);
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
+                   "Setting state for \"%s\" from %s to LC_WAIT4EVENT.",
+                   data->loc->getId( data->loc ), re_enter?"LC_RE_ENTERBLOCK":"LC_ENTERBLOCK" );
+
+    if( data->next1Block->hasExtStop(data->next1Block, NULL) ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201,
           "block %s has a stop module; not sending velocity hint to loco %s",
           data->next1Block->base.id(data->next1Block), data->loc->getId(data->loc));
     }
@@ -273,30 +358,24 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
         }
       }
       else
-        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 4101,
                      "destBlock for \"%s\" is not set!",
                      data->loc->getId( data->loc ) );
 
       wLoc.setdir( cmd, wLoc.isdir( data->loc->base.properties( data->loc ) ) );
 
-
-      if( !data->gomanual && !re_enter ) {
-        data->loc->cmd( data->loc, cmd );
-      }
-      else {
-        /* delete un sended node */
-        NodeOp.base.del(cmd);
+      {
+        Boolean bbt = wLoc.isusebbt(data->loc->base.properties( data->loc )) && data->next1Block->allowBBT(data->next1Block);
+        if( !data->gomanual && !re_enter && !bbt ) {
+          data->loc->cmd( data->loc, cmd );
+        }
+        else {
+          /* delete un sended node */
+          NodeOp.base.del(cmd);
+        }
       }
     }
 
-
-    data->state = LC_WAIT4EVENT;
-    data->eventTimeout = 0;
-    data->signalReset  = 0;
-    data->loc->setMode(data->loc, wLoc.mode_wait);
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
-                   "Setting state for \"%s\" from %s to LC_WAIT4EVENT.",
-                   data->loc->getId( data->loc ), re_enter?"LC_RE_ENTERBLOCK":"LC_ENTERBLOCK" );
   }
 
 
@@ -324,14 +403,6 @@ void statusEnter( iILcDriverInt inst, Boolean re_enter ) {
     data->loc->cmd( data->loc, cmd );
   }
 
-  if( !re_enter ) {
-    if( data->next1Block != NULL ) {
-      if( StrOp.equals(data->next1Block->base.id(data->next1Block), data->next1Route->getToBlock(data->next1Route)) )
-        data->loc->setBlockEnterSide(data->loc, data->next1Route->getToBlockSide(data->next1Route), data->next1Route->getToBlock(data->next1Route));
-      else
-        data->loc->setBlockEnterSide(data->loc, data->next1Route->getFromBlockSide(data->next1Route), data->next1Route->getFromBlock(data->next1Route));
-    }
-  }
-
+  /* Previous place of the loco block enterside setting...  */
 
 }

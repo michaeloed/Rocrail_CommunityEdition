@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -33,6 +36,7 @@
 #include "wx/spinctrl.h"
 ////@end includes
 
+#include "basedlg.h"
 #include "rocs/public/node.h"
 
 /*!
@@ -88,7 +92,7 @@ class wxSpinCtrl;
  * TrackDialog class declaration
  */
 
-class TrackDialog: public wxDialog
+class TrackDialog: public wxDialog, public BaseDialog
 {
     DECLARE_DYNAMIC_CLASS( TrackDialog )
     DECLARE_EVENT_TABLE()
@@ -116,6 +120,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end TrackDialog event handler declarations
 

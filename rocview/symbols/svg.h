@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -39,6 +42,7 @@ class svgPoly {
   wxPoint* poly;
   int cnt;
   char* stroke;
+  char* stroke_width;
   char* fill;
   bool arc;
 };
@@ -49,6 +53,7 @@ class svgCircle {
   int cy;
   int r;
   char* stroke;
+  char* stroke_width;
   char* fill;
 };
 
@@ -56,6 +61,8 @@ class svgSymbol {
   public:
   iOList polyList;
   iOList circleList;
+  iOList polyListAlt;
+  iOList circleListAlt;
   char* name;
   int cx;
   int cy;
@@ -65,8 +72,8 @@ class svgSymbol {
 
 class svgReader {
   private:
-  void addPoly2List( iOList polyList, int cnt, int xpoints[], int ypoints[], const char* stroke, const char* fill, bool arc );
-  void addCircle2List( iOList circleList, int cx, int cy, int r, const char* stroke, const char* fill );
+  void addPoly2List( iOList polyList, int cnt, int xpoints[], int ypoints[], const char* stroke, const char* fill, bool arc, const char* stroke_width );
+  void addCircle2List( iOList circleList, int cx, int cy, int r, const char* stroke, const char* fill, const char* stroke_width );
   bool parsePoly( const char* d, int xpoints[], int ypoints[], int* cnt );
   int evalCoord( const char* d, int* x, int* y );
 

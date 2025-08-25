@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -95,6 +98,8 @@ static int _toFADA( int module ,int port ,int gate ) {
 
 /**  */
 static int _toPADA( int module ,int port ) {
+  if( module == 0 ) /* already in PADA format */
+    return port;
   return (module-1) * 4 + port;
 }
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -30,6 +33,7 @@
  */
 
 ////@begin includes
+#include "wx/spinctrl.h"
 ////@end includes
 #include "rocs/public/node.h"
 
@@ -39,6 +43,7 @@
  */
 
 ////@begin forward declarations
+class wxSpinCtrl;
 ////@end forward declarations
 
 /*!
@@ -51,9 +56,8 @@
 #define ID_STATICTEXT_DINAMO_IID 10009
 #define ID_TEXTCTRL_DINAMO_IID 10010
 #define ID_STATICTEXT_DINAMO_DEV 10011
-#define ID_TEXTCTRL_DINAMO_DEV 10012
 #define ID_STATICTEXT_DINAMO_SWTIME 10013
-#define ID_TEXTCTRL_DINAMO_SWTIME 10014
+#define ID_BAUDRATE 10014
 #define SYMBOL_DINAMOCTRLDLG_STYLE wxCAPTION|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCLOSE_BOX
 #define SYMBOL_DINAMOCTRLDLG_TITLE _("Dinamo")
 #define SYMBOL_DINAMOCTRLDLG_IDNAME ID_DIALOG_DINAMO_SETTINGS
@@ -81,11 +85,12 @@ class DinamoCtrlDlg: public wxDialog
   void initValues();
   void evaluate();
   iONode m_Props;
+  const char* m_Devices;
 
 public:
     /// Constructors
     DinamoCtrlDlg( );
-    DinamoCtrlDlg( wxWindow* parent, iONode props );
+    DinamoCtrlDlg( wxWindow* parent, iONode props, const char* devices=NULL );
 
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_DINAMOCTRLDLG_IDNAME, const wxString& caption = SYMBOL_DINAMOCTRLDLG_TITLE, const wxPoint& pos = SYMBOL_DINAMOCTRLDLG_POSITION, const wxSize& size = SYMBOL_DINAMOCTRLDLG_SIZE, long style = SYMBOL_DINAMOCTRLDLG_STYLE );
@@ -100,6 +105,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end DinamoCtrlDlg event handler declarations
 
@@ -119,9 +127,12 @@ public:
     wxStaticText* m_labIID;
     wxTextCtrl* m_IID;
     wxStaticText* m_labDevice;
-    wxTextCtrl* m_Device;
+    wxComboBox* m_Device;
     wxStaticText* m_labSwTime;
-    wxTextCtrl* m_SwTime;
+    wxSpinCtrl* m_SwTime;
+    wxStaticText* m_Sleep;
+    wxSpinCtrl* m_TxSleep;
+    wxRadioBox* m_Baudrate;
     wxButton* m_OK;
     wxButton* m_Cancel;
 ////@end DinamoCtrlDlg member variables

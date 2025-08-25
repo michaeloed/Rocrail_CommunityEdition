@@ -1,13 +1,9 @@
-/** ------------------------------------------------------------
-  * Module:
-  * Object:
-  * ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocgui/dialogs/rocgui-dialogs.pjd,v $
-  * $Author: robvrs $
-  * $Date: 2006/02/22 14:10:57 $
-  * $Revision: 1.63 $
-  * $Name:  $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #if defined(__GNUG__) && !defined(NO_GCC_PRAGMA)
 #pragma implementation "softwareupdates.h"
 #endif
@@ -58,11 +54,9 @@ BEGIN_EVENT_TABLE( Softwareupdates, wxDialog )
 ////@begin Softwareupdates event table entries
     EVT_LISTBOX( wxID_ANY, Softwareupdates::OnAnySelected )
     EVT_CHECKLISTBOX( wxID_ANY, Softwareupdates::OnAnyToggled )
-
     EVT_BUTTON( wxID_OK, Softwareupdates::OnOkClick )
-
     EVT_BUTTON( wxID_CANCEL, Softwareupdates::OnCancelClick )
-
+    EVT_BUTTON( wxID_HELP, Softwareupdates::OnHelpClick )
 ////@end Softwareupdates event table entries
     EVT_TIMER (ME_UpdateTimer, Softwareupdates::OnTimer)
 
@@ -236,7 +230,7 @@ void updateReaderThread( void* threadinst ) {
     /* Reading rest of HTTP header: */
 
     int contlen = 0;
-    while( SocketOp.readln( sh, str ) && !SocketOp.isBroken( sh ) ) {
+    while( SocketOp.isConnected(sh) && !SocketOp.isBroken( sh ) && SocketOp.readln( sh, str ) ) {
       if( str[0] == '\r' || str[0] == '\n' ) {
         break;
       }
@@ -247,7 +241,7 @@ void updateReaderThread( void* threadinst ) {
       }
       TraceOp.trc( "updates", TRCLEVEL_INFO, __LINE__, 9999, str );
     };
-    if( contlen > 0 ) {
+    if( SocketOp.isConnected(sh) && !SocketOp.isBroken( sh ) && contlen > 0 ) {
       char* release = (char*)allocMem(contlen+1);
       SocketOp.read( sh, release, contlen );
       TraceOp.trc( "updates", TRCLEVEL_INFO, __LINE__, 9999, release );
@@ -450,25 +444,28 @@ void Softwareupdates::CreateControls()
     itemBoxSizer2->Add(m_labUpdates, 0, wxALIGN_LEFT|wxLEFT|wxRIGHT|wxTOP, 5);
 
     wxArrayString m_UpdatesStrings;
-    m_Updates = new wxCheckListBox( itemDialog1, wxID_ANY, wxDefaultPosition, wxSize(300, 100), m_UpdatesStrings, wxLB_SINGLE|wxLB_ALWAYS_SB );
+    m_Updates = new wxCheckListBox( itemDialog1, wxID_ANY, wxDefaultPosition, wxSize(300, 120), m_UpdatesStrings, wxLB_SINGLE|wxLB_ALWAYS_SB );
     itemBoxSizer2->Add(m_Updates, 1, wxGROW|wxALL, 5);
 
     m_labInfo = new wxStaticText( itemDialog1, wxID_ANY, _("Update info"), wxDefaultPosition, wxDefaultSize, 0 );
     itemBoxSizer2->Add(m_labInfo, 0, wxALIGN_LEFT|wxLEFT|wxRIGHT|wxTOP, 5);
 
-    m_Info = new wxTextCtrl( itemDialog1, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE|wxTE_READONLY );
+    m_Info = new wxTextCtrl( itemDialog1, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(-1, 80), wxTE_MULTILINE|wxTE_READONLY );
     m_Info->Enable(false);
     itemBoxSizer2->Add(m_Info, 0, wxGROW|wxALL, 5);
 
     wxStdDialogButtonSizer* itemStdDialogButtonSizer7 = new wxStdDialogButtonSizer;
 
-    itemBoxSizer2->Add(itemStdDialogButtonSizer7, 0, wxALIGN_RIGHT|wxALL, 5);
+    itemBoxSizer2->Add(itemStdDialogButtonSizer7, 0, wxGROW|wxALL, 5);
     m_OK = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
     m_OK->Enable(false);
     itemStdDialogButtonSizer7->AddButton(m_OK);
 
     m_Cancel = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
     itemStdDialogButtonSizer7->AddButton(m_Cancel);
+
+    wxButton* itemButton10 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer7->AddButton(itemButton10);
 
     itemStdDialogButtonSizer7->Realize();
 
@@ -543,6 +540,7 @@ void Softwareupdates::OnOkClick( wxCommandEvent& event )
   }
   
   NodeOp.base.del( m_ReleaseNode );
+  delete m_Timer;
   EndModal(wxID_OK);
 }
 
@@ -554,6 +552,7 @@ void Softwareupdates::OnOkClick( wxCommandEvent& event )
 void Softwareupdates::OnCancelClick( wxCommandEvent& event )
 {
   NodeOp.base.del( m_ReleaseNode );
+  delete m_Timer;
   EndModal(0);
 }
 
@@ -597,5 +596,15 @@ void Softwareupdates::OnAnyToggled( wxCommandEvent& event )
       m_OK->Enable(true);
     }
   }
+}
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void Softwareupdates::OnHelpClick( wxCommandEvent& event )
+{
+  wxGetApp().openLink( "updates" );
 }
 

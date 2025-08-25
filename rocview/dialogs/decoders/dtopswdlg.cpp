@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -90,6 +93,7 @@ void DTOpSwDlg::onReadAll( wxCommandEvent& event ) {
         "get", DT_idxOpSw[selectedBoard][idx], addr );
 
     iONode cmd = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    wProgram.setiid( cmd, m_IID->GetValue().mb_str(wxConvUTF8) );
     wProgram.setlntype( cmd, wProgram.lntype_opsw );
     wProgram.setcmd( cmd, wProgram.lncvget );
     wProgram.setaddr( cmd, addr-1 );
@@ -123,6 +127,7 @@ void DTOpSwDlg::onWriteAll( wxCommandEvent& event ) {
         "set", DT_idxOpSw[selectedBoard][idx], addr );
 
     iONode cmd = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    wProgram.setiid( cmd, m_IID->GetValue().mb_str(wxConvUTF8) );
     wProgram.setlntype( cmd, wProgram.lntype_opsw );
     wProgram.setcmd( cmd, wProgram.lncvset );
     wProgram.setaddr( cmd, addr-1 );
@@ -219,8 +224,13 @@ void DTOpSwDlg::event( iONode event ) {
 }
 
 
-
 void DTOpSwDlg::onOK( wxCommandEvent& event ){
+  delete m_Timer;
   EndModal( wxID_OK );
+}
+
+
+void DTOpSwDlg::onHelp( wxCommandEvent& event ) {
+  wxGetApp().openLink( "loconet:dtopsw" );
 }
 

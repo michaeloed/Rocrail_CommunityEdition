@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -41,6 +44,7 @@
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocrail/wrapper/public/HSI88.h"
 #include "rocview/public/guiapp.h"
+#include "rocs/public/strtok.h"
 
 ////@begin XPM images
 ////@end XPM images
@@ -59,9 +63,8 @@ BEGIN_EVENT_TABLE( Hsi88CntrlDlg, wxDialog )
 
 ////@begin Hsi88CntrlDlg event table entries
     EVT_BUTTON( wxID_OK, Hsi88CntrlDlg::OnOkClick )
-
     EVT_BUTTON( wxID_CANCEL, Hsi88CntrlDlg::OnCancelClick )
-
+    EVT_BUTTON( wxID_HELP, Hsi88CntrlDlg::OnHelpClick )
 ////@end Hsi88CntrlDlg event table entries
 
 END_EVENT_TABLE()
@@ -74,10 +77,11 @@ Hsi88CntrlDlg::Hsi88CntrlDlg( )
 {
 }
 
-Hsi88CntrlDlg::Hsi88CntrlDlg( wxWindow* parent, iONode props )
+Hsi88CntrlDlg::Hsi88CntrlDlg( wxWindow* parent, iONode props, const char* devices )
 {
-  Create(parent, -1, wxGetApp().getMsg("hsi88"));
+  Create(parent, -1, wxT("HSI88"));
   m_Props = props;
+  m_Devices = devices;
   initLabels();
   initValues();
 
@@ -99,6 +103,9 @@ void Hsi88CntrlDlg::initLabels() {
   m_labLeft->SetLabel( wxGetApp().getMsg( "left" ) );
   m_labMid->SetLabel( wxGetApp().getMsg( "middle" ) );
   m_labRight->SetLabel( wxGetApp().getMsg( "right" ) );
+  m_OptionsBox->SetLabel( wxGetApp().getMsg( "options" ) );
+  m_Smooth->SetLabel( wxGetApp().getMsg( "delay" ) );
+  m_labTriggerMS->SetLabel( wxT( "ms" ) );
 }
 
 void Hsi88CntrlDlg::initValues() {
@@ -107,6 +114,13 @@ void Hsi88CntrlDlg::initValues() {
 
   m_IID->SetValue( wxString( wDigInt.getiid( m_Props ), wxConvUTF8 ) );
   m_Device->SetValue( wxString( wDigInt.getdevice( m_Props ), wxConvUTF8 ) );
+  if( m_Devices != NULL ) {
+    iOStrTok tok = StrTokOp.inst(m_Devices, ',');
+    while( StrTokOp.hasMoreTokens(tok) ) {
+      m_Device->Append( wxString( StrTokOp.nextToken(tok), wxConvUTF8 ) );
+    }
+    StrTokOp.base.del(tok);
+  }
 
   iONode hsi88ini = wDigInt.gethsi88(m_Props);
   if( hsi88ini == NULL ) {
@@ -125,6 +139,9 @@ void Hsi88CntrlDlg::initValues() {
   val = StrOp.fmt( "%d", wHSI88.getfbright( hsi88ini ) );
   m_Right->SetValue( wxString( val, wxConvUTF8 ) );
   StrOp.free( val );
+  m_Smooth->SetValue( wHSI88.issmooth( hsi88ini )?true:false );
+  m_TriggerTime->SetValue( wHSI88.gettriggertime( hsi88ini ) );
+  m_CTS->SetValue( StrOp.equals( wDigInt.cts, wDigInt.getflow( m_Props ))?true:false );
 }
 
 
@@ -145,6 +162,9 @@ void Hsi88CntrlDlg::evaluate() {
   wHSI88.setfbleft( hsi88ini, atoi( m_Left->GetValue().mb_str(wxConvUTF8) ) );
   wHSI88.setfbmiddle( hsi88ini, atoi( m_Mid->GetValue().mb_str(wxConvUTF8) ) );
   wHSI88.setfbright( hsi88ini, atoi( m_Right->GetValue().mb_str(wxConvUTF8) ) );
+  wHSI88.setsmooth( hsi88ini, m_Smooth->IsChecked()?True:False );
+  wHSI88.settriggertime( hsi88ini, m_TriggerTime->GetValue() );
+  wDigInt.setflow( m_Props, m_CTS->IsChecked() ? wDigInt.cts:wDigInt.none );
 }
 
 
@@ -169,6 +189,11 @@ bool Hsi88CntrlDlg::Create( wxWindow* parent, wxWindowID id, const wxString& cap
     m_Left = NULL;
     m_Mid = NULL;
     m_Right = NULL;
+    m_OptionsBox = NULL;
+    m_Smooth = NULL;
+    m_TriggerTime = NULL;
+    m_labTriggerMS = NULL;
+    m_CTS = NULL;
     m_OK = NULL;
     m_Cancel = NULL;
 ////@end Hsi88CntrlDlg member initialisation
@@ -206,7 +231,6 @@ void Hsi88CntrlDlg::CreateControls()
     m_Panel->SetSizer(itemBoxSizer4);
 
     wxFlexGridSizer* itemFlexGridSizer5 = new wxFlexGridSizer(0, 2, 0, 0);
-    itemFlexGridSizer5->AddGrowableCol(1);
     itemBoxSizer4->Add(itemFlexGridSizer5, 0, wxGROW|wxALL, 5);
 
     m_labIID = new wxStaticText( m_Panel, ID_STATICTEXT_HSI_IID, _("IID"), wxDefaultPosition, wxDefaultSize, 0 );
@@ -218,15 +242,18 @@ void Hsi88CntrlDlg::CreateControls()
     m_labDevice = new wxStaticText( m_Panel, ID_STATICTEXT_HSI_DEVICE, _("Device"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer5->Add(m_labDevice, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_Device = new wxTextCtrl( m_Panel, ID_TEXTCTRL_HSI_DEVICE, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
+    wxArrayString m_DeviceStrings;
+    m_Device = new wxComboBox( m_Panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, m_DeviceStrings, wxCB_DROPDOWN );
     itemFlexGridSizer5->Add(m_Device, 0, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+
+    itemFlexGridSizer5->AddGrowableCol(1);
 
     wxArrayString m_TypeStrings;
     m_TypeStrings.Add(_("&RS232"));
-    m_TypeStrings.Add(_("&USB"));
+    m_TypeStrings.Add(_("&LDT-USB"));
     m_Type = new wxRadioBox( m_Panel, wxID_ANY, _("Type"), wxDefaultPosition, wxDefaultSize, m_TypeStrings, 1, wxRA_SPECIFY_ROWS );
     m_Type->SetSelection(0);
-    itemBoxSizer4->Add(m_Type, 0, wxGROW|wxALL, 5);
+    itemBoxSizer4->Add(m_Type, 0, wxALIGN_LEFT|wxALL, 5);
 
     m_ChainBox = new wxStaticBox(m_Panel, wxID_ANY, _("Chains"));
     wxStaticBoxSizer* itemStaticBoxSizer11 = new wxStaticBoxSizer(m_ChainBox, wxVERTICAL);
@@ -256,17 +283,41 @@ void Hsi88CntrlDlg::CreateControls()
     m_Right->SetMaxLength(5);
     itemFlexGridSizer12->Add(m_Right, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    wxStdDialogButtonSizer* itemStdDialogButtonSizer19 = new wxStdDialogButtonSizer;
+    m_OptionsBox = new wxStaticBox(m_Panel, wxID_ANY, _("Options"));
+    wxStaticBoxSizer* itemStaticBoxSizer19 = new wxStaticBoxSizer(m_OptionsBox, wxVERTICAL);
+    itemBoxSizer4->Add(itemStaticBoxSizer19, 0, wxGROW|wxALL, 5);
 
-    itemBoxSizer2->Add(itemStdDialogButtonSizer19, 0, wxALIGN_RIGHT|wxALL, 5);
+    wxFlexGridSizer* itemFlexGridSizer20 = new wxFlexGridSizer(0, 3, 0, 0);
+    itemStaticBoxSizer19->Add(itemFlexGridSizer20, 0, wxALIGN_LEFT, 5);
+
+    m_Smooth = new wxCheckBox( m_Panel, wxID_ANY, _("Low events stable at"), wxDefaultPosition, wxDefaultSize, 0 );
+    m_Smooth->SetValue(false);
+    itemFlexGridSizer20->Add(m_Smooth, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+
+    m_TriggerTime = new wxSpinCtrl( m_Panel, wxID_ANY, wxT("100"), wxDefaultPosition, wxSize(100, -1), wxSP_ARROW_KEYS, 100, 2000, 100 );
+    itemFlexGridSizer20->Add(m_TriggerTime, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+
+    m_labTriggerMS = new wxStaticText( m_Panel, wxID_ANY, _("ms"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemFlexGridSizer20->Add(m_labTriggerMS, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxRIGHT|wxTOP|wxBOTTOM, 5);
+
+    m_CTS = new wxCheckBox( m_Panel, wxID_ANY, _("CTS"), wxDefaultPosition, wxDefaultSize, 0 );
+    m_CTS->SetValue(false);
+    itemStaticBoxSizer19->Add(m_CTS, 0, wxALIGN_LEFT|wxLEFT|wxRIGHT|wxBOTTOM, 5);
+
+    wxStdDialogButtonSizer* itemStdDialogButtonSizer25 = new wxStdDialogButtonSizer;
+
+    itemBoxSizer2->Add(itemStdDialogButtonSizer25, 0, wxGROW|wxALL, 5);
     m_OK = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
     m_OK->SetDefault();
-    itemStdDialogButtonSizer19->AddButton(m_OK);
+    itemStdDialogButtonSizer25->AddButton(m_OK);
 
     m_Cancel = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemStdDialogButtonSizer19->AddButton(m_Cancel);
+    itemStdDialogButtonSizer25->AddButton(m_Cancel);
 
-    itemStdDialogButtonSizer19->Realize();
+    wxButton* itemButton28 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer25->AddButton(itemButton28);
+
+    itemStdDialogButtonSizer25->Realize();
 
 ////@end Hsi88CntrlDlg content construction
 }
@@ -324,3 +375,14 @@ wxIcon Hsi88CntrlDlg::GetIconResource( const wxString& name )
     return wxNullIcon;
 ////@end Hsi88CntrlDlg icon retrieval
 }
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void Hsi88CntrlDlg::OnHelpClick( wxCommandEvent& event )
+{
+  wxGetApp().openLink( "hsi88" );
+}
+

@@ -1,14 +1,9 @@
-/////////////////////////////////////////////////////////////////////////////
-// Name:        lenzdlg.cpp
-// Purpose:
-// Author:
-// Modified by:
-// Created:     Tue 06 Jan 2009 04:49:35 PM CET
-// RCS-ID:
-// Copyright:
-// Licence:
-/////////////////////////////////////////////////////////////////////////////
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
+ 
+
+ */
 #if defined(__GNUG__) && !defined(NO_GCC_PRAGMA)
 #pragma implementation "lenzdlg.h"
 #endif
@@ -34,6 +29,7 @@
 
 #include "rocview/public/guiapp.h"
 #include "rocrail/wrapper/public/DigInt.h"
+#include "rocs/public/strtok.h"
 
 /*!
  * LenzDlg type definition
@@ -50,11 +46,9 @@ BEGIN_EVENT_TABLE( LenzDlg, wxDialog )
 
 ////@begin LenzDlg event table entries
     EVT_RADIOBOX( ID_LENZTYPE, LenzDlg::OnLenztypeSelected )
-
     EVT_BUTTON( wxID_OK, LenzDlg::OnOkClick )
-
     EVT_BUTTON( wxID_CANCEL, LenzDlg::OnCancelClick )
-
+    EVT_BUTTON( wxID_HELP, LenzDlg::OnHelpClick )
 ////@end LenzDlg event table entries
 
 END_EVENT_TABLE()
@@ -69,12 +63,13 @@ LenzDlg::LenzDlg()
     Init();
 }
 
-LenzDlg::LenzDlg( wxWindow* parent, iONode props )
+LenzDlg::LenzDlg( wxWindow* parent, iONode props, const char* devices )
 {
     Init();
     Create(parent, -1, _T("XpressNet"));
 
     m_Props = props;
+    m_Devices = devices;
     initLabels();
     initValues();
 
@@ -91,19 +86,25 @@ void LenzDlg::initLabels() {
   m_labPort->SetLabel( wxGetApp().getMsg( "port" ) );
   m_Type->SetLabel( wxGetApp().getMsg( "type" ) );
   m_BPS->SetLabel( wxGetApp().getMsg( "bps" ) );
-  m_labSensorOffset->SetLabel( wxGetApp().getMsg( "sensor" ) + _T(" ") + wxGetApp().getMsg( "offset" ) );
   m_labSwitchTime->SetLabel( wxGetApp().getMsg( "switchtime" ) );
   m_labPower->SetLabel( wxGetApp().getMsg( "options" ) );
   m_PowerAtStartup->SetLabel( wxGetApp().getMsg( "poweronstartup" ) );
   m_FastClock->SetLabel( wxGetApp().getMsg( "fastclock" ) );
   m_HardwareFlow->SetLabel( wxGetApp().getMsg( "ctsflow" ) );
   m_AccPower->SetLabel( wxGetApp().getMsg( "power4acc" ) );
-  m_IgnoreBusy->SetLabel( wxGetApp().getMsg( "ignorebusy" ) );
 }
 
 void LenzDlg::initValues() {
   m_IID->SetValue( wxString( wDigInt.getiid( m_Props ), wxConvUTF8 ) );
   m_Device->SetValue( wxString( wDigInt.getdevice( m_Props ), wxConvUTF8 ) );
+  if( m_Devices != NULL ) {
+    iOStrTok tok = StrTokOp.inst(m_Devices, ',');
+    while( StrTokOp.hasMoreTokens(tok) ) {
+      m_Device->Append( wxString( StrTokOp.nextToken(tok), wxConvUTF8 ) );
+    }
+    StrTokOp.base.del(tok);
+  }
+
   m_Host->SetValue( wxString( wDigInt.gethost( m_Props ), wxConvUTF8 ) );
   m_Port->SetValue( wDigInt.getport(m_Props));
 
@@ -120,15 +121,22 @@ void LenzDlg::initValues() {
     m_Type->SetSelection(4);
   else if( StrOp.equals( wDigInt.sublib_lenz_cttran, wDigInt.getsublib(m_Props) ))
     m_Type->SetSelection(5);
+  else if( StrOp.equals( wDigInt.sublib_lenz_ethernet, wDigInt.getsublib(m_Props) ))
+    m_Type->SetSelection(6);
   else
     m_Type->SetSelection(0);
 
-  m_SensorOffset->SetValue( wDigInt.getfboffset(m_Props));
+  if( m_Type->GetSelection() == 4 || m_Type->GetSelection() == 6 ) {
+    m_BPS->Enable(false);
+    m_HardwareFlow->Enable(false);
+  }
+
+
   m_SwitchTime->SetValue( wDigInt.getswtime(m_Props));
   m_PowerAtStartup->SetValue( wDigInt.isstartpwstate(m_Props)?true:false);
   m_FastClock->SetValue( wDigInt.isfastclock(m_Props)?true:false);
   m_AccPower->SetValue( wDigInt.ispw4acc(m_Props)?true:false);
-  m_IgnoreBusy->SetValue( wDigInt.isignorebusy(m_Props)?true:false);
+  m_V2->SetValue( wDigInt.getprotver(m_Props) > 0 ? true:false);
 
   if( wDigInt.getbps( m_Props ) == 9600 )
     m_BPS->SetSelection(0);
@@ -158,11 +166,14 @@ void LenzDlg::evaluate() {
   wDigInt.sethost( m_Props, m_Host->GetValue().mb_str(wxConvUTF8) );
   wDigInt.setport( m_Props, m_Port->GetValue() );
   wDigInt.setswtime( m_Props, m_SwitchTime->GetValue() );
-  wDigInt.setfboffset( m_Props, m_SensorOffset->GetValue() );
   wDigInt.setstartpwstate(m_Props, m_PowerAtStartup->IsChecked()?True:False);
   wDigInt.setfastclock(m_Props, m_FastClock->IsChecked()?True:False);
   wDigInt.setpw4acc(m_Props, m_AccPower->IsChecked()?True:False);
-  wDigInt.setignorebusy(m_Props, m_IgnoreBusy->IsChecked()?True:False);
+
+  if( m_Type->GetSelection() == 2 ) // Elite
+    wDigInt.setprotver(m_Props, m_V2->IsChecked()?1:0);
+  else
+    wDigInt.setprotver(m_Props, m_V2->IsChecked()?2:0);
 
   if( m_Type->GetSelection() == 1 )
     wDigInt.setsublib(m_Props, wDigInt.sublib_usb );
@@ -174,6 +185,8 @@ void LenzDlg::evaluate() {
     wDigInt.setsublib(m_Props, wDigInt.sublib_lenz_xntcp );
   else if( m_Type->GetSelection() == 5 )
     wDigInt.setsublib(m_Props, wDigInt.sublib_lenz_cttran );
+  else if( m_Type->GetSelection() == 6 )
+    wDigInt.setsublib(m_Props, wDigInt.sublib_lenz_ethernet );
   else
     wDigInt.setsublib(m_Props, wDigInt.sublib_default );
 
@@ -253,9 +266,7 @@ void LenzDlg::Init()
     m_PowerAtStartup = NULL;
     m_FastClock = NULL;
     m_AccPower = NULL;
-    m_IgnoreBusy = NULL;
-    m_labSensorOffset = NULL;
-    m_SensorOffset = NULL;
+    m_V2 = NULL;
     m_labSwitchTime = NULL;
     m_SwitchTime = NULL;
 ////@end LenzDlg member initialisation
@@ -284,7 +295,6 @@ void LenzDlg::CreateControls()
     itemBoxSizer4->Add(itemBoxSizer5, 0, wxALIGN_TOP|wxALL, 5);
 
     wxFlexGridSizer* itemFlexGridSizer6 = new wxFlexGridSizer(0, 2, 0, 0);
-    itemFlexGridSizer6->AddGrowableCol(1);
     itemBoxSizer5->Add(itemFlexGridSizer6, 0, wxGROW, 5);
 
     m_labIID = new wxStaticText( m_MainPanel, wxID_ANY, _("IID"), wxDefaultPosition, wxDefaultSize, 0 );
@@ -296,7 +306,8 @@ void LenzDlg::CreateControls()
     m_labDevice = new wxStaticText( m_MainPanel, wxID_ANY, _("Device"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer6->Add(m_labDevice, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT|wxBOTTOM, 5);
 
-    m_Device = new wxTextCtrl( m_MainPanel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(200, -1), 0 );
+    wxArrayString m_DeviceStrings;
+    m_Device = new wxComboBox( m_MainPanel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, m_DeviceStrings, wxCB_DROPDOWN );
     itemFlexGridSizer6->Add(m_Device, 0, wxGROW|wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT|wxBOTTOM, 5);
 
     m_labHost = new wxStaticText( m_MainPanel, wxID_ANY, _("Host"), wxDefaultPosition, wxDefaultSize, 0 );
@@ -311,6 +322,8 @@ void LenzDlg::CreateControls()
     m_Port = new wxSpinCtrl( m_MainPanel, wxID_ANY, _T("0"), wxDefaultPosition, wxSize(120, -1), wxSP_ARROW_KEYS, 0, 65535, 0 );
     itemFlexGridSizer6->Add(m_Port, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT|wxBOTTOM, 5);
 
+    itemFlexGridSizer6->AddGrowableCol(1);
+
     wxArrayString m_BPSStrings;
     m_BPSStrings.Add(_("&9600"));
     m_BPSStrings.Add(_("&19200"));
@@ -319,14 +332,14 @@ void LenzDlg::CreateControls()
     m_BPSStrings.Add(_("&115200"));
     m_BPS = new wxRadioBox( m_MainPanel, wxID_ANY, _("BPS"), wxDefaultPosition, wxDefaultSize, m_BPSStrings, 2, wxRA_SPECIFY_ROWS );
     m_BPS->SetSelection(0);
-    itemBoxSizer5->Add(m_BPS, 0, wxGROW|wxALL, 5);
+    itemBoxSizer5->Add(m_BPS, 0, wxALIGN_LEFT|wxALL, 5);
 
     wxArrayString m_HardwareFlowStrings;
     m_HardwareFlowStrings.Add(_("&None"));
     m_HardwareFlowStrings.Add(_("&CTS"));
     m_HardwareFlow = new wxRadioBox( m_MainPanel, wxID_ANY, _("Hardware Flow"), wxDefaultPosition, wxDefaultSize, m_HardwareFlowStrings, 2, wxRA_SPECIFY_COLS );
     m_HardwareFlow->SetSelection(0);
-    itemBoxSizer5->Add(m_HardwareFlow, 0, wxGROW|wxLEFT|wxRIGHT|wxBOTTOM, 5);
+    itemBoxSizer5->Add(m_HardwareFlow, 0, wxALIGN_LEFT|wxLEFT|wxRIGHT|wxBOTTOM, 5);
 
     wxBoxSizer* itemBoxSizer17 = new wxBoxSizer(wxVERTICAL);
     itemBoxSizer4->Add(itemBoxSizer17, 0, wxALIGN_TOP|wxALL, 5);
@@ -338,13 +351,14 @@ void LenzDlg::CreateControls()
     m_TypeStrings.Add(_("&OpenDCC"));
     m_TypeStrings.Add(_("&XnTcp"));
     m_TypeStrings.Add(_("&CtTran"));
+    m_TypeStrings.Add(_("&LI-ETH"));
     m_Type = new wxRadioBox( m_MainPanel, ID_LENZTYPE, _("SubType"), wxDefaultPosition, wxDefaultSize, m_TypeStrings, 2, wxRA_SPECIFY_ROWS );
     m_Type->SetSelection(0);
-    itemBoxSizer17->Add(m_Type, 0, wxGROW|wxALL, 5);
+    itemBoxSizer17->Add(m_Type, 0, wxALIGN_LEFT|wxALL, 5);
 
     m_labPower = new wxStaticBox(m_MainPanel, wxID_ANY, _("Options"));
     wxStaticBoxSizer* itemStaticBoxSizer19 = new wxStaticBoxSizer(m_labPower, wxVERTICAL);
-    itemBoxSizer17->Add(itemStaticBoxSizer19, 0, wxGROW|wxALL, 5);
+    itemBoxSizer17->Add(itemStaticBoxSizer19, 0, wxALIGN_LEFT|wxALL, 5);
 
     m_PowerAtStartup = new wxCheckBox( m_MainPanel, wxID_ANY, _("Power on at startup"), wxDefaultPosition, wxDefaultSize, 0 );
     m_PowerAtStartup->SetValue(false);
@@ -358,19 +372,12 @@ void LenzDlg::CreateControls()
     m_AccPower->SetValue(true);
     itemStaticBoxSizer19->Add(m_AccPower, 0, wxALIGN_LEFT|wxLEFT|wxRIGHT, 5);
 
-    m_IgnoreBusy = new wxCheckBox( m_MainPanel, wxID_ANY, _("Ignore busy"), wxDefaultPosition, wxDefaultSize, 0 );
-    m_IgnoreBusy->SetValue(false);
-    itemStaticBoxSizer19->Add(m_IgnoreBusy, 0, wxALIGN_LEFT|wxLEFT|wxRIGHT|wxBOTTOM, 5);
+    m_V2 = new wxCheckBox( m_MainPanel, wxID_ANY, _("V2"), wxDefaultPosition, wxDefaultSize, 0 );
+    m_V2->SetValue(false);
+    itemStaticBoxSizer19->Add(m_V2, 0, wxALIGN_LEFT|wxLEFT|wxRIGHT|wxBOTTOM, 5);
 
     wxFlexGridSizer* itemFlexGridSizer24 = new wxFlexGridSizer(0, 2, 0, 0);
-    itemFlexGridSizer24->AddGrowableRow(1);
     itemStaticBoxSizer19->Add(itemFlexGridSizer24, 0, wxALIGN_LEFT, 5);
-
-    m_labSensorOffset = new wxStaticText( m_MainPanel, wxID_ANY, _("Sensor Offset"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer24->Add(m_labSensorOffset, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT, 5);
-
-    m_SensorOffset = new wxSpinCtrl( m_MainPanel, wxID_ANY, _T("0"), wxDefaultPosition, wxSize(100, -1), wxSP_ARROW_KEYS, 0, 99, 0 );
-    itemFlexGridSizer24->Add(m_SensorOffset, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT, 5);
 
     m_labSwitchTime = new wxStaticText( m_MainPanel, wxID_ANY, _("Switch time (ms)"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer24->Add(m_labSwitchTime, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT, 5);
@@ -378,16 +385,21 @@ void LenzDlg::CreateControls()
     m_SwitchTime = new wxSpinCtrl( m_MainPanel, wxID_ANY, _T("250"), wxDefaultPosition, wxSize(100, -1), wxSP_ARROW_KEYS, 0, 1000, 250 );
     itemFlexGridSizer24->Add(m_SwitchTime, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT, 5);
 
-    wxStdDialogButtonSizer* itemStdDialogButtonSizer29 = new wxStdDialogButtonSizer;
+    itemFlexGridSizer24->AddGrowableCol(1);
 
-    itemBoxSizer2->Add(itemStdDialogButtonSizer29, 0, wxALIGN_RIGHT|wxALL, 5);
-    wxButton* itemButton30 = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemStdDialogButtonSizer29->AddButton(itemButton30);
+    wxStdDialogButtonSizer* itemStdDialogButtonSizer27 = new wxStdDialogButtonSizer;
 
-    wxButton* itemButton31 = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemStdDialogButtonSizer29->AddButton(itemButton31);
+    itemBoxSizer2->Add(itemStdDialogButtonSizer27, 0, wxGROW|wxALL, 5);
+    wxButton* itemButton28 = new wxButton( itemDialog1, wxID_OK, _("&OK"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer27->AddButton(itemButton28);
 
-    itemStdDialogButtonSizer29->Realize();
+    wxButton* itemButton29 = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer27->AddButton(itemButton29);
+
+    wxButton* itemButton30 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer27->AddButton(itemButton30);
+
+    itemStdDialogButtonSizer27->Realize();
 
 ////@end LenzDlg content construction
 }
@@ -459,14 +471,28 @@ void LenzDlg::OnLenztypeSelected( wxCommandEvent& event )
   if( m_Type->GetSelection() == 1 ) {
     m_BPS->SetSelection(3);
     m_BPS->Enable(false);
+    m_HardwareFlow->Enable(true);
     return;
   }
 
-  if( m_Type->GetSelection() == 4 ) {
+  if( m_Type->GetSelection() == 4 || m_Type->GetSelection() == 6 ) {
     m_BPS->Enable(false);
+    m_HardwareFlow->Enable(false);
     return;
   }
 
   m_BPS->Enable(true);
+  m_HardwareFlow->Enable(true);
+}
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void LenzDlg::OnHelpClick( wxCommandEvent& event )
+{
+  if( StrOp.equals( wDigInt.xpressnet, wDigInt.getlib( m_Props ) ) )
+    wxGetApp().openLink( "xpressnet" );
 }
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2009 Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -220,7 +223,7 @@ static void __handleNetReq(iOR2Rnet inst, iONode req) {
     if( block != NULL ) {
       iONode lc = NodeOp.findNode(req, wLoc.name());
       iONode bk = NodeOp.findNode(req, wBlock.name());
-      Boolean reserved = block->lock(block, wLoc.getid(lc), wNetReq.getlocalbk(req), wNetReq.getrouteid(req), False, False, False, 0);
+      Boolean reserved = block->lock(block, wLoc.getid(lc), wNetReq.getlocalbk(req), wNetReq.getrouteid(req), False, False, False, 0, NULL, False);
       iORoute route = ModelOp.getRoute( AppOp.getModel(), wNetReq.getrouteid(req) );
 
       if( route != NULL ) {
@@ -231,7 +234,7 @@ static void __handleNetReq(iOR2Rnet inst, iONode req) {
           iOLoc loc = ModelOp.addNetLoc( AppOp.getModel(), lc );
 
           /* re-lock again to provide the block with the cloned ID pointer */
-          block->lock(block, LocOp.getId(loc), wNetReq.getlocalbk(req), wNetReq.getrouteid(req), False, False, False, 0);
+          block->lock(block, LocOp.getId(loc), wNetReq.getlocalbk(req), wNetReq.getrouteid(req), False, False, False, 0, NULL, False);
 
           wBlock.setremote( bk, True );
           wBlock.setrrid( bk, wNetReq.getlocalid(req) );
@@ -271,13 +274,13 @@ static void __handleNetReq(iOR2Rnet inst, iONode req) {
       iOLoc loc = NULL;
 
       if( StrOp.equals( rrid, wR2RnetIni.getid(data->props)) )
-        unlocked = block->unLock(block, lcid );
+        unlocked = block->unLock(block, lcid, NULL );
       else {
-        unlocked = block->unLock(block, wNetReq.getlcid(req) );
+        unlocked = block->unLock(block, wNetReq.getlcid(req), NULL );
         lcid = wNetReq.getlcid(req);
       }
 
-      loc = ModelOp.getLoc(AppOp.getModel(), lcid);
+      loc = ModelOp.getLoc(AppOp.getModel(), lcid, NULL, False);
 
       if( unlocked && loc != NULL) {
         iONode rsp = NodeOp.inst( wNetRsp.name(), NULL, ELEMENT_NODE );
@@ -303,10 +306,10 @@ static void __handleNetReq(iOR2Rnet inst, iONode req) {
   else if( StrOp.equals( wNetReq.req_locoisin, wNetReq.getreq(req) ) &&
     StrOp.equals( wNetReq.getremoteid(req), wR2RnetIni.getid(data->props) ) )
   {
-    iOLoc loco = ModelOp.getLoc( AppOp.getModel(), wNetReq.getlcid(req) );
+    iOLoc loco = ModelOp.getLoc( AppOp.getModel(), wNetReq.getlcid(req), NULL, False );
     if( loco == NULL && StrOp.find(wNetReq.getlcid(req), "::") != NULL ) {
       char* s = StrOp.find(wNetReq.getlcid(req), "::");
-      loco = ModelOp.getLoc( AppOp.getModel(), s + 2 );
+      loco = ModelOp.getLoc( AppOp.getModel(), s + 2, NULL, False );
     }
     if( loco == NULL ) {
       LocOp.stop(loco, False);

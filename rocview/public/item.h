@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -51,27 +54,40 @@ public:
   void OnMouseLeave(wxMouseEvent& event);
   void OnPopup(wxMouseEvent& event);
   void OnProps(wxCommandEvent& event);
+  void OnHelp(wxCommandEvent& event);
   void OnRotate(wxCommandEvent& event);
   void OnSelect(wxCommandEvent& event);
   void OnType(wxCommandEvent& event);
   void OnDelete(wxCommandEvent& event);
+  void OnCopy(wxCommandEvent& event);
   void OnLoc(wxCommandEvent& event);
   void OnUnLoc(wxCommandEvent& event);
   void OnLocGoTo(wxCommandEvent& event);
   void OnLocSchedule(wxCommandEvent& event);
+  void OnLocTour(wxCommandEvent& event);
   void OnLocGo(wxCommandEvent& event);
   void OnLocSwap(wxCommandEvent& event);
   void OnLocSwapBlockSide(wxCommandEvent& event);
   void OnScheduleGo(wxCommandEvent& event);
   void OnFYGo(wxCommandEvent& event);
+  void OnTTGo(wxCommandEvent& event);
   void OnLocGoManual(wxCommandEvent& event);
+  void OnLocGoVirtual(wxCommandEvent& event);
   void OnLocStop(wxCommandEvent& event);
   void OnLocReset(wxCommandEvent& event);
+  void OnLocResetAll(wxCommandEvent& event);
   void OnCloseBlock(wxCommandEvent& event);
+  void OnCloseExitBlock(wxCommandEvent& event);
   void OnOpenBlock(wxCommandEvent& event);
+  void OnOpenExitBlock(wxCommandEvent& event);
   void OnAcceptIdent(wxCommandEvent& event);
   void OnInfo(wxCommandEvent& event);
   void OnResetWheelcounter(wxCommandEvent& event);
+  void OnResetSensor(wxCommandEvent& event);
+  void OnSetSensorLoad(wxCommandEvent& event);
+  void OnIdentifierFwd(wxCommandEvent& event);
+  void OnIdentifierRev(wxCommandEvent& event);
+  void OnOutputColor(wxCommandEvent& event);
   void OnCompress(wxCommandEvent& event);
   void OnLocMIC(wxCommandEvent& event);
   void OnLocActivate(wxCommandEvent& event);
@@ -81,6 +97,7 @@ public:
   void OnCmdTurnout(wxCommandEvent& event);
   void OnCmdLeft(wxCommandEvent& event);
   void OnCmdRight(wxCommandEvent& event);
+  void OnCmdAction(wxCommandEvent& event);
 
   void OnCmdSignalAuto(wxCommandEvent& event);
   void OnCmdSignalManual(wxCommandEvent& event);
@@ -88,6 +105,8 @@ public:
   void OnCmdSignalGreen(wxCommandEvent& event);
   void OnCmdSignalYellow(wxCommandEvent& event);
   void OnCmdSignalWhite(wxCommandEvent& event);
+  void OnCmdSignalAspect(wxCommandEvent& event);
+  void OnCmdSignalAspectName(wxCommandEvent& event);
 
   void OnTimer(wxTimerEvent& event);
 
@@ -96,8 +115,13 @@ public:
   void OnTTPrev(wxCommandEvent& event);
   void OnTT180(wxCommandEvent& event);
   void OnTTTrack(wxCommandEvent& event);
+  void OnTTCalibrate(wxCommandEvent& event);
 
-  void modelEvent( iONode node );
+  void OnResetWC(wxCommandEvent& event);
+  void OnResetFiFo(wxCommandEvent& event);
+
+  void showTooltip(bool show);
+  void modelEvent( iONode node, bool oncreate=false );
   const char* getId();
   iONode getProperties();
   void reScale( double scale );
@@ -107,6 +131,14 @@ public:
   void locoDropped() {m_locoIsDropped = true;};
   void setZ(int z){m_Z = z;}
   void setPanel(PlanPanel* panel);
+  void setPosition();
+  bool isDragged() {return m_isDragged;}
+  bool isSignal();
+  bool isSwitch();
+  bool hasAlt();
+
+  void Blockstate(iONode bk, iONode lc);
+  bool m_DandD;
 
 private:
   SymbolRenderer* m_Renderer;
@@ -118,10 +150,10 @@ private:
   bool m_isDragged;
   bool m_locoIsDropped;
   char* m_locidStr;
+  char* m_Tip;
   //char* m_RouteID;
   void sizeToScale();
   double getSize();
-  void setPosition();
   void updateLabel();
 	wxWindow* m_Parent;
   iONode m_Props;
@@ -134,6 +166,10 @@ private:
 
   iOList m_sclist;
   iOList m_fylist;
+  iOList m_ttlist;
+  iOList m_actionlist;
+
+  bool m_RotateSym;
 
   void checkSpeakAction(iONode node);
 

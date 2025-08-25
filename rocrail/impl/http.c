@@ -1,33 +1,39 @@
 /*
- Rocrail - Model Railroad Software
-
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
-
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 2
- of the License, or (at your option) any later version.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License
- along with this program; if not, write to the Free Software
- Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-*/
+ * This is part of FreeRail - Model Railway Software
+ *
+ * Copyright: See AUTHORS at the top-level directory of this project and
+ * at GitHub <https://github.com/michaeloed/FreeRail/>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 3
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "rocrail/public/hclient.h"
 #include "rocrail/public/pclient.h"
 #include "rocrail/impl/http_impl.h"
 #include "rocrail/wrapper/public/HttpService.h"
 #include "rocrail/wrapper/public/WebClient.h"
+#include "rocrail/wrapper/public/Global.h"
+#include "rocrail/wrapper/public/Tcp.h"
+#include "rocrail/wrapper/public/SysCmd.h"
 
 #include "rocs/public/mem.h"
 #include "rocs/public/trace.h"
 #include "rocs/public/map.h"
 #include "rocs/public/strtok.h"
+#include "rocs/public/doc.h"
+#include "rocs/public/system.h"
 
+#include "rocrail/public/app.h"
 
 static int instCnt = 0;
 
@@ -187,12 +193,13 @@ static void __pportserver( void* threadinst ) {
   iOThread     th = (iOThread)threadinst;
   iOHttp     http = (iOHttp)ThreadOp.getParm(th);
   iOHttpData data = Data( http );
+  iONode    event = NULL;
 
-  char* desc = StrOp.fmt( "WebClient Service on port %d", data->pport  );
+  char* desc = StrOp.fmt( "Rocweb service on port %d", data->pport  );
   ThreadOp.setDescription( th, desc );
   StrOp.free( desc );
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "WebClient Service started on %d.", data->pport );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Rocweb service started on %d.", data->pport );
 
   do {
     iOPClient client = NULL;
@@ -200,14 +207,72 @@ static void __pportserver( void* threadinst ) {
       client = (iOPClient)MapOp.first( data->pclientMap );
       MutexOp.post( data->pclientmux );
     }
+
+    event = NULL;
+    obj post = ThreadOp.getPost( th );
+    if( post != NULL ) {
+      event = (iONode)post;
+    }
+
     /* Iterate the list of connected clients. */
     while( client != NULL ) {
+      char* cmd = NULL;
 
       /* Let the client do the work... */
-      Boolean remove = PClientOp.work( client );
+      Boolean remove = PClientOp.work( client, event, &cmd );
+      if( cmd != NULL ) {
+        if( (byte)(cmd[0]) == 0x03 && ((byte)(cmd[1]) == 0xE8 || (byte)(cmd[1]) == 0xE9) ) {
+          TraceOp.dump( name, TRCLEVEL_INFO, (const char*)cmd, StrOp.len(cmd) );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "shutdown Rocweb [%s] unexpected opcode 0X%02X", PClientOp.getId( client ), (byte)(cmd[0]) );
+          remove = True;
+        }
+        else {
+          iODoc doc = NULL;
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "command received: %.120s", cmd );
+          /* Parse command and semd it over the callback function to the control. */
+          doc = DocOp.parse( cmd );
+          if( doc != NULL ) {
+            iONode nodeA = DocOp.getRootNode( doc );
+            if( nodeA != NULL ) {
+              Boolean slave    = False;
+              Boolean readonly = False;
+              if( data->controlcode != NULL && StrOp.len( data->controlcode ) > 0 && !StrOp.equals( data->controlcode, wTcp.getcontrolcode(nodeA) ) )
+                readonly = True;
+              if( data->slavecode != NULL && StrOp.len( data->slavecode ) > 0 && !StrOp.equals( data->slavecode, wTcp.getslavecode(nodeA) ) )
+                slave = True;
+
+              /* Check the control code... */
+              if( readonly ) {
+                TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "client is readonly, reject: %.120s", cmd );
+                NodeOp.base.del(nodeA);
+              }
+              else {
+                if( slave ) {
+                  if( StrOp.equals( wSysCmd.name(), NodeOp.getName(nodeA) ) ) {
+                    const char* cmd = wSysCmd.getcmd(nodeA);
+                    if( StrOp.equals( wSysCmd.shutdown, cmd ) || StrOp.equals( wSysCmd.go, cmd ) )
+                    {
+                      /* ignore */
+                      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ignore [%s] from slave client", cmd);
+                      NodeOp.base.del(nodeA);
+                      nodeA = NULL;
+                    }
+                  }
+                }
+                if( nodeA != NULL ) {
+                  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "send command received to control: %.120s", cmd );
+                  data->callback( data->callbackObj, nodeA );
+                }
+              }
+            }
+            DocOp.base.del(doc);
+          }
+        }
+        StrOp.free(cmd);
+      }
 
       if( remove ) {
-        TraceOp.trc( name, TRCLEVEL_USER2, __LINE__, 9999, "Removing WebClient [%s].", PClientOp.getId( client ) );
+        TraceOp.trc( name, TRCLEVEL_USER2, __LINE__, 9999, "Removing Rocweb [%s].", PClientOp.getId( client ) );
         if( MutexOp.wait( data->pclientmux ) ) {
           MapOp.remove( data->pclientMap, PClientOp.getId( client ) );
           MutexOp.post( data->pclientmux );
@@ -226,10 +291,15 @@ static void __pportserver( void* threadinst ) {
       }
     };
 
+    if( event != NULL ) {
+      NodeOp.base.del(event);
+      event = NULL;
+    }
+
     ThreadOp.sleep( 5 );
   } while( !ThreadOp.isQuit( th ) );
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "WebClient Service ended on %d.", data->port );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Rocweb service ended on %d.", data->pport );
   ThreadOp.base.del( th );
   data->pportserver = NULL;
 }
@@ -245,11 +315,11 @@ static void __pportmanager( void* threadinst ) {
   iOHttp           http = (iOHttp)ThreadOp.getParm(th);
   iOHttpData       data = Data( http );
 
-  char* desc = StrOp.fmt( "WebClient Manager on port %d", data->port  );
+  char* desc = StrOp.fmt( "Rocweb manager on port %d", data->port  );
   ThreadOp.setDescription( th, desc );
   StrOp.free( desc );
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "WebClient Manager started on %d.", data->pport );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Rocweb manager started on %d.", data->pport );
   do {
     /* Wait for a connection. */
     iOSocket clientSocket = SocketOp.accept( data->psrvrsocket );
@@ -257,7 +327,7 @@ static void __pportmanager( void* threadinst ) {
     if( clientSocket ) {
       iOPClient client = PClientOp.inst( clientSocket, data->webclient  );
 
-      TraceOp.trc( name, TRCLEVEL_USER2, __LINE__, 9999, "WebClient Manager accept for %s:%d. (id=%s)",
+      TraceOp.trc( name, TRCLEVEL_USER2, __LINE__, 9999, "Rocweb manager accept for %s:%d. (id=%s)",
                      SocketOp.getPeername( clientSocket ), data->pport, PClientOp.getId( client ) );
 
       if( MutexOp.wait( data->pclientmux ) ) {
@@ -276,14 +346,21 @@ static void __pportmanager( void* threadinst ) {
     ThreadOp.sleep( 10 );
   } while( !ThreadOp.isQuit( th ) );
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "WebClient Manager ended for %d.", data->pport );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Rocweb manager ended for %d.", data->pport );
   ThreadOp.base.del( th );
   data->pportmanager = NULL;
 }
 
 
+static void _setCallback( iOHttp inst, httpcon_callback pfun, obj callbackObj ) {
+  iOHttpData data = Data(inst);
+  data->callback    = pfun;
+  data->callbackObj = callbackObj;
+}
+
+
 /** Object creator. */
-static struct OHttp* _inst( iONode ini ) {
+static struct OHttp* _inst( iONode ini, httpcon_callback pfun, obj callbackObj, const char* imgpath, const char* controlcode, const char* slavecode ) {
   if( ini != NULL ) {
     iOHttp __Http = allocMem( sizeof( struct OHttp ) );
     iOHttpData data = allocMem( sizeof( struct OHttpData ) );
@@ -292,7 +369,10 @@ static struct OHttp* _inst( iONode ini ) {
     data->ini = ini;
     data->port = wHttpService.getport( ini );
     data->webclient = wHttpService.getwebclient( ini );
-
+    data->callback    = pfun;
+    data->callbackObj = callbackObj;
+    data->controlcode = controlcode;
+    data->slavecode   = slavecode;
   
     /* Initialize data->xxx members... */
     if( data->port > 0 ) {
@@ -314,9 +394,15 @@ static struct OHttp* _inst( iONode ini ) {
     }
   
     if( data->webclient && wWebClient.getport( data->webclient ) > 0 ) {
-      char*  phtmName = StrOp.fmt( "phtm%08X", __Http );
-      char*  phtsName = StrOp.fmt( "phts%08X", __Http );
+      char*  phtmName = NULL;
+      char*  phtsName = NULL;
+
+      phtmName = StrOp.fmt( "phtm%08X", __Http );
+      phtsName = StrOp.fmt( "phts%08X", __Http );
+
       
+      wWebClient.setimgpath( data->webclient, imgpath );
+
       data->pclientMap = MapOp.inst();
       data->pclientmux = MutexOp.inst( NULL, True );
   
@@ -361,6 +447,27 @@ static void _shutdown( struct OHttp* inst ) {
       ThreadOp.requestQuit( data->pportserver );
     if( data->psrvrsocket != NULL )
       SocketOp.disConnect( data->psrvrsocket );
+  }
+  return;
+}
+
+
+static Boolean _isEnded(iOHttp inst) {
+  // hardcoded, as it relied on the demo mode that is removed now
+  return False;
+}
+
+/**  */
+static void _broadcastEvent( struct OHttp* inst ,iONode evt ) {
+  iOHttpData data = Data(inst);
+  if( data->pportserver == NULL ) {
+    NodeOp.base.del(evt);
+    return;
+  }
+
+  if( !ThreadOp.post( data->pportserver, (obj)evt ) ) {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Unable to broadcast event: Shutdown service." );
+    NodeOp.base.del(evt);
   }
   return;
 }

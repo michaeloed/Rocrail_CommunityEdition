@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -143,6 +146,7 @@ void ModPanel::OnAddModule(wxCommandEvent& event) {
 
     if( wxID_OK == dlg->ShowModal() ) {
       wModule.setid( module, dlg->GetValue().mb_str(wxConvUTF8) );
+      wModule.settitle( module, dlg->GetValue().mb_str(wxConvUTF8) );
     }
     dlg->Destroy();
 
@@ -179,6 +183,16 @@ void ModPanel::removeModule(iONode zlevel) {
 }
 
 
+void* ModPanel::GetItem( const char* key ) {
+  BasePanel* p = (BasePanel*)ListOp.first(m_ModList);
+  while( p != NULL ) {
+    void* item = p->GetItem(key);
+    if( item != NULL )
+      return item;
+    p = (BasePanel*)ListOp.next(m_ModList);
+  }
+  return NULL;
+}
 
 void ModPanel::modelEvent( iONode node ) {
   BasePanel* p = (BasePanel*)ListOp.first(m_ModList);
@@ -268,6 +282,8 @@ void ModPanel::OnPanelProps(wxCommandEvent& event) {
     // PropertiesDialog:
     m_ModPlanDlg = new ModPlanDlg( this, ini );
     if( wxID_OK == m_ModPlanDlg->ShowModal() ) {
+      SetLabel(wxString( wModPlan.getsubtitle( ini ),wxConvUTF8 ));
+      wxGetApp().getFrame()->setPlanTitle( wModPlan.gettitle( ini ) );
     }
     m_ModPlanDlg->Destroy();
     m_ModPlanDlg = NULL;
@@ -319,6 +335,9 @@ BasePanel* ModPanel::updateZLevel(iONode zlevel) {
   return NULL;
 }
 
+void ModPanel::showTooltip(bool show)
+{
+}
 
 void ModPanel::OnPaint(wxPaintEvent& event)
 {

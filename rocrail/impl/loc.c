@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -27,6 +30,7 @@
 #include "rocrail/public/model.h"
 #include "rocrail/public/control.h"
 #include "rocrail/public/http.h"
+#include "rocrail/public/operator.h"
 
 #include "rocint/public/lcdriverint.h"
 
@@ -40,6 +44,7 @@
 #include "rocs/public/lib.h"
 #include "rocs/public/system.h"
 
+#include "rocrail/wrapper/public/FreeRail.h"
 #include "rocrail/wrapper/public/ModelCmd.h"
 #include "rocrail/wrapper/public/Loc.h"
 #include "rocrail/wrapper/public/Block.h"
@@ -50,7 +55,14 @@
 #include "rocrail/wrapper/public/SysCmd.h"
 #include "rocrail/wrapper/public/FeedbackEvent.h"
 #include "rocrail/wrapper/public/Schedule.h"
+#include "rocrail/wrapper/public/Tour.h"
 #include "rocrail/wrapper/public/ActionCtrl.h"
+#include "rocrail/wrapper/public/Stage.h"
+#include "rocrail/wrapper/public/BBT.h"
+#include "rocrail/wrapper/public/SBT.h"
+#include "rocrail/wrapper/public/Program.h"
+#include "rocrail/wrapper/public/Action.h"
+#include "rocrail/wrapper/public/BinStateCmd.h"
 
 static int instCnt = 0;
 
@@ -58,6 +70,12 @@ static iONode __resetTimedFunction(iOLoc loc, iONode cmd, int function);
 static void __checkConsist( iOLoc inst, iONode nodeA, Boolean byEvent );
 static void __funEvent( iOLoc inst, const char* blockid, int evt, int timer );
 static void __swapConsist( iOLoc inst, iONode cmd );
+static int __getFnAddr( iOLoc inst, int function, int* mappedfn);
+static void __doSound(iOLoc inst, iONode cmd);
+static void __initBBTmap( iOLoc loc );
+static void __initSBTmap( iOLoc loc );
+static void __initCVmap( iOLoc loc );
+static Boolean __loadDriver( iOLoc inst );
 
 /*
  ***** OBase functions.
@@ -67,14 +85,14 @@ static const char* __id( void* inst ) {
   return wLoc.getid( data->props );
 }
 
-static void __checkAction( iOLoc inst, const char* state ) {
+static void __checkAction( iOLoc inst, const char* state, const char* substate ) {
 
   iOLocData data     = Data(inst);
   iOModel   model    = AppOp.getModel();
   iONode    lcaction = wLoc.getactionctrl( data->props );
 
   while( lcaction != NULL) {
-      if( StrOp.equals(wActionCtrl.getstate(lcaction), state ) )
+      if( StrOp.equals(wActionCtrl.getstate(lcaction), state ) && StrOp.equals(wActionCtrl.getsubstate(lcaction), substate ) )
       {
 
         iOAction action = ModelOp.getAction( AppOp.getModel(), wActionCtrl.getid( lcaction ));
@@ -84,8 +102,8 @@ static void __checkAction( iOLoc inst, const char* state ) {
         }
       }
       else {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "action state does not match: [%s-%s]",
-            wActionCtrl.getstate( lcaction ), state );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "%s action state does not match: [%s-%s] sub[%s-%s]",
+            wLoc.getid(data->props), wActionCtrl.getstate( lcaction ), state, wActionCtrl.getsubstate( lcaction ), substate );
       }
     lcaction = wLoc.nextactionctrl( data->props, lcaction );
   }
@@ -94,79 +112,113 @@ static void __checkAction( iOLoc inst, const char* state ) {
 
 
 
-static void __FnOnOff(iOLoc inst, int fn, Boolean OnOff, iONode cmd) {
+static void __FnOnOff(iOLoc inst, int fn, Boolean OnOff, iONode cmd, Boolean save) {
   iOLocData data = Data(inst);
   int fgroup = 0;
 
   switch( fn ) {
-    case  0: wFunCmd.setf0 ( cmd, OnOff ); data->fn0  = OnOff; fgroup = 0; break;
-    case  1: wFunCmd.setf1 ( cmd, OnOff ); data->fn1  = OnOff; fgroup = 1; break;
-    case  2: wFunCmd.setf2 ( cmd, OnOff ); data->fn2  = OnOff; fgroup = 1; break;
-    case  3: wFunCmd.setf3 ( cmd, OnOff ); data->fn3  = OnOff; fgroup = 1; break;
-    case  4: wFunCmd.setf4 ( cmd, OnOff ); data->fn4  = OnOff; fgroup = 1; break;
-    case  5: wFunCmd.setf5 ( cmd, OnOff ); data->fn5  = OnOff; fgroup = 2; break;
-    case  6: wFunCmd.setf6 ( cmd, OnOff ); data->fn6  = OnOff; fgroup = 2; break;
-    case  7: wFunCmd.setf7 ( cmd, OnOff ); data->fn7  = OnOff; fgroup = 2; break;
-    case  8: wFunCmd.setf8 ( cmd, OnOff ); data->fn8  = OnOff; fgroup = 2; break;
-    case  9: wFunCmd.setf9 ( cmd, OnOff ); data->fn9  = OnOff; fgroup = 3; break;
-    case 10: wFunCmd.setf10( cmd, OnOff ); data->fn10 = OnOff; fgroup = 3; break;
-    case 11: wFunCmd.setf11( cmd, OnOff ); data->fn11 = OnOff; fgroup = 3; break;
-    case 12: wFunCmd.setf12( cmd, OnOff ); data->fn12 = OnOff; fgroup = 3; break;
-    case 13: wFunCmd.setf13( cmd, OnOff ); data->fn13 = OnOff; fgroup = 4; break;
-    case 14: wFunCmd.setf14( cmd, OnOff ); data->fn14 = OnOff; fgroup = 4; break;
-    case 15: wFunCmd.setf15( cmd, OnOff ); data->fn15 = OnOff; fgroup = 4; break;
-    case 16: wFunCmd.setf16( cmd, OnOff ); data->fn16 = OnOff; fgroup = 4; break;
-    case 17: wFunCmd.setf17( cmd, OnOff ); data->fn17 = OnOff; fgroup = 5; break;
-    case 18: wFunCmd.setf18( cmd, OnOff ); data->fn18 = OnOff; fgroup = 5; break;
-    case 19: wFunCmd.setf19( cmd, OnOff ); data->fn19 = OnOff; fgroup = 5; break;
-    case 20: wFunCmd.setf20( cmd, OnOff ); data->fn20 = OnOff; fgroup = 5; break;
-    case 21: wFunCmd.setf21( cmd, OnOff ); data->fn21 = OnOff; fgroup = 6; break;
-    case 22: wFunCmd.setf22( cmd, OnOff ); data->fn22 = OnOff; fgroup = 6; break;
-    case 23: wFunCmd.setf23( cmd, OnOff ); data->fn23 = OnOff; fgroup = 6; break;
-    case 24: wFunCmd.setf24( cmd, OnOff ); data->fn24 = OnOff; fgroup = 6; break;
-    case 25: wFunCmd.setf25( cmd, OnOff ); data->fn25 = OnOff; fgroup = 7; break;
-    case 26: wFunCmd.setf26( cmd, OnOff ); data->fn26 = OnOff; fgroup = 7; break;
-    case 27: wFunCmd.setf27( cmd, OnOff ); data->fn27 = OnOff; fgroup = 7; break;
-    case 28: wFunCmd.setf28( cmd, OnOff ); data->fn28 = OnOff; fgroup = 7; break;
+    case  0: wFunCmd.setf0 ( cmd, OnOff ); if(save) data->fn0  = OnOff; fgroup = 0; break;
+    case  1: wFunCmd.setf1 ( cmd, OnOff ); if(save) data->fn1  = OnOff; fgroup = 1; break;
+    case  2: wFunCmd.setf2 ( cmd, OnOff ); if(save) data->fn2  = OnOff; fgroup = 1; break;
+    case  3: wFunCmd.setf3 ( cmd, OnOff ); if(save) data->fn3  = OnOff; fgroup = 1; break;
+    case  4: wFunCmd.setf4 ( cmd, OnOff ); if(save) data->fn4  = OnOff; fgroup = 1; break;
+    case  5: wFunCmd.setf5 ( cmd, OnOff ); if(save) data->fn5  = OnOff; fgroup = 2; break;
+    case  6: wFunCmd.setf6 ( cmd, OnOff ); if(save) data->fn6  = OnOff; fgroup = 2; break;
+    case  7: wFunCmd.setf7 ( cmd, OnOff ); if(save) data->fn7  = OnOff; fgroup = 2; break;
+    case  8: wFunCmd.setf8 ( cmd, OnOff ); if(save) data->fn8  = OnOff; fgroup = 2; break;
+    case  9: wFunCmd.setf9 ( cmd, OnOff ); if(save) data->fn9  = OnOff; fgroup = 3; break;
+    case 10: wFunCmd.setf10( cmd, OnOff ); if(save) data->fn10 = OnOff; fgroup = 3; break;
+    case 11: wFunCmd.setf11( cmd, OnOff ); if(save) data->fn11 = OnOff; fgroup = 3; break;
+    case 12: wFunCmd.setf12( cmd, OnOff ); if(save) data->fn12 = OnOff; fgroup = 3; break;
+    case 13: wFunCmd.setf13( cmd, OnOff ); if(save) data->fn13 = OnOff; fgroup = 4; break;
+    case 14: wFunCmd.setf14( cmd, OnOff ); if(save) data->fn14 = OnOff; fgroup = 4; break;
+    case 15: wFunCmd.setf15( cmd, OnOff ); if(save) data->fn15 = OnOff; fgroup = 4; break;
+    case 16: wFunCmd.setf16( cmd, OnOff ); if(save) data->fn16 = OnOff; fgroup = 4; break;
+    case 17: wFunCmd.setf17( cmd, OnOff ); if(save) data->fn17 = OnOff; fgroup = 5; break;
+    case 18: wFunCmd.setf18( cmd, OnOff ); if(save) data->fn18 = OnOff; fgroup = 5; break;
+    case 19: wFunCmd.setf19( cmd, OnOff ); if(save) data->fn19 = OnOff; fgroup = 5; break;
+    case 20: wFunCmd.setf20( cmd, OnOff ); if(save) data->fn20 = OnOff; fgroup = 5; break;
+    case 21: wFunCmd.setf21( cmd, OnOff ); if(save) data->fn21 = OnOff; fgroup = 6; break;
+    case 22: wFunCmd.setf22( cmd, OnOff ); if(save) data->fn22 = OnOff; fgroup = 6; break;
+    case 23: wFunCmd.setf23( cmd, OnOff ); if(save) data->fn23 = OnOff; fgroup = 6; break;
+    case 24: wFunCmd.setf24( cmd, OnOff ); if(save) data->fn24 = OnOff; fgroup = 6; break;
+    case 25: wFunCmd.setf25( cmd, OnOff ); if(save) data->fn25 = OnOff; fgroup = 7; break;
+    case 26: wFunCmd.setf26( cmd, OnOff ); if(save) data->fn26 = OnOff; fgroup = 7; break;
+    case 27: wFunCmd.setf27( cmd, OnOff ); if(save) data->fn27 = OnOff; fgroup = 7; break;
+    case 28: wFunCmd.setf28( cmd, OnOff ); if(save) data->fn28 = OnOff; fgroup = 7; break;
   }
   wFunCmd.setfncnt( cmd, wLoc.getfncnt( data->props ) );
-  wFunCmd.setgroup( cmd, fgroup );
-  wFunCmd.setfnchanged( cmd, fn );
+  if( save ) {
+    wFunCmd.setgroup( cmd, fgroup );
+    wFunCmd.setfnchanged( cmd, fn );
+  }
 }
 
 
-static void __cpFn2Node(iOLoc inst, iONode cmd, int fn) {
+static void __cpFn2Node(iOLoc inst, iONode cmd, int fn, int addr) {
   iOLocData data = Data(inst);
+  int mappedfn = fn;
   wFunCmd.setfncnt( cmd, wLoc.getfncnt( data->props ) );
-  if( fn == -1 || fn != 0 ) wFunCmd.setf0 ( cmd, data->fn0  );
-  if( fn == -1 || fn != 1 ) wFunCmd.setf1 ( cmd, data->fn1  );
-  if( fn == -1 || fn != 2 ) wFunCmd.setf2 ( cmd, data->fn2  );
-  if( fn == -1 || fn != 3 ) wFunCmd.setf3 ( cmd, data->fn3  );
-  if( fn == -1 || fn != 4 ) wFunCmd.setf4 ( cmd, data->fn4  );
-  if( fn == -1 || fn != 5 ) wFunCmd.setf5 ( cmd, data->fn5  );
-  if( fn == -1 || fn != 6 ) wFunCmd.setf6 ( cmd, data->fn6  );
-  if( fn == -1 || fn != 7 ) wFunCmd.setf7 ( cmd, data->fn7  );
-  if( fn == -1 || fn != 8 ) wFunCmd.setf8 ( cmd, data->fn8  );
-  if( fn == -1 || fn != 9 ) wFunCmd.setf9 ( cmd, data->fn9  );
-  if( fn == -1 || fn != 10 ) wFunCmd.setf10( cmd, data->fn10 );
-  if( fn == -1 || fn != 11 ) wFunCmd.setf11( cmd, data->fn11 );
-  if( fn == -1 || fn != 12 ) wFunCmd.setf12( cmd, data->fn12 );
-  if( fn == -1 || fn != 13 ) wFunCmd.setf13( cmd, data->fn13 );
-  if( fn == -1 || fn != 14 ) wFunCmd.setf14( cmd, data->fn14 );
-  if( fn == -1 || fn != 15 ) wFunCmd.setf15( cmd, data->fn15 );
-  if( fn == -1 || fn != 16 ) wFunCmd.setf16( cmd, data->fn16 );
-  if( fn == -1 || fn != 17 ) wFunCmd.setf17( cmd, data->fn17 );
-  if( fn == -1 || fn != 18 ) wFunCmd.setf18( cmd, data->fn18 );
-  if( fn == -1 || fn != 19 ) wFunCmd.setf19( cmd, data->fn19 );
-  if( fn == -1 || fn != 20 ) wFunCmd.setf20( cmd, data->fn20 );
-  if( fn == -1 || fn != 21 ) wFunCmd.setf21( cmd, data->fn21 );
-  if( fn == -1 || fn != 22 ) wFunCmd.setf22( cmd, data->fn22 );
-  if( fn == -1 || fn != 23 ) wFunCmd.setf23( cmd, data->fn23 );
-  if( fn == -1 || fn != 24 ) wFunCmd.setf24( cmd, data->fn24 );
-  if( fn == -1 || fn != 25 ) wFunCmd.setf25( cmd, data->fn25 );
-  if( fn == -1 || fn != 26 ) wFunCmd.setf26( cmd, data->fn26 );
-  if( fn == -1 || fn != 27 ) wFunCmd.setf27( cmd, data->fn27 );
-  if( fn == -1 || fn != 28 ) wFunCmd.setf28( cmd, data->fn28 );
+
+  if( addr == 0 || __getFnAddr(inst, 1, &mappedfn) == addr )
+    if( fn == -1 || fn != 0 ) __FnOnOff(inst, 0, data->fn0, cmd, False);
+
+  if( addr == 0 || __getFnAddr(inst, 1, &mappedfn) == addr )
+    if( fn == -1 || fn != 1 ) __FnOnOff(inst, mappedfn==-1?1:mappedfn, data->fn1, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 2, &mappedfn) == addr )
+    if( fn == -1 || fn != 2 ) __FnOnOff(inst, mappedfn==-1?2:mappedfn, data->fn2, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 3, &mappedfn) == addr )
+    if( fn == -1 || fn != 3 ) __FnOnOff(inst, mappedfn==-1?3:mappedfn, data->fn3, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 4, &mappedfn) == addr )
+    if( fn == -1 || fn != 4 ) __FnOnOff(inst, mappedfn==-1?4:mappedfn, data->fn4, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 5, &mappedfn) == addr )
+    if( fn == -1 || fn != 5 ) __FnOnOff(inst, mappedfn==-1 ? 5:mappedfn, data->fn5, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 6, &mappedfn) == addr )
+    if( fn == -1 || fn != 6 ) __FnOnOff(inst, mappedfn==-1?6:mappedfn, data->fn6, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 7, &mappedfn) == addr )
+    if( fn == -1 || fn != 7 ) __FnOnOff(inst, mappedfn==-1?7:mappedfn, data->fn7, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 8, &mappedfn) == addr )
+    if( fn == -1 || fn != 8 ) __FnOnOff(inst, mappedfn==-1?8:mappedfn, data->fn8, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 9, &mappedfn) == addr )
+    if( fn == -1 || fn != 9 ) __FnOnOff(inst, mappedfn==-1?9:mappedfn, data->fn9, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 10, &mappedfn) == addr )
+    if( fn == -1 || fn != 10 ) __FnOnOff(inst, mappedfn==-1?10:mappedfn, data->fn10, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 11, &mappedfn) == addr )
+    if( fn == -1 || fn != 11 ) __FnOnOff(inst, mappedfn==-1?11:mappedfn, data->fn11, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 12, &mappedfn) == addr )
+    if( fn == -1 || fn != 12 ) __FnOnOff(inst, mappedfn==-1?12:mappedfn, data->fn12, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 13, &mappedfn) == addr )
+    if( fn == -1 || fn != 13 ) __FnOnOff(inst, mappedfn==-1?13:mappedfn, data->fn13, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 14, &mappedfn) == addr )
+    if( fn == -1 || fn != 14 ) __FnOnOff(inst, mappedfn==-1?14:mappedfn, data->fn14, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 15, &mappedfn) == addr )
+    if( fn == -1 || fn != 15 ) __FnOnOff(inst, mappedfn==-1?15:mappedfn, data->fn15, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 16, &mappedfn) == addr )
+    if( fn == -1 || fn != 16 ) __FnOnOff(inst, mappedfn==-1?16:mappedfn, data->fn16, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 17, &mappedfn) == addr )
+    if( fn == -1 || fn != 17 ) __FnOnOff(inst, mappedfn==-1?17:mappedfn, data->fn17, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 18, &mappedfn) == addr )
+    if( fn == -1 || fn != 18 ) __FnOnOff(inst, mappedfn==-1?18:mappedfn, data->fn18, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 19, &mappedfn) == addr )
+    if( fn == -1 || fn != 19 ) __FnOnOff(inst, mappedfn==-1?19:mappedfn, data->fn19, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 20, &mappedfn) == addr )
+    if( fn == -1 || fn != 20 ) __FnOnOff(inst, mappedfn==-1?20:mappedfn, data->fn20, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 21, &mappedfn) == addr )
+    if( fn == -1 || fn != 21 ) __FnOnOff(inst, mappedfn==-1?21:mappedfn, data->fn21, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 22, &mappedfn) == addr )
+    if( fn == -1 || fn != 22 ) __FnOnOff(inst, mappedfn==-1?22:mappedfn, data->fn22, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 23, &mappedfn) == addr )
+    if( fn == -1 || fn != 23 ) __FnOnOff(inst, mappedfn==-1?23:mappedfn, data->fn23, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 24, &mappedfn) == addr )
+    if( fn == -1 || fn != 24 ) __FnOnOff(inst, mappedfn==-1?24:mappedfn, data->fn24, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 25, &mappedfn) == addr )
+    if( fn == -1 || fn != 25 ) __FnOnOff(inst, mappedfn==-1?25:mappedfn, data->fn25, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 26, &mappedfn) == addr )
+    if( fn == -1 || fn != 26 ) __FnOnOff(inst, mappedfn==-1?26:mappedfn, data->fn26, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 27, &mappedfn) == addr )
+    if( fn == -1 || fn != 27 ) __FnOnOff(inst, mappedfn==-1?27:mappedfn, data->fn27, cmd, False);
+  if( addr == 0 || __getFnAddr(inst, 28, &mappedfn) == addr )
+    if( fn == -1 || fn != 28 ) __FnOnOff(inst, mappedfn==-1?28:mappedfn, data->fn28, cmd, False);
 }
 
 
@@ -204,89 +256,195 @@ static void __saveFxState(iOLoc inst) {
   wLoc.setfx( data->props, fx );
 }
 
-static void __cpNode2Fn(iOLoc inst, iONode cmd) {
+static Boolean __cpNode2Fn(iOLoc inst, iONode cmd) {
   iOLocData data = Data(inst);
-  if( StrOp.equals( wLoc.function, wLoc.getcmd(cmd) ) ) {
-    int function = wFunCmd.getfnchanged(cmd);
+  int function = wFunCmd.getfnchanged(cmd);
+
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999,
+      "copy node function status, fnchanged=%d group=%d", function,wFunCmd.getgroup(cmd));
+
+  if( function != -1 || StrOp.equals( wLoc.function, wLoc.getcmd(cmd) ) ) {
     switch ( function ) {
-      case 0 : data->fn0 = wFunCmd.isf0(cmd); break;
-      case 1 : data->fn1 = wFunCmd.isf1(cmd); break;
-      case 2 : data->fn2 = wFunCmd.isf2(cmd); break;
-      case 3 : data->fn3 = wFunCmd.isf3(cmd); break;
-      case 4 : data->fn4 = wFunCmd.isf4(cmd); break;
-      case 5 : data->fn5 = wFunCmd.isf5(cmd); break;
-      case 6 : data->fn6 = wFunCmd.isf6(cmd); break;
-      case 7 : data->fn7 = wFunCmd.isf7(cmd); break;
-      case 8 : data->fn8 = wFunCmd.isf8(cmd); break;
-      case 9 : data->fn9 = wFunCmd.isf9(cmd); break;
-      case 10 : data->fn10 = wFunCmd.isf10(cmd); break;
-      case 11 : data->fn11 = wFunCmd.isf11(cmd); break;
-      case 12 : data->fn12 = wFunCmd.isf12(cmd); break;
-      case 13 : data->fn13 = wFunCmd.isf13(cmd); break;
-      case 14 : data->fn14 = wFunCmd.isf14(cmd); break;
-      case 15 : data->fn15 = wFunCmd.isf15(cmd); break;
-      case 16 : data->fn16 = wFunCmd.isf16(cmd); break;
-      case 17 : data->fn17 = wFunCmd.isf17(cmd); break;
-      case 18 : data->fn18 = wFunCmd.isf18(cmd); break;
-      case 19 : data->fn19 = wFunCmd.isf19(cmd); break;
-      case 20 : data->fn20 = wFunCmd.isf20(cmd); break;
-      case 21 : data->fn21 = wFunCmd.isf21(cmd); break;
-      case 22 : data->fn22 = wFunCmd.isf22(cmd); break;
-      case 23 : data->fn23 = wFunCmd.isf23(cmd); break;
-      case 24 : data->fn24 = wFunCmd.isf24(cmd); break;
-      case 25 : data->fn25 = wFunCmd.isf25(cmd); break;
-      case 26 : data->fn26 = wFunCmd.isf26(cmd); break;
-      case 27 : data->fn27 = wFunCmd.isf27(cmd); break;
-      case 28 : data->fn28 = wFunCmd.isf28(cmd); break;
+      case 0 : data->fn0 = wFunCmd.isf0(cmd); return data->fn0;
+      case 1 : data->fn1 = wFunCmd.isf1(cmd); return data->fn1;
+      case 2 : data->fn2 = wFunCmd.isf2(cmd); return data->fn2;
+      case 3 : data->fn3 = wFunCmd.isf3(cmd); return data->fn3;
+      case 4 : data->fn4 = wFunCmd.isf4(cmd); return data->fn4;
+      case 5 : data->fn5 = wFunCmd.isf5(cmd); return data->fn5;
+      case 6 : data->fn6 = wFunCmd.isf6(cmd); return data->fn6;
+      case 7 : data->fn7 = wFunCmd.isf7(cmd); return data->fn7;
+      case 8 : data->fn8 = wFunCmd.isf8(cmd); return data->fn8;
+      case 9 : data->fn9 = wFunCmd.isf9(cmd); return data->fn9;
+      case 10 : data->fn10 = wFunCmd.isf10(cmd); return data->fn10;
+      case 11 : data->fn11 = wFunCmd.isf11(cmd); return data->fn11;
+      case 12 : data->fn12 = wFunCmd.isf12(cmd); return data->fn12;
+      case 13 : data->fn13 = wFunCmd.isf13(cmd); return data->fn13;
+      case 14 : data->fn14 = wFunCmd.isf14(cmd); return data->fn14;
+      case 15 : data->fn15 = wFunCmd.isf15(cmd); return data->fn15;
+      case 16 : data->fn16 = wFunCmd.isf16(cmd); return data->fn16;
+      case 17 : data->fn17 = wFunCmd.isf17(cmd); return data->fn17;
+      case 18 : data->fn18 = wFunCmd.isf18(cmd); return data->fn18;
+      case 19 : data->fn19 = wFunCmd.isf19(cmd); return data->fn19;
+      case 20 : data->fn20 = wFunCmd.isf20(cmd); return data->fn20;
+      case 21 : data->fn21 = wFunCmd.isf21(cmd); return data->fn21;
+      case 22 : data->fn22 = wFunCmd.isf22(cmd); return data->fn22;
+      case 23 : data->fn23 = wFunCmd.isf23(cmd); return data->fn23;
+      case 24 : data->fn24 = wFunCmd.isf24(cmd); return data->fn24;
+      case 25 : data->fn25 = wFunCmd.isf25(cmd); return data->fn25;
+      case 26 : data->fn26 = wFunCmd.isf26(cmd); return data->fn26;
+      case 27 : data->fn27 = wFunCmd.isf27(cmd); return data->fn27;
+      case 28 : data->fn28 = wFunCmd.isf28(cmd); return data->fn28;
     }
   } else {
-    if( wFunCmd.getgroup(cmd) == 0)
-      data->fn0  = wFunCmd.isf0 ( cmd );
     if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 1 ) {
-    data->fn1  = wFunCmd.isf1 ( cmd );
-    data->fn2  = wFunCmd.isf2 ( cmd );
-    data->fn3  = wFunCmd.isf3 ( cmd );
-    data->fn4  = wFunCmd.isf4 ( cmd );
+      data->fn0  = wFunCmd.isf0 ( cmd );
+    }
+    if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 1 ) {
+      if( data->fn1 != wFunCmd.isf1 ( cmd ) ) wFunCmd.setfnchanged(cmd, 1);
+      if( data->fn2 != wFunCmd.isf2 ( cmd ) ) wFunCmd.setfnchanged(cmd, 2);
+      if( data->fn3 != wFunCmd.isf3 ( cmd ) ) wFunCmd.setfnchanged(cmd, 3);
+      if( data->fn4 != wFunCmd.isf4 ( cmd ) ) wFunCmd.setfnchanged(cmd, 4);
+      data->fn1  = wFunCmd.isf1 ( cmd );
+      data->fn2  = wFunCmd.isf2 ( cmd );
+      data->fn3  = wFunCmd.isf3 ( cmd );
+      data->fn4  = wFunCmd.isf4 ( cmd );
     }
     if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 2 ) {
-    data->fn5  = wFunCmd.isf5 ( cmd );
-    data->fn6  = wFunCmd.isf6 ( cmd );
-    data->fn7  = wFunCmd.isf7 ( cmd );
-    data->fn8  = wFunCmd.isf8 ( cmd );
+      if( data->fn5 != wFunCmd.isf5 ( cmd ) ) wFunCmd.setfnchanged(cmd, 5);
+      if( data->fn6 != wFunCmd.isf6 ( cmd ) ) wFunCmd.setfnchanged(cmd, 6);
+      if( data->fn7 != wFunCmd.isf7 ( cmd ) ) wFunCmd.setfnchanged(cmd, 7);
+      if( data->fn8 != wFunCmd.isf8 ( cmd ) ) wFunCmd.setfnchanged(cmd, 8);
+      data->fn5  = wFunCmd.isf5 ( cmd );
+      data->fn6  = wFunCmd.isf6 ( cmd );
+      data->fn7  = wFunCmd.isf7 ( cmd );
+      data->fn8  = wFunCmd.isf8 ( cmd );
     }
     if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 3 ) {
-    data->fn9  = wFunCmd.isf9 ( cmd );
-    data->fn10 = wFunCmd.isf10( cmd );
-    data->fn11 = wFunCmd.isf11( cmd );
-    data->fn12 = wFunCmd.isf12( cmd );
+      if( data->fn9  != wFunCmd.isf9  ( cmd ) ) wFunCmd.setfnchanged(cmd, 9 );
+      if( data->fn10 != wFunCmd.isf10 ( cmd ) ) wFunCmd.setfnchanged(cmd, 10);
+      if( data->fn11 != wFunCmd.isf11 ( cmd ) ) wFunCmd.setfnchanged(cmd, 11);
+      if( data->fn12 != wFunCmd.isf12 ( cmd ) ) wFunCmd.setfnchanged(cmd, 12);
+      data->fn9  = wFunCmd.isf9 ( cmd );
+      data->fn10 = wFunCmd.isf10( cmd );
+      data->fn11 = wFunCmd.isf11( cmd );
+      data->fn12 = wFunCmd.isf12( cmd );
     }
     if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 4 ) {
-    data->fn13 = wFunCmd.isf13( cmd );
-    data->fn14 = wFunCmd.isf14( cmd );
-    data->fn15 = wFunCmd.isf15( cmd );
-    data->fn16 = wFunCmd.isf16( cmd );
+      if( data->fn13 != wFunCmd.isf13 ( cmd ) ) wFunCmd.setfnchanged(cmd, 13);
+      if( data->fn14 != wFunCmd.isf14 ( cmd ) ) wFunCmd.setfnchanged(cmd, 14);
+      if( data->fn15 != wFunCmd.isf15 ( cmd ) ) wFunCmd.setfnchanged(cmd, 15);
+      if( data->fn16 != wFunCmd.isf16 ( cmd ) ) wFunCmd.setfnchanged(cmd, 16);
+      data->fn13 = wFunCmd.isf13( cmd );
+      data->fn14 = wFunCmd.isf14( cmd );
+      data->fn15 = wFunCmd.isf15( cmd );
+      data->fn16 = wFunCmd.isf16( cmd );
     }
     if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 5 ) {
-    data->fn17 = wFunCmd.isf17( cmd );
-    data->fn18 = wFunCmd.isf18( cmd );
-    data->fn19 = wFunCmd.isf19( cmd );
-    data->fn20 = wFunCmd.isf20( cmd );
+      if( data->fn17 != wFunCmd.isf17 ( cmd ) ) wFunCmd.setfnchanged(cmd, 17);
+      if( data->fn18 != wFunCmd.isf18 ( cmd ) ) wFunCmd.setfnchanged(cmd, 18);
+      if( data->fn19 != wFunCmd.isf19 ( cmd ) ) wFunCmd.setfnchanged(cmd, 19);
+      if( data->fn20 != wFunCmd.isf20 ( cmd ) ) wFunCmd.setfnchanged(cmd, 20);
+      data->fn17 = wFunCmd.isf17( cmd );
+      data->fn18 = wFunCmd.isf18( cmd );
+      data->fn19 = wFunCmd.isf19( cmd );
+      data->fn20 = wFunCmd.isf20( cmd );
     }
     if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 6 ) {
-    data->fn21 = wFunCmd.isf21( cmd );
-    data->fn22 = wFunCmd.isf22( cmd );
-    data->fn23 = wFunCmd.isf23( cmd );
-    data->fn24 = wFunCmd.isf24( cmd );
+      if( data->fn21 != wFunCmd.isf21 ( cmd ) ) wFunCmd.setfnchanged(cmd, 21);
+      if( data->fn22 != wFunCmd.isf22 ( cmd ) ) wFunCmd.setfnchanged(cmd, 22);
+      if( data->fn23 != wFunCmd.isf23 ( cmd ) ) wFunCmd.setfnchanged(cmd, 23);
+      if( data->fn24 != wFunCmd.isf24 ( cmd ) ) wFunCmd.setfnchanged(cmd, 24);
+      data->fn21 = wFunCmd.isf21( cmd );
+      data->fn22 = wFunCmd.isf22( cmd );
+      data->fn23 = wFunCmd.isf23( cmd );
+      data->fn24 = wFunCmd.isf24( cmd );
     }
     if( wFunCmd.getgroup(cmd) == 0 || wFunCmd.getgroup(cmd) == 7 ) {
-    data->fn25 = wFunCmd.isf25( cmd );
-    data->fn26 = wFunCmd.isf26( cmd );
-    data->fn27 = wFunCmd.isf27( cmd );
-    data->fn28 = wFunCmd.isf28( cmd );
+      if( data->fn25 != wFunCmd.isf25 ( cmd ) ) wFunCmd.setfnchanged(cmd, 25);
+      if( data->fn26 != wFunCmd.isf26 ( cmd ) ) wFunCmd.setfnchanged(cmd, 26);
+      if( data->fn27 != wFunCmd.isf27 ( cmd ) ) wFunCmd.setfnchanged(cmd, 27);
+      if( data->fn28 != wFunCmd.isf28 ( cmd ) ) wFunCmd.setfnchanged(cmd, 28);
+      data->fn25 = wFunCmd.isf25( cmd );
+      data->fn26 = wFunCmd.isf26( cmd );
+      data->fn27 = wFunCmd.isf27( cmd );
+      data->fn28 = wFunCmd.isf28( cmd );
     }
   }
+  return False;
 }
 
+
+static void __resetFx( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOLoc loc = (iOLoc)ThreadOp.getParm( th );
+  iOLocData data = Data(loc);
+  iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+
+  ThreadOp.sleep(100 + 200 * data->fxsleep );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "resetfx group %d for %s", data->fxgroup, wLoc.getid(data->props) );
+
+  wFunCmd.setgroup(fcmd, data->fxgroup);
+  __cpFn2Node(loc, fcmd, -1, 0);
+  switch(data->fxgroup) {
+  case 0:
+    wLoc.setfn(fcmd, False);
+    wFunCmd.setf0(fcmd, False);
+    wFunCmd.setf1(fcmd, False);
+    wFunCmd.setf2(fcmd, False);
+    wFunCmd.setf3(fcmd, False);
+    wFunCmd.setf4(fcmd, False);
+    break;
+  case 1:
+    wFunCmd.setf5(fcmd, False);
+    wFunCmd.setf6(fcmd, False);
+    wFunCmd.setf7(fcmd, False);
+    wFunCmd.setf8(fcmd, False);
+    break;
+  case 2:
+    wFunCmd.setf9(fcmd, False);
+    wFunCmd.setf10(fcmd, False);
+    wFunCmd.setf11(fcmd, False);
+    wFunCmd.setf12(fcmd, False);
+    break;
+  case 3:
+    wFunCmd.setf13(fcmd, False);
+    wFunCmd.setf14(fcmd, False);
+    wFunCmd.setf15(fcmd, False);
+    wFunCmd.setf16(fcmd, False);
+    break;
+  case 4:
+    wFunCmd.setf17(fcmd, False);
+    wFunCmd.setf18(fcmd, False);
+    wFunCmd.setf19(fcmd, False);
+    wFunCmd.setf20(fcmd, False);
+    break;
+  case 5:
+    wFunCmd.setf21(fcmd, False);
+    wFunCmd.setf22(fcmd, False);
+    wFunCmd.setf23(fcmd, False);
+    wFunCmd.setf24(fcmd, False);
+    break;
+  case 6:
+    wFunCmd.setf25(fcmd, False);
+    wFunCmd.setf26(fcmd, False);
+    wFunCmd.setf27(fcmd, False);
+    wFunCmd.setf28(fcmd, False);
+    break;
+  }
+  __cpNode2Fn(loc, fcmd);
+
+  wFunCmd.setid( fcmd, wLoc.getid( data->props ) );
+  wFunCmd.setaddr( fcmd, wLoc.getaddr( data->props ) );
+  wLoc.setfx( fcmd, wLoc.getfx( data->props ) );
+
+  LocOp.cmd(loc, (iONode)NodeOp.base.clone(fcmd) );
+
+  wLoc.setfx( fcmd, wLoc.getfx( data->props ) );
+  AppOp.broadcastEvent( fcmd );
+
+  data->fxresetpending = False;
+  ThreadOp.base.del(th);
+}
 
 
 static void __restoreFx( void* threadinst ) {
@@ -298,58 +456,112 @@ static void __restoreFx( void* threadinst ) {
   int i = 0;
 
   ThreadOp.sleep(100 + 200 * data->fxsleep );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restore started for %s", wLoc.getid(data->props) );
 
-  /* Test for restoring the lights function. */
-  if( wLoc.isfn(data->props) ) {
-    iONode vcmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restoring lights for %s", wLoc.getid(data->props) );
-    wLoc.setV( vcmd, 0 );
-    wLoc.setfn( vcmd, wLoc.isfn(data->props) );
-    LocOp.cmd(loc, vcmd);
-    ThreadOp.sleep(500);
-  }
-
-  for( i = 0; i < 28; i++ ) {
-    int f = (1 << i);
-    if( fx & f ) {
-      iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restoring function %d for %s", i+1, wLoc.getid(data->props) );
-      wFunCmd.setf0 ( fcmd, wLoc.isfn(data->props));
-      wFunCmd.setfnchanged( fcmd, i + 1);
-      switch( i ) {
-        case 0 : wFunCmd.setf1 ( fcmd, True); break;
-        case 1 : wFunCmd.setf2 ( fcmd, True); break;
-        case 2 : wFunCmd.setf3 ( fcmd, True); break;
-        case 3 : wFunCmd.setf4 ( fcmd, True); break;
-        case 4 : wFunCmd.setf5 ( fcmd, True); break;
-        case 5 : wFunCmd.setf6 ( fcmd, True); break;
-        case 6 : wFunCmd.setf7 ( fcmd, True); break;
-        case 7 : wFunCmd.setf8 ( fcmd, True); break;
-        case 8 : wFunCmd.setf9 ( fcmd, True); break;
-        case 9 : wFunCmd.setf10( fcmd, True); break;
-        case 10: wFunCmd.setf11( fcmd, True); break;
-        case 11: wFunCmd.setf12( fcmd, True); break;
-        case 12: wFunCmd.setf13( fcmd, True); break;
-        case 13: wFunCmd.setf14( fcmd, True); break;
-        case 14: wFunCmd.setf15( fcmd, True); break;
-        case 15: wFunCmd.setf16( fcmd, True); break;
-        case 16: wFunCmd.setf17( fcmd, True); break;
-        case 17: wFunCmd.setf18( fcmd, True); break;
-        case 18: wFunCmd.setf19( fcmd, True); break;
-        case 19: wFunCmd.setf20( fcmd, True); break;
-        case 20: wFunCmd.setf21( fcmd, True); break;
-        case 21: wFunCmd.setf22( fcmd, True); break;
-        case 22: wFunCmd.setf23( fcmd, True); break;
-        case 23: wFunCmd.setf24( fcmd, True); break;
-        case 24: wFunCmd.setf25( fcmd, True); break;
-        case 25: wFunCmd.setf26( fcmd, True); break;
-        case 26: wFunCmd.setf27( fcmd, True); break;
-        case 27: wFunCmd.setf28( fcmd, True); break;
+  if( wLoc.isrestorefx(data->props) ) {
+    /* Test for restoring the lights function. */
+    if( wLoc.isfn(data->props) ) {
+      iONode vcmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restoring lights for %s", wLoc.getid(data->props) );
+      if ( wLoc.isrestorespeed(data->props) ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restoring speed for %s to %d", wLoc.getid(data->props), wLoc.getV(data->props) );
+        wLoc.setV( vcmd, wLoc.getV(data->props) );
       }
+      else {
+        wLoc.setV( vcmd, 0 );
+      }
+      wLoc.setfn( vcmd, wLoc.isfn(data->props) );
+      LocOp.cmd(loc, vcmd);
+      ThreadOp.sleep(500);
+    }
+
+    if( wLoc.isfn(data->props) ) {
+      iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+      wFunCmd.setgroup( fcmd, 1 );
+      wFunCmd.setfnchanged( fcmd, 0 );
+      wFunCmd.setf0(fcmd, True);
+      wLoc.setfn(fcmd, True);
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restoring lights for %s", wLoc.getid(data->props) );
       LocOp.cmd(loc, fcmd);
       ThreadOp.sleep(500);
     }
+
+    for( i = 0; i < 28; i++ ) {
+      int f = (1 << i);
+      if( fx & f ) {
+        int group = (i+1) / 4;
+        if( (i+1) % 4 != 0 )
+          group++;
+
+        iONode fcmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restoring function %d for %s fg=%d fx=%X", i+1, wLoc.getid(data->props), group, fx );
+        wFunCmd.setf0 ( fcmd, wLoc.isfn(data->props));
+        wFunCmd.setgroup ( fcmd, group );
+        wFunCmd.setfnchanged( fcmd, i + 1);
+        wFunCmd.setf1 ( fcmd, fx & 0x01);
+        wFunCmd.setf2 ( fcmd, fx & 0x02);
+        wFunCmd.setf3 ( fcmd, fx & 0x04);
+        wFunCmd.setf4 ( fcmd, fx & 0x08);
+        wFunCmd.setf5 ( fcmd, fx & 0x10);
+        wFunCmd.setf6 ( fcmd, fx & 0x20);
+        wFunCmd.setf7 ( fcmd, fx & 0x40);
+        wFunCmd.setf8 ( fcmd, fx & 0x80);
+        wFunCmd.setf9 ( fcmd, fx & 0x0100);
+        wFunCmd.setf10( fcmd, fx & 0x0200);
+        wFunCmd.setf11( fcmd, fx & 0x0400);
+        wFunCmd.setf12( fcmd, fx & 0x0800);
+        wFunCmd.setf13( fcmd, fx & 0x1000);
+        wFunCmd.setf14( fcmd, fx & 0x2000);
+        wFunCmd.setf15( fcmd, fx & 0x4000);
+        wFunCmd.setf16( fcmd, fx & 0x8000);
+        wFunCmd.setf17( fcmd, fx & 0x010000);
+        wFunCmd.setf18( fcmd, fx & 0x020000);
+        wFunCmd.setf19( fcmd, fx & 0x040000);
+        wFunCmd.setf20( fcmd, fx & 0x080000);
+        wFunCmd.setf21( fcmd, fx & 0x100000);
+        wFunCmd.setf22( fcmd, fx & 0x200000);
+        wFunCmd.setf23( fcmd, fx & 0x400000);
+        wFunCmd.setf24( fcmd, fx & 0x800000);
+        wFunCmd.setf25( fcmd, fx & 0x01000000);
+        wFunCmd.setf26( fcmd, fx & 0x02000000);
+        wFunCmd.setf27( fcmd, fx & 0x04000000);
+        wFunCmd.setf28( fcmd, fx & 0x08000000);
+        LocOp.cmd(loc, fcmd);
+        ThreadOp.sleep(500);
+      }
+    }
+    data->fxrestoredbythread = True;
   }
+
+  if( wLoc.getV(data->props) > 0 && wLoc.isrestorespeed(data->props) ) {
+    iONode vcmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restoring speed for %s", wLoc.getid(data->props) );
+    wLoc.setV( vcmd, wLoc.getV(data->props) );
+    wLoc.setfn( vcmd, wLoc.isfn(data->props) );
+    LocOp.cmd(loc, vcmd);
+    data->speedrestoredbythread = True;
+  }
+
+
+  ThreadOp.base.del(th);
+}
+
+
+
+static void __V0AtPowerOn( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOLoc loc = (iOLoc)ThreadOp.getParm( th );
+  iOLocData data = Data(loc);
+  iONode node = NodeOp.inst(wLoc.name(), NULL, ELEMENT_NODE);
+
+  ThreadOp.sleep(100 + 200 * data->fxsleep );
+
+  wLoc.setV( node, 0 );
+  wLoc.setfn( node, wLoc.isfn(data->props) );
+  wLoc.setdir( node, wLoc.isdir(data->props) );
+  LocOp.cmd(loc, node);
+
+  data->v0pending = False;
   ThreadOp.base.del(th);
 }
 
@@ -360,11 +572,31 @@ static void __sysEvent( obj inst, iONode evtNode ) {
 
   TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "sysEvent [%s] for [%s]...", cmd, LocOp.getId((iOLoc)inst) );
 
-  if( StrOp.equals( wSysCmd.go, cmd ) && !data->fxrestored ) {
+  if( wLoc.isshow(data->props) && StrOp.equals( wSysCmd.go, cmd ) ) {
+    if( !data->v0pending && data->drvSpeed == 0 && wCtrl.isv0atpoweron( AppOp.getIniNode(wCtrl.name())) ) {
+      iOThread th = ThreadOp.inst( NULL, &__V0AtPowerOn, inst );
+      data->v0sleep = wSysCmd.getval(evtNode);
+      data->v0pending = True;
+      ThreadOp.start(th);
+    }
+  }
+
+  if( StrOp.equals( wSysCmd.resetfx, cmd ) ) {
+    data->fxsleep = wSysCmd.getval(evtNode);
+    {
+      iOThread th = ThreadOp.inst( NULL, &__resetFx, inst );
+      data->fxresetpending = True;
+      data->fxgroup = wSysCmd.getvalA(evtNode);
+      ThreadOp.start(th);
+    }
+  }
+  else if( wLoc.isshow(data->props) && StrOp.equals( wSysCmd.go, cmd ) && (!data->fxrestored||wLoc.isrestorefxalways(data->props)) ) {
     /* restore fx */
     data->fxrestored = True;
+    data->fxrestoredbythread = False;
+    data->speedrestoredbythread = False;
     data->fxsleep = wSysCmd.getval(evtNode);
-    if( wLoc.isrestorefx(data->props)) {
+    if( wLoc.isrestorefx(data->props) || wLoc.isrestorespeed(data->props) ) {
       iOThread th = ThreadOp.inst( NULL, &__restoreFx, inst );
       ThreadOp.start(th);
     }
@@ -411,21 +643,115 @@ static void _depart(iOLoc inst) {
 }
 
 
+static void __broadcastLocoProps( iOLoc inst, const char* cmd, iONode node, const char* blockId ) {
+  iOLocData data = Data(inst);
+  if( node == NULL )
+    node = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+  wLoc.setid( node, wLoc.getid( data->props ) );
+  wLoc.setdir( node, wLoc.isdir( data->props ) );
+  wLoc.setaddr( node, wLoc.getaddr( data->props ) );
+  wLoc.setsecaddr( node, wLoc.getsecaddr( data->props ) );
+  wLoc.setV( node, wLoc.getV( data->props ) );
+  wLoc.setplacing( node, wLoc.isplacing( data->props ) );
+  wLoc.setblockenterside( node, wLoc.isblockenterside( data->props ) );
+  wLoc.setblockenterid( node, wLoc.getblockenterid( data->props ) );
+  wLoc.setmode( node, wLoc.getmode( data->props ) );
+  wLoc.setmodereason( node, wLoc.getmodereason( data->props ) );
+  wLoc.setresumeauto( node, wLoc.isresumeauto(data->props) );
+  wLoc.setmanual( node, data->gomanual );
+  if( blockId != NULL )
+    wLoc.setdestblockid(node, blockId );
+  else
+    wLoc.setdestblockid( node, data->destBlock );
+
+  wLoc.setblockid( node, data->curBlock );
+  if( (wLoc.getdestblockid(node) != NULL && StrOp.equals(wLoc.getdestblockid(node), wLoc.getblockid(node))) || wLoc.getdestblockid(node) == NULL )
+    wLoc.setdestblockid( node, "" );
+  wLoc.setfn( node, wLoc.isfn(data->props) );
+  wLoc.setruntime( node, wLoc.getruntime(data->props) );
+  wLoc.setmtime( node, wLoc.getmtime(data->props) );
+  wLoc.setmint( node, wLoc.getmint(data->props) );
+  wLoc.setthrottleid( node, wLoc.getthrottleid(data->props) );
+  wLoc.setactive( node, wLoc.isactive(data->props) );
+  if( data->driver != NULL ) {
+    wLoc.setscidx( node, data->driver->getScheduleIdx( data->driver ) );
+    wLoc.setscheduleid(node, LocOp.getSchedule(inst, NULL));
+    wLoc.settourid(node, LocOp.getTour(inst));
+  }
+  wLoc.settrain( node, wLoc.gettrain(data->props) );
+  wLoc.settrainlen( node, wLoc.gettrainlen(data->props) );
+  wLoc.settrainweight( node, wLoc.gettrainweight(data->props) );
+  wLoc.setV_realkmh( node, wLoc.getV_realkmh(data->props) );
+  if( cmd != NULL )
+    wLoc.setcmd( node, cmd );
+  wLoc.setfifotop( node, wLoc.isfifotop( data->props ) );
+  AppOp.broadcastEvent( node );
+}
+
 static void* __event( void* inst, const void* evt ) {
   iOLocData data = Data(inst);
   iONode evtNode = (iONode)evt;
   Boolean broadcast = False;
 
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "event for loco %s: %s", wLoc.getid(data->props), NodeOp.getName(evtNode) );
+
   if( evtNode == NULL )
     return NULL;
 
-  if( data->go ) {
+  if( StrOp.equals( wLoc.name(), NodeOp.getName(evtNode) ) && StrOp.equals( wLoc.bidikmh, wLoc.getcmd(evtNode) ) ) {
+    int kmh = wLoc.getV_realkmh(evtNode);
+    wLoc.setV_realkmh( data->props, kmh );
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "reported speed for [%s] is %dkm/h", wLoc.getid(data->props), kmh );
+    __broadcastLocoProps(inst, wLoc.bidikmh, NULL, NULL);
+    return NULL;
+  }
+
+  if( data->go && !data->gomanual ) {
     TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
         "ignore field event for [%s] while running in auto mode", wLoc.getid(data->props) );
     return NULL;
   }
 
-  if( StrOp.equals( wLoc.name(), NodeOp.getName(evtNode) )) {
+  if( StrOp.equals( wLoc.name(), NodeOp.getName(evtNode) ) && StrOp.equals( wLoc.fieldcmd, wLoc.getcmd(evtNode) ) ) {
+    int V = __getVfromRaw(inst, evtNode);
+    int V_raw = wLoc.getV_raw(evtNode);
+    int V_rawMax = wLoc.getV_rawMax(evtNode);
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "field command for [%s] V=%d V_raw=%d V_rawMax=%d lights=%d", wLoc.getid(data->props), V, V_raw, V_rawMax, wLoc.isfn(evtNode) );
+    wLoc.setcmd(evtNode, wLoc.velocity );
+    wLoc.setV(evtNode, V );
+    wLoc.setfn( data->props, wLoc.isfn(evtNode) );
+    data->fn0 = wLoc.isfn(evtNode);
+    LocOp.cmd(inst, (iONode)NodeOp.base.clone(evtNode));
+    return NULL;
+  }
+
+  if( StrOp.equals( wFunCmd.name(), NodeOp.getName(evtNode) ) && StrOp.equals( wLoc.fieldcmd, wLoc.getcmd(evtNode) ) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "field function command for [%s] fnchanged=%d", wLoc.getid(data->props), wFunCmd.getfnchanged(evtNode) );
+    NodeOp.removeAttrByName(evtNode, "cmd");
+    LocOp.cmd(inst, (iONode)NodeOp.base.clone(evtNode));
+    return NULL;
+  }
+
+  if( StrOp.equals( wLoc.name(), NodeOp.getName(evtNode) ) || StrOp.equals( wFunCmd.name(), NodeOp.getName(evtNode) ) ) {
+    if( wLoc.isrestorefx(data->props) && !data->fxrestoredbythread ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+          "ignore field event for [%s] while function restore is not ready", wLoc.getid(data->props) );
+      return NULL;
+    }
+  }
+
+  if( !MutexOp.trywait( data->muxEngine, 100 ) ) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "(event) loco %s engine lock timeout", wLoc.getid(data->props) );
+    return NULL;
+  }
+
+  if( wLoc.getaddr(evtNode) == 0 ) {
+    wLoc.setaddr(evtNode, wLoc.getaddr(data->props));
+  }
+
+  if( StrOp.equals( wLoc.name(), NodeOp.getName(evtNode) ) && wLoc.getaddr( evtNode ) != wLoc.getsecaddr( data->props ) ) {
     int V = __getVfromRaw(inst, evtNode);
     int spcnt = wLoc.getspcnt( data->props );
     int V_raw = wLoc.getV_raw(evtNode);
@@ -444,12 +770,21 @@ static void* __event( void* inst, const void* evt ) {
       }
     }
 
-    if( !data->go ) {
+    if( !data->go || data->gomanual ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "lc=%s V=%d(%d)",
+          wLoc.getid(data->props), V, wLoc.getV(data->props) );
       wLoc.setV( data->props, V);
+      data->drvSpeed = V;
+      if( StrOp.equals( wLoc.velocity, wLoc.getcmd(evtNode) ) ) {
+        wLoc.setdir( data->props, wLoc.isplacing(data->props) ? wLoc.isdir(evtNode):!wLoc.isdir(evtNode) );
+      }
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "not using the field velocity because loco %s is in auto mode", wLoc.getid(data->props));
     }
 
     if( wCtrl.isallowzerothrottleid( AppOp.getIniNode( wCtrl.name() ) ) ||
-        StrOp.len(wLoc.getthrottleid(evtNode)) > 0 && !StrOp.equals( "0", wLoc.getthrottleid(evtNode) ) ) {
+        (StrOp.len(wLoc.getthrottleid(evtNode)) > 0 && !StrOp.equals( "0", wLoc.getthrottleid(evtNode) ) ) ) {
       wLoc.setthrottleid( data->props, wLoc.getthrottleid(evtNode) );
       /* TODO: inform consist slaves */
       __checkConsist(inst, evtNode, True);
@@ -457,36 +792,16 @@ static void* __event( void* inst, const void* evt ) {
     }
     else {
       /* this is an echo comming from the loconet reader; do not broadcast it */
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ignoring field event for loco %s because its an echo or zero throttleID", wLoc.getid(data->props));
       broadcast = False;
     }
 
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "lc=%s V_raw=%d V=%d fn=%d dir=%s throttleID=%s",
-        wLoc.getid(data->props), V_raw, V, wLoc.isfn(data->props), wLoc.isdir(data->props)?"Forwards":"Reverse", wLoc.getthrottleid(data->props) );
+        wLoc.getid(data->props), V_raw, V, wLoc.isfn(data->props), wLoc.isdir(data->props)?"Forwards":"Reverse",
+        wLoc.getthrottleid(data->props)!=NULL?wLoc.getthrottleid(data->props):"-" );
     /* Broadcast to clients. */
     if( broadcast ) {
-      iONode node = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-      wLoc.setid( node, wLoc.getid( data->props ) );
-      wLoc.setdir( node, wLoc.isdir( data->props ) );
-      wLoc.setaddr( node, wLoc.getaddr( data->props ) );
-      wLoc.setV( node, V );
-      wLoc.setplacing( node, wLoc.isplacing( data->props ) );
-      wLoc.setblockenterside( node, wLoc.isblockenterside( data->props ) );
-      wLoc.setmode( node, wLoc.getmode( data->props ) );
-      wLoc.setresumeauto( node, wLoc.isresumeauto(data->props) );
-      wLoc.setmanual( node, data->gomanual );
-      wLoc.setblockid( node, data->curBlock );
-      wLoc.setdir( node, wLoc.isdir(data->props) );
-      wLoc.setfn( node, wLoc.isfn(data->props) );
-      wLoc.setruntime( node, wLoc.getruntime(data->props) );
-      wLoc.setmtime( node, wLoc.getmtime(data->props) );
-      wLoc.setmint( node, wLoc.getmint(data->props) );
-      wLoc.setthrottleid( node, wLoc.getthrottleid(data->props) );
-      wLoc.setactive( node, wLoc.isactive(data->props) );
-      if( data->driver != NULL ) {
-        wLoc.setscidx( node, data->driver->getScheduleIdx( data->driver ) );
-      }
-
-      AppOp.broadcastEvent( node );
+      __broadcastLocoProps(inst, NULL, NULL, NULL);
     }
 
   }
@@ -496,9 +811,14 @@ static void* __event( void* inst, const void* evt ) {
     wLoc.setfn( data->props, data->fn0);
 
     if( wCtrl.isallowzerothrottleid( AppOp.getIniNode( wCtrl.name() ) ) ||
-        StrOp.len(wLoc.getthrottleid(evtNode)) > 0 && !StrOp.equals( "0", wLoc.getthrottleid(evtNode) ) )
+        ( StrOp.len(wLoc.getthrottleid(evtNode)) > 0 && !StrOp.equals( "0", wLoc.getthrottleid(evtNode) ) ) )
     {
       wLoc.setthrottleid( data->props, wLoc.getthrottleid(evtNode) );
+      if( SystemOp.getTick() - data->lastfncmd > 100 ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "trigger sound for external throttle lc=%s throttleid=%s",
+            wLoc.getid( data->props ), wLoc.getthrottleid(data->props)!=NULL?wLoc.getthrottleid(data->props):"-");
+        __doSound( inst, evtNode );
+      }
       __checkConsist(inst, evtNode, True);
       broadcast = True;
     }
@@ -507,9 +827,12 @@ static void* __event( void* inst, const void* evt ) {
       broadcast = False;
     }
 
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "lc=%s throttleid=%s f0=%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "lc=%s throttleid=%s chfn=%d chgr=%d f0=%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
         wLoc.getid( data->props ),
-        wLoc.getthrottleid( data->props),
+        wLoc.getthrottleid( data->props)!=NULL?wLoc.getthrottleid( data->props):"-",
+        wFunCmd.getfnchanged( evtNode),
+        wFunCmd.getgroup( evtNode),
         wLoc.isfn(data->props) ? "on":"off",
         data->fn1  ? "01":"--", data->fn2  ? "02":"--", data->fn3  ? "03":"--", data->fn4  ? "04":"--",
         data->fn5  ? "05":"--", data->fn6  ? "06":"--", data->fn7  ? "07":"--", data->fn8  ? "08":"--",
@@ -524,8 +847,11 @@ static void* __event( void* inst, const void* evt ) {
       iONode node = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
       wFunCmd.setid( node, wLoc.getid( data->props ) );
       wFunCmd.setaddr( node, wLoc.getaddr( data->props ) );
-      __cpFn2Node(inst, node, -1);
+      __cpFn2Node(inst, node, -1, 0);
+      if( wLoc.getthrottleid( data->props) != NULL )
+        wLoc.setthrottleid( node, wLoc.getthrottleid(data->props) );
       wFunCmd.setf0( node, wLoc.isfn(data->props) );
+      wFunCmd.setgroup( node, wFunCmd.getgroup( evtNode)),
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "broadcasting function command %d...", wFunCmd.isf0( node));
       AppOp.broadcastEvent( node );
     }
@@ -533,6 +859,8 @@ static void* __event( void* inst, const void* evt ) {
   else if( StrOp.equals( wSysCmd.name(), NodeOp.getName(evtNode) ) ) {
     __sysEvent( inst, evtNode );
   }
+
+  MutexOp.post( data->muxEngine );
 
   return NULL;
 }
@@ -552,12 +880,16 @@ static void __del(void* inst) {
   iOLocData data = Data(inst);
   int retry = 0;
   data->run = False;
+
+  ModelOp.removeSysEventListener( AppOp.getModel(), (obj)inst );
+
   /* wait for thread to stop. */
   while( data->running && retry < 10 ) {
     ThreadOp.sleep( 100 );
     retry++;
   };
-  data->runner->base.del(data->runner);
+  if( data->runner != NULL )
+    ThreadOp.base.del(data->runner);
   freeMem( data );
   freeMem( inst );
   instCnt--;
@@ -584,6 +916,37 @@ static int __translateVhint(iOLoc inst, const char* V_hint, int V_maxkmh ) {
   int V_max = wLoc.getV_max( data->props );
   int V_mid = wLoc.getV_mid( data->props );
   int V_min = wLoc.getV_min( data->props );
+  int V_cru = wLoc.getV_cru( data->props );
+
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      int V_max_train = OperatorOp.getVMax(train);
+      if( (V_max_train > 0 && (V_max_train < V_maxkmh)) || V_maxkmh == 0 )
+        V_maxkmh = V_max_train;
+    }
+  }
+
+  /* inform all slave locos of the new maxkmh */
+  if( wLoc.getconsist(data->props) != NULL && StrOp.len(wLoc.getconsist(data->props)) > 0) {
+    iOStrTok  consist = StrTokOp.inst( wLoc.getconsist ( data->props ), ',' );
+    while( StrTokOp.hasMoreTokens( consist ) ) {
+      const char* tok = StrTokOp.nextToken( consist );
+      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok, NULL, False );
+      if( consistloc != NULL ) {
+        LocOp.setMaxKmh(consistloc, V_maxkmh);
+      }
+    }
+    StrTokOp.base.del( consist );
+  }
+
+  /* use the maxkmh from master */
+  if( ModelOp.getMasterLoc(AppOp.getModel(), wLoc.getid(data->props) ) != NULL ) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "slave loco [%s] maxkmh=%d", wLoc.getid(data->props), data->maxkmh);
+    V_maxkmh = data->maxkmh;
+  }
+
+
 
   if( !wLoc.isdir(data->props) || (wLoc.isdir(data->props) && !wLoc.isplacing( data->props ) ) ){
     if( wLoc.getV_Rmax( data->props ) > 0 ) {
@@ -594,6 +957,9 @@ static int __translateVhint(iOLoc inst, const char* V_hint, int V_maxkmh ) {
     }
     if( wLoc.getV_Rmin( data->props ) > 0 ) {
       V_min = wLoc.getV_Rmin( data->props );
+    }
+    if( wLoc.getV_Rcru( data->props ) > 0 ) {
+      V_cru = wLoc.getV_Rcru( data->props );
     }
   }
 
@@ -607,8 +973,13 @@ static int __translateVhint(iOLoc inst, const char* V_hint, int V_maxkmh ) {
     V_new = V_max;
 
   else if( StrOp.equals( wLoc.cruise, V_hint ) ) {
-    V_new = V_max;
-    V_new = (V_new * 80) / 100;
+    if( V_cru > 0 ) {
+      V_new = V_cru;
+    }
+    else {
+      V_new = V_max;
+      V_new = (V_new * 80) / 100;
+    }
   }
 
   else if( StrOp.equals( wLoc.climb, V_hint ) ) {
@@ -625,9 +996,10 @@ static int __translateVhint(iOLoc inst, const char* V_hint, int V_maxkmh ) {
   }
   
   if(StrOp.equals( wLoc.V_mode_kmh, wLoc.getV_mode(data->props) ) && V_maxkmh > 0 ) {
+    int l_Vnew = V_new;
     if( V_new > V_maxkmh ) {
       V_new = V_maxkmh;
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "reduce max. speed from %dKmh to %dKmh", V_new, V_maxkmh );
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loco [%s] reduce max. speed from %dKmh to %dKmh", wLoc.getid(data->props), l_Vnew, V_maxkmh );
     }
   }
 
@@ -648,6 +1020,24 @@ int _compareVhint(iOLoc inst, const char* V_hint) {
 }
 
 
+static int _getFnNrByDesc( iOLoc inst, const char* desc) {
+  iOLocData    data = Data(inst);
+
+  iONode fundef = wLoc.getfundef( data->props );
+  while( fundef != NULL ) {
+    if( wFunDef.gettext(fundef) != NULL && StrOp.equals(wFunDef.gettext(fundef), desc) ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "function number for [%s] = %d", desc, wFunDef.getfn(fundef) );
+      return wFunDef.getfn(fundef);
+    }
+    fundef = wLoc.nextfundef( data->props, fundef );
+  };
+
+  if( StrOp.len(desc) > 0 && isdigit(desc[0]) )
+    return atoi(desc);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco function [%s] not defined", desc );
+  return -1;
+}
+
 static int __getFnTimer( iOLoc inst, int function) {
   iOLocData    data = Data(inst);
 
@@ -662,6 +1052,93 @@ static int __getFnTimer( iOLoc inst, int function) {
   return 0;
 }
 
+static int __getFnAddr( iOLoc inst, int function, int* mappedfn) {
+  iOLocData    data = Data(inst);
+
+  iONode fundef = wLoc.getfundef( data->props );
+
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "looking up function %d...", function );
+
+
+  while( fundef != NULL ) {
+    if( wFunDef.getfn(fundef) == function ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+          "function address for %d = %d:%d", function, wFunDef.getaddr(fundef), wFunDef.getmappedfn(fundef) );
+      if( mappedfn != NULL ) {
+        if( wFunDef.getmappedfn(fundef) > 0 ) {
+          *mappedfn = wFunDef.getmappedfn(fundef);
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "mapped function is %d", *mappedfn );
+        }
+        else
+          *mappedfn = function;
+      }
+
+      return wFunDef.getaddr(fundef);
+    }
+    fundef = wLoc.nextfundef( data->props, fundef );
+  };
+  if( mappedfn != NULL ) {
+    *mappedfn = function;
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "function %d not defined", *mappedfn );
+  }
+  return wLoc.getaddr( data->props );
+}
+
+static const char* __getFnSound( iOLoc inst, int function, int* addr) {
+  iOLocData    data = Data(inst);
+
+  iONode fundef = wLoc.getfundef( data->props );
+
+  while( fundef != NULL ) {
+    if( wFunDef.getfn(fundef) == function ) {
+      *addr = wFunDef.getaddr(fundef);
+      return wFunDef.getsound(fundef);
+    }
+    fundef = wLoc.nextfundef( data->props, fundef );
+  };
+  return NULL;
+}
+
+static void __doSound(iOLoc inst, iONode cmd) {
+  iOLocData    data = Data(inst);
+
+  if( wFunCmd.getfnchanged(cmd) != -1 ) {
+    int fx = wLoc.getfx( data->props );
+    if( fx & 1 << (wFunCmd.getfnchanged(cmd)-1) ) {
+      int addr = 0;
+      const char* sound = __getFnSound(inst, wFunCmd.getfnchanged(cmd), &addr );
+      if( sound != NULL && StrOp.len(sound) > 0 ) {
+        if( addr == 0 ) {
+          /* play */
+          char* s = NULL;
+          if( wFreeRail.issoundplayerlocation(AppOp.getIni()) && data->curBlock != NULL && data->curSensor != NULL )
+            s = StrOp.fmt("%s \"%s%c%s\" \"%s\" \"%s\"", wFreeRail.getsoundplayer(AppOp.getIni()),
+                wFreeRail.getsoundpath(AppOp.getIni()), SystemOp.getFileSeparator(), sound, data->curBlock, data->curSensor );
+          else if( wFreeRail.issoundplayerlocation(AppOp.getIni()) && data->curBlock != NULL )
+            s = StrOp.fmt("%s \"%s%c%s\" \"%s\"", wFreeRail.getsoundplayer(AppOp.getIni()),
+                wFreeRail.getsoundpath(AppOp.getIni()), SystemOp.getFileSeparator(), sound, data->curBlock );
+          else
+            s = StrOp.fmt("%s \"%s%c%s\"", wFreeRail.getsoundplayer(AppOp.getIni()),
+                wFreeRail.getsoundpath(AppOp.getIni()), SystemOp.getFileSeparator(), sound );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "executing [%s]", s );
+          SystemOp.system( s, True, False );
+          StrOp.free(s);
+        }
+        else {
+          iONode cmd = NodeOp.inst( wAction.name(), NULL, ELEMENT_NODE );
+          wAction.setcmd( cmd, wAction.sound_play );
+          wAction.setiid( cmd, wLoc.getiid( data->props ) );
+          wAction.setbus( cmd, wLoc.getaddr( data->props ) );
+          wAction.setsndfile( cmd, sound );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sound action on bus %d [%s]", wLoc.getaddr( data->props ), sound );
+          ControlOp.cmd( AppOp.getControl(), cmd, NULL );
+        }
+      }
+    }
+  }
+
+}
+
 /*
   Using the new V_* attributes for controlling loc speed.
 */
@@ -669,64 +1146,74 @@ static int __getFnTimer( iOLoc inst, int function) {
    Called by the loc runner in a 100ms cycle or
    some object called it with a command node.
 */
-static void __engine( iOLoc inst, iONode cmd ) {
+static Boolean __engine( iOLoc inst, iONode cmd ) {
   iOLocData    data = Data(inst);
   iOControl control = AppOp.getControl();
+  Boolean didPost = False;
 
-  const char* V_hint = NULL;
+  const char* V_hint   = NULL;
   int         V_maxkmh = 0;
-  int         V_new  = -1;
-  int         V_old  = wLoc.getV(data->props);
-  iONode      cmdTD  = NULL;
-  iONode      cmdFn  = NULL;
-  static Boolean  f0changed = False;
+  int         V_new    = -1;
+  int         V_old    = wLoc.getV(data->props);
+  iONode      cmdTD    = NULL;
+  iONode      cmdFn    = NULL;
+  int     fnchanged   = -1;
+  Boolean useSecAddr = False;
 
   if( cmd != NULL )
   {
     V_new    = wLoc.getV( cmd );
     V_hint   = wLoc.getV_hint( cmd );
     V_maxkmh = wLoc.getV_maxkmh( cmd );
+    useSecAddr = wLoc.isusesecaddr( cmd );
 
+    if( wLoc.isconsistcmd( cmd ) ) {
+      /* overwrite id and address */
+      wLoc.setid(cmd, wLoc.getid(data->props) );
+      wLoc.setaddr(cmd, wLoc.getaddr(data->props) );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco %s cmd=\"%s\"", LocOp.getId(inst), wLoc.getcmd(cmd)==NULL?"-":wLoc.getcmd(cmd));
+    }
+
+    /* Workarounds for the P50 interface. */
     if( NodeOp.findAttr(cmd,"dir") && wLoc.isdir(cmd) != wLoc.isdir( data->props ) ) {
       /* Informing the P50 interface. */
       wLoc.setsw( cmd, True );
       wLoc.setdir( data->props, wLoc.isdir(cmd) );
+      __checkAction(inst, "dirchange", "");
     }
     else if( wLoc.issw( cmd ) ) {
       /* Could be generated by the switch button of the locdlg. */
       wLoc.setdir( cmd, !wLoc.isdir( data->props ) );
       wLoc.setdir( data->props, wLoc.isdir(cmd) );
+      __checkAction(inst, "dirchange", "");
     }
 
     if( NodeOp.findAttr(cmd,"fn") ) {
-      /* Informing the P50 interface. */
       wLoc.setfn( data->props, wLoc.isfn( cmd ) );
       if( data->fn0 != wLoc.isfn( cmd ) )
-        f0changed = True;
+        wFunCmd.setfnchanged(cmd, 0);
       data->fn0 = wLoc.isfn( cmd );
+      __checkAction(inst, "lights", "");
     }
+
 
     if( StrOp.equals( wFunCmd.name(), NodeOp.getName(cmd )) ) {
 
-      int fnchanged = -1;
-
       wFunCmd.setaddr(cmd, wLoc.getaddr( data->props ));
 
-      if( wFunCmd.getfnchanged(cmd) != -1 ) {
-        /* TODO: Merge all known states in this command node. */
-        __cpFn2Node(inst, cmd, wFunCmd.getfnchanged(cmd));
-      }
+      /* The fnchanged attribute is no longer optional and must be set in all cases. */
+      fnchanged = wFunCmd.getfnchanged(cmd);
 
-      /* function timers
-         when f0 is turned on, data->fn0 is set true above at informing the P50 interface, 
+      /* when f0 is turned on, data->fn0 is set true above at informing the P50 interface,
          so if data->fn0 is true and f0changed is true, fn0 is turned on and we must check for the function timer */
-      if( data->fn0 && f0changed && wFunCmd.isf0( cmd ) )
-        data->fxtimer[0] = __getFnTimer( inst, 0);
-      if( (!data->fn0 && wFunCmd.isf0( cmd ) ) || (data->fn0 && !wFunCmd.isf0( cmd ) ) || f0changed ) {
-        fnchanged = 0;
+
+      if( fnchanged == 0 ) {
         cmdFn = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
         wLoc.setdir( cmdFn, wLoc.isplacing(data->props) ? wLoc.isdir(data->props):!wLoc.isdir(data->props) );
         wLoc.setfn( cmdFn, wFunCmd.isf0( cmd ) );
+        wFunCmd.setf0(cmdFn, wFunCmd.isf0( cmd ) );
+        data->fn0 = wFunCmd.isf0( cmd );
+        wLoc.setfn( data->props, wFunCmd.isf0( cmd ) );
         wLoc.setfncnt( cmdFn, wLoc.getfncnt( data->props ) );
         wLoc.setid( cmdFn, wLoc.getid(data->props) );
         wLoc.setoid( cmdFn, wLoc.getoid(data->props) );
@@ -744,161 +1231,19 @@ static void __engine( iOLoc inst, iONode cmd ) {
         wLoc.setprotver( cmdFn, wLoc.getprotver( data->props ) );
         wLoc.setfncnt( cmdFn, wLoc.getfncnt( data->props ) );
         wFunCmd.setfnchanged(cmdFn, wFunCmd.getfnchanged(cmd));
-        f0changed = False;
       }
 
-      if( !data->fn1 && wFunCmd.isf1( cmd ) )
-        data->fxtimer[1] = __getFnTimer( inst, 1);
-      if( (!data->fn1 && wFunCmd.isf1( cmd ) ) || (data->fn1 && !wFunCmd.isf1( cmd ) ) )
-        fnchanged = 1;
-
-      if( !data->fn2 && wFunCmd.isf2( cmd ) )
-        data->fxtimer[2] = __getFnTimer( inst, 2);
-      if( (!data->fn2 && wFunCmd.isf2( cmd ) ) || (data->fn2 && !wFunCmd.isf2( cmd ) ) )
-        fnchanged = 2;
-
-      if( !data->fn3 && wFunCmd.isf3( cmd ) )
-        data->fxtimer[3] = __getFnTimer( inst, 3);
-      if( (!data->fn3 && wFunCmd.isf3( cmd ) ) || (data->fn3 && !wFunCmd.isf3( cmd ) ) )
-        fnchanged = 3;
-
-      if( !data->fn4 && wFunCmd.isf4( cmd ) )
-        data->fxtimer[4] = __getFnTimer( inst, 4);
-      if( (!data->fn4 && wFunCmd.isf4( cmd ) ) || (data->fn4 && !wFunCmd.isf4( cmd ) ) )
-        fnchanged = 4;
-
-      if( !data->fn5 && wFunCmd.isf5( cmd ) )
-        data->fxtimer[5] = __getFnTimer( inst, 5);
-      if( (!data->fn5 && wFunCmd.isf5( cmd ) ) || (data->fn5 && !wFunCmd.isf5( cmd ) ) )
-        fnchanged = 5;
-
-      if( !data->fn6 && wFunCmd.isf6( cmd ) )
-        data->fxtimer[6] = __getFnTimer( inst, 6);
-      if( (!data->fn6 && wFunCmd.isf6( cmd ) ) || (data->fn6 && !wFunCmd.isf6( cmd ) ) )
-        fnchanged = 6;
-
-      if( !data->fn7 && wFunCmd.isf7( cmd ) )
-        data->fxtimer[7] = __getFnTimer( inst, 7);
-      if( (!data->fn7 && wFunCmd.isf7( cmd ) ) || (data->fn7 && !wFunCmd.isf7( cmd ) ) )
-        fnchanged = 7;
-
-      if( !data->fn8 && wFunCmd.isf8( cmd ) )
-        data->fxtimer[8] = __getFnTimer( inst, 8);
-      if( (!data->fn8 && wFunCmd.isf8( cmd ) ) || (data->fn8 && !wFunCmd.isf8( cmd ) ) )
-        fnchanged = 8;
-
-      if( !data->fn9 && wFunCmd.isf9( cmd ) )
-        data->fxtimer[9] = __getFnTimer( inst, 9);
-      if( (!data->fn9 && wFunCmd.isf9( cmd ) ) || (data->fn9 && !wFunCmd.isf9( cmd ) ) )
-        fnchanged = 9;
-
-      if( !data->fn10 && wFunCmd.isf10( cmd ) )
-        data->fxtimer[10] = __getFnTimer( inst, 10);
-      if( (!data->fn10 && wFunCmd.isf10( cmd ) ) || (data->fn10 && !wFunCmd.isf10( cmd ) ) )
-        fnchanged = 10;
-
-      if( !data->fn11 && wFunCmd.isf11( cmd ) )
-        data->fxtimer[11] = __getFnTimer( inst, 11);
-      if( (!data->fn11 && wFunCmd.isf11( cmd ) ) || (data->fn11 && !wFunCmd.isf11( cmd ) ) )
-        fnchanged = 11;
-
-      if( !data->fn12 && wFunCmd.isf12( cmd ) )
-        data->fxtimer[12] = __getFnTimer( inst, 12);
-      if( (!data->fn12 && wFunCmd.isf12( cmd ) ) || (data->fn12 && !wFunCmd.isf12( cmd ) ) )
-        fnchanged = 12;
-
-      if( !data->fn13 && wFunCmd.isf13( cmd ) )
-        data->fxtimer[13] = __getFnTimer( inst, 13);
-      if( (!data->fn13 && wFunCmd.isf13( cmd ) ) || (data->fn13 && !wFunCmd.isf13( cmd ) ) )
-        fnchanged = 13;
-
-      if( !data->fn14 && wFunCmd.isf14( cmd ) )
-        data->fxtimer[14] = __getFnTimer( inst, 14);
-      if( (!data->fn14 && wFunCmd.isf14( cmd ) ) || (data->fn14 && !wFunCmd.isf14( cmd ) ) )
-        fnchanged = 14;
-
-      if( !data->fn15 && wFunCmd.isf15( cmd ) )
-        data->fxtimer[15] = __getFnTimer( inst, 15);
-      if( (!data->fn15 && wFunCmd.isf15( cmd ) ) || (data->fn15 && !wFunCmd.isf15( cmd ) ) )
-        fnchanged = 15;
-
-      if( !data->fn16 && wFunCmd.isf16( cmd ) )
-        data->fxtimer[16] = __getFnTimer( inst, 16);
-      if( (!data->fn16 && wFunCmd.isf16( cmd ) ) || (data->fn16 && !wFunCmd.isf16( cmd ) ) )
-        fnchanged = 16;
-
-      if( !data->fn17 && wFunCmd.isf17( cmd ) )
-        data->fxtimer[17] = __getFnTimer( inst, 17);
-      if( (!data->fn17 && wFunCmd.isf17( cmd ) ) || (data->fn17 && !wFunCmd.isf17( cmd ) ) )
-        fnchanged = 17;
-
-      if( !data->fn18 && wFunCmd.isf18( cmd ) )
-        data->fxtimer[18] = __getFnTimer( inst, 18);
-      if( (!data->fn18 && wFunCmd.isf18( cmd ) ) || (data->fn18 && !wFunCmd.isf18( cmd ) ) )
-        fnchanged = 18;
-
-      if( !data->fn19 && wFunCmd.isf19( cmd ) )
-        data->fxtimer[19] = __getFnTimer( inst, 19);
-      if( (!data->fn19 && wFunCmd.isf19( cmd ) ) || (data->fn19 && !wFunCmd.isf19( cmd ) ) )
-        fnchanged = 19;
-
-      if( !data->fn20 && wFunCmd.isf20( cmd ) )
-        data->fxtimer[20] = __getFnTimer( inst, 20);
-      if( (!data->fn20 && wFunCmd.isf20( cmd ) ) || (data->fn20 && !wFunCmd.isf20( cmd ) ) )
-        fnchanged = 20;
-
-      if( !data->fn21 && wFunCmd.isf21( cmd ) )
-        data->fxtimer[21] = __getFnTimer( inst, 21);
-      if( (!data->fn21 && wFunCmd.isf21( cmd ) ) || (data->fn21 && !wFunCmd.isf21( cmd ) ) )
-        fnchanged = 21;
-
-      if( !data->fn22 && wFunCmd.isf22( cmd ) )
-        data->fxtimer[22] = __getFnTimer( inst, 22);
-      if( (!data->fn22 && wFunCmd.isf22( cmd ) ) || (data->fn22 && !wFunCmd.isf22( cmd ) ) )
-        fnchanged = 22;
-
-      if( !data->fn23 && wFunCmd.isf23( cmd ) )
-        data->fxtimer[23] = __getFnTimer( inst, 23);
-      if( (!data->fn23 && wFunCmd.isf23( cmd ) ) || (data->fn23 && !wFunCmd.isf23( cmd ) ) )
-        fnchanged = 23;
-
-      if( !data->fn24 && wFunCmd.isf24( cmd ) )
-        data->fxtimer[24] = __getFnTimer( inst, 24);
-      if( (!data->fn24 && wFunCmd.isf24( cmd ) ) || (data->fn24 && !wFunCmd.isf24( cmd ) ) )
-        fnchanged = 24;
-
-      if( !data->fn25 && wFunCmd.isf25( cmd ) )
-        data->fxtimer[25] = __getFnTimer( inst, 25);
-      if( (!data->fn25 && wFunCmd.isf25( cmd ) ) || (data->fn25 && !wFunCmd.isf25( cmd ) ) )
-        fnchanged = 25;
-
-      if( !data->fn26 && wFunCmd.isf26( cmd ) )
-        data->fxtimer[26] = __getFnTimer( inst, 26);
-      if( (!data->fn26 && wFunCmd.isf26( cmd ) ) || (data->fn26 && !wFunCmd.isf26( cmd ) ) )
-        fnchanged = 26;
-
-      if( !data->fn27 && wFunCmd.isf27( cmd ) )
-        data->fxtimer[27] = __getFnTimer( inst, 27);
-      if( (!data->fn27 && wFunCmd.isf27( cmd ) ) || (data->fn27 && !wFunCmd.isf27( cmd ) ) )
-        fnchanged = 27;
-
-      if( !data->fn28 && wFunCmd.isf28( cmd ) )
-        data->fxtimer[28] = __getFnTimer( inst, 28);
-      if( (!data->fn28 && wFunCmd.isf28( cmd ) ) || (data->fn28 && !wFunCmd.isf28( cmd ) ) )
-        fnchanged = 28;
-
-      if( wFunCmd.getfnchanged(cmd) != -1 ) {
-        /* use the fnchanged send from client */
-        fnchanged = wFunCmd.getfnchanged(cmd);
+      /* function timers */
+      if( fnchanged != -1 && fnchanged < 29 ) {
+        data->fxtimer[fnchanged] = __getFnTimer( inst, fnchanged);
       }
-
-      wFunCmd.setfnchanged(cmd, fnchanged);
 
       if( data->timedfn >= 0 && wFunCmd.gettimedfn( cmd ) >= 0 && wFunCmd.gettimer( cmd ) > 0) {
         /* reset previous timed function */
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "reset previous timed function");
         __resetTimedFunction(inst, cmd, -1);
       }
-      if( wFunCmd.gettimedfn( cmd ) >= 0 ) {
+      if( wFunCmd.gettimedfn( cmd ) >= 0 && wFunCmd.gettimer( cmd ) > 0 ) {
         data->timedfn = wFunCmd.gettimedfn( cmd );
         data->fntimer = wFunCmd.gettimer( cmd );
 
@@ -917,11 +1262,18 @@ static void __engine( iOLoc inst, iONode cmd ) {
       }
 
       /* save the function status: */
-      __cpNode2Fn(inst, cmd);
+      Boolean fon = __cpNode2Fn(inst, cmd);
       __saveFxState(inst);
 
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "lc=%s(%d) lights=%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
-          wLoc.getid( data->props ), fnchanged,
+      if( fnchanged != -1 ) {
+        char fstr[32] = {'\0'};
+        StrOp.fmtb(fstr, "f%d", fnchanged );
+        __checkAction(inst, fstr, fon?"":"off");
+      }
+
+
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "lc=%s [addr=%d] [fn=%d] lights=%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
+          wLoc.getid( data->props ), cmdFn==NULL?wLoc.getaddr( cmd ):wFunCmd.getaddr(cmdFn), fnchanged,
           data->fn0  ? "on":"off",
           data->fn1  ? "01":"--", data->fn2  ? "02":"--", data->fn3  ? "03":"--", data->fn4  ? "04":"--",
           data->fn5  ? "05":"--", data->fn6  ? "06":"--", data->fn7  ? "07":"--", data->fn8  ? "08":"--",
@@ -932,8 +1284,55 @@ static void __engine( iOLoc inst, iONode cmd ) {
           data->fn25 ? "25":"--", data->fn26 ? "26":"--", data->fn27 ? "27":"--", data->fn28 ? "28":"--"
       );
 
+      /* secondary decoder check */
+      if( wFunCmd.getfnchanged(cmd) != -1 ) {
+        int locoAddr = cmdFn==NULL?wLoc.getaddr( cmd ):wFunCmd.getaddr(cmdFn);
+        int mappedfn = 0;
+        int decaddr = __getFnAddr(inst, wFunCmd.getfnchanged(cmd), &mappedfn );
+        if( decaddr > 0 && decaddr!=locoAddr ) {
+          int ifn = 0;
+          wLoc.setaddr( cmdFn==NULL?cmd:cmdFn, decaddr > 0 ? decaddr:wLoc.getaddr(data->props) );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+              "function %d address=%d:%d", wFunCmd.getfnchanged(cmd), decaddr, mappedfn );
+          /* reset */
+          for( ifn = 0; ifn < 29; ifn++ )
+            __FnOnOff(inst, ifn, False, cmdFn==NULL?cmd:cmdFn, False);
+          __cpFn2Node(inst, cmdFn==NULL?cmd:cmdFn, -1, decaddr);
+          wFunCmd.setfnchanged(cmdFn==NULL?cmd:cmdFn, mappedfn);
+          wFunCmd.setgroup(cmdFn==NULL?cmd:cmdFn, mappedfn/4 + ((mappedfn%4 > 0) ? 1:0) );
+        }
+        else {
+          /* some controllers use this information because they make no diff between loc or fun cmd: */
+          __cpFn2Node(inst, cmd, -1, 0);
+        }
+      }
+      else {
+        __cpFn2Node(inst, cmd, -1, 0);
+      }
+
+      /* sound */
+      __doSound( inst, cmd );
+
+    }
+    else {
+      /* copy functions */
+      __cpFn2Node(inst, cmd, -1, 0);
+    }
 
 
+  }
+
+  else if( !LocOp.isAutomode(inst) || data->gomanual ) {
+    if( wLoc.isinfo4throttle(data->props ) ) {
+      data->infocheck++;
+      if( data->infocheck > 10 ) {
+        if( cmd == NULL ) {
+          cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+          wLoc.setaddr( cmd, wLoc.getaddr(data->props) );
+        }
+        wLoc.setcmd( cmd, wLoc.info );
+        data->infocheck = 0;
+      }
     }
   }
 
@@ -941,7 +1340,7 @@ static void __engine( iOLoc inst, iONode cmd ) {
 
   /* New speed attributes: */
   if( V_hint != NULL ) {
-    __checkAction(inst, V_hint);
+    __checkAction(inst, V_hint, "");
     V_new = __translateVhint( inst, V_hint, V_maxkmh );
 
     if( data->drvSpeed != V_new || StrOp.equals( wFunCmd.name(), NodeOp.getName(cmd )) ) {
@@ -971,18 +1370,20 @@ static void __engine( iOLoc inst, iONode cmd ) {
 
 
   /* check for run and stall event */
-  if( V_old != data->drvSpeed ) {
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "check function event (curV=%d drvV=%d)", V_old, data->drvSpeed );
-    if( V_old == 0 ) {
-      __funEvent(inst, NULL, run_event, 0);
-      __checkAction(inst, "run");
-    }
-    if( data->drvSpeed == 0 ) {
-      __funEvent(inst, NULL, stall_event, 0);
-      __checkAction(inst, "stall");
+  if( !wLoc.isrestorespeed(data->props) || data->speedrestoredbythread ) {
+    if( V_old != data->drvSpeed ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "check function event (curV=%d drvV=%d)", V_old, data->drvSpeed );
+      if( V_old == 0 ) {
+        __funEvent(inst, NULL, run_event, 0);
+        __checkAction(inst, "run", "");
+      }
+      if( data->drvSpeed == 0 ) {
+        __funEvent(inst, NULL, stall_event, 0);
+        __checkAction(inst, "stall", "");
+      }
+      wLoc.setV(data->props, data->drvSpeed);
     }
   }
-
 
   /* Check for simple decoders like "Maerklin Delta": */
   if( StrOp.equals( wLoc.V_mode_percent, wLoc.getV_mode( data->props ) ) &&
@@ -1013,6 +1414,37 @@ static void __engine( iOLoc inst, iONode cmd ) {
     }
   }
 
+  else if(wLoc.isregulated(data->props) && data->sbtDecelerate > 0 &&
+      (StrOp.equals( wLoc.mode_auto, wLoc.getmode(data->props)) || ! wLoc.isusebbt(data->props) ) )
+  {
+    if( data->step >= data->sbtInterval ) {
+      data->step = 0;
+      if( data->curSpeed == 0 && data->drvSpeed )
+        data->curSpeed = data->drvSpeed;
+
+      if( data->curSpeed > data->drvSpeed && data->curSpeed > wLoc.getV_min(data->props) && data->drvSpeed > wLoc.getV_min(data->props) ) {
+        data->curSpeed -= data->sbtDecelerate;
+        if( data->curSpeed < data->drvSpeed )
+          data->curSpeed = data->drvSpeed;
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "SBT Vcur=%d Vdrv=%d decelerate=%d", data->curSpeed, data->drvSpeed, data->sbtDecelerate );
+        if( cmd == NULL )
+          cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+        wLoc.setV( cmd, data->curSpeed );
+      }
+      else {
+        data->curSpeed = data->drvSpeed;
+      }
+    }
+  }
+
+  else {
+    if( cmd != NULL ) {
+      if( wLoc.getV( cmd ) == -1 )
+        data->curSpeed = data->drvSpeed;
+      else
+        data->curSpeed = wLoc.getV(cmd);
+    }
+  }
 
   /* Send the command to the controller with all mandatory attributes: */
   if( cmd != NULL && control != NULL )
@@ -1039,8 +1471,6 @@ static void __engine( iOLoc inst, iONode cmd ) {
     wLoc.setoid( cmd, wLoc.getoid(data->props) );
     wLoc.setid( cmd, wLoc.getid(data->props) );
 
-    /* some controllers use this information because they make no diff between loc or fun cmd: */
-    __cpFn2Node(inst, cmd, -1);
 
     if( wLoc.getV( cmd ) == -1 )
       wLoc.setV( cmd, data->drvSpeed );
@@ -1086,7 +1516,7 @@ static void __engine( iOLoc inst, iONode cmd ) {
       if( iid != NULL )
         wLoc.setiid( cmd, iid );
 
-      wLoc.setaddr( cmd, wLoc.getaddr( data->props ) );
+      /*wLoc.setaddr( cmd, wLoc.getaddr( data->props ) );*/
 
       if( curblock != NULL ) {
         wBlock.setport( cmd, curblock->getTDport( curblock ) );
@@ -1099,17 +1529,50 @@ static void __engine( iOLoc inst, iONode cmd ) {
 
     }
 
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "Sending command...V=%d",wLoc.getV(cmd) );
-    if( cmdFn != NULL )
-      ControlOp.cmd( control, cmdFn, NULL );
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "Sending command...V=%d dir=%s secaddr=%s",
+        wLoc.getV(cmd), wLoc.isdir(cmd)?"fwd":"rev", wLoc.isusesecaddr(cmd)?"true":"false" );
 
+    if( cmdFn != NULL ) {
+      wLoc.setimagenr( cmdFn, wLoc.getimagenr(data->props) );
+      if( wLoc.getaddr( cmdFn ) == 0 && !StrOp.equals( wLoc.prot_A, wLoc.getprot( data->props ))) {
+        wLoc.setaddr( cmdFn, wLoc.getaddr(data->props) );
+      }
+      ControlOp.cmd( control, cmdFn, NULL );
+    }
+
+    if( wLoc.getaddr( cmd ) == 0 && !StrOp.equals( wLoc.prot_A, wLoc.getprot( data->props ))) {
+      wLoc.setaddr( cmd, wLoc.getaddr(data->props) );
+    }
+
+    if( useSecAddr && wLoc.getsecaddr(data->props) > 0  && !StrOp.equals( wLoc.prot_A, wLoc.getprot( data->props )) ) {
+      wLoc.setaddr( cmd, wLoc.getsecaddr(data->props));
+      wLoc.setspcnt( cmd, wLoc.getsecspcnt(data->props));
+      wLoc.setV_mode( cmd, wLoc.V_mode_step);
+    }
+    wLoc.setimagenr( cmd, wLoc.getimagenr(data->props) );
     ControlOp.cmd( control, cmd, NULL );
 
-    if( cmdTD != NULL )
+    if( cmdTD != NULL ) {
       ControlOp.cmd( control, cmdTD, NULL );
+    }
+  }
+
+  if( wCtrl.isreleaseonidle( AppOp.getIniNode( wCtrl.name() )) ) {
+    if( cmd == NULL && wLoc.getV(data->props) == 0 && !data->go && !data->released ) {
+      /* Release loco? */
+      cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      wLoc.setaddr(cmd, wLoc.getaddr(data->props));
+      wLoc.setfn( cmd, wLoc.isfn(data->props));
+      wLoc.setdir(cmd, wLoc.isdir(data->props));
+      wLoc.setid(cmd, wLoc.getid(data->props));
+      wLoc.setcmd(cmd, wLoc.release );
+      ControlOp.cmd( control, cmd, NULL );
+      data->released = True;
+    }
   }
 
   data->step++;
+  return True;
 }
 
 
@@ -1118,6 +1581,8 @@ static iONode __resetTimedFunction(iOLoc loc, iONode cmd, int function) {
   iONode fncmd = cmd==NULL?NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE ):cmd;
   int timedfn = data->timedfn;
   int newtimedfn = wFunCmd.gettimedfn( cmd );
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "reset timed function %d,%d Lights=%d", timedfn, function, data->fn0 );
 
   if( function >= 0 ) {
     timedfn = function;
@@ -1129,6 +1594,11 @@ static iONode __resetTimedFunction(iOLoc loc, iONode cmd, int function) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "keep state of function [%d]; is same as new", timedfn );
     timedfn = -1;
   }
+
+  if( function != -1 )
+    wFunCmd.setfnchanged( fncmd, function );
+  else if( timedfn != -1 )
+    wFunCmd.setfnchanged( fncmd, timedfn );
 
   wFunCmd.setid ( fncmd, wLoc.getid(data->props) );
   wFunCmd.setf0 ( fncmd, timedfn== 0?False:data->fn0 );
@@ -1164,19 +1634,412 @@ static iONode __resetTimedFunction(iOLoc loc, iONode cmd, int function) {
 
   wFunCmd.setgroup( fncmd, timedfn/4 + ((timedfn%4 > 0) ? 1:0) );
 
-  wLoc.setfn(data->props, wFunCmd.isf0( fncmd ) );
+  if( timedfn == 0 )
+    wLoc.setfn(data->props, wFunCmd.isf0( fncmd ) );
 
   return fncmd;
 }
+
+
+#define RUNNERTICK 100
+#define RUNNERBBTTICK 10
+
+static iOMsg __getQueueMsg( iOLocData data, iOList list, iOMsg msg) {
+  iOMsg qmsg = NULL;
+  int size = 0;
+  int i = 0;
+
+  /* count down timers */
+  size = ListOp.size(list);
+  for( i = 0; i < size; i++ ) {
+    iOMsg m = (iOMsg)ListOp.get(list, i);
+    MsgOp.setTimer( m, MsgOp.getTimer( m ) - RUNNERTICK );
+  }
+
+  /* process the new message */
+  if( msg != NULL ) {
+    if( MsgOp.getTimer( msg ) == 0 )
+      return msg;
+    else {
+      int event = MsgOp.getEvent( msg );
+      int type  = MsgOp.getUsrDataType( msg );
+      int timer = MsgOp.getTimer( msg );
+
+      if( type == 0 && wLoc.getevttimer(data->props) > 0 ) {
+        timer = wLoc.getevttimer(data->props);
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loc evttimer %d ms", timer );
+      }
+      else if( event == in_event ) {
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loc evttimer %d ms * %d %%", timer, wLoc.getent2incorr(data->props) );
+        timer = timer * wLoc.getent2incorr(data->props) / 100;
+        if( timer < 1 )
+          timer = 1;
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loc evttimer %d ms", timer );
+      }
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "timed event[%d] %d ms", event, timer );
+
+      MsgOp.setTimer( msg, timer );
+
+      if( timer < RUNNERTICK ) {
+        /* blind for less then 100 ms */
+        ThreadOp.sleep(timer);
+        return msg;
+      }
+
+      ListOp.add(list, (obj)msg);
+    }
+  }
+
+  /* check timers */
+  size = ListOp.size(list);
+  for( i = 0; i < size; i++ ) {
+    iOMsg m = (iOMsg)ListOp.get(list, i);
+    if( MsgOp.getTimer( m ) <= 0 ) {
+      ListOp.remove( list, i);
+      qmsg = m;
+      break;
+    }
+  }
+
+  return qmsg;
+}
+
+
+static void __theSwap(iOLoc loc, Boolean swap, Boolean consist, iONode cmd) {
+  iOLocData data = Data(loc);
+  /* The swap: */
+  wLoc.setplacing( data->props, swap );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "placing for [%s] set to [%s]", wLoc.getid(data->props), wLoc.isplacing( data->props )?"FWD":"REV" );
+  /* inform model to keep this setting in the occupancy file */
+  ModelOp.setBlockOccupancy( AppOp.getModel(), data->curBlock, wLoc.getid(data->props), False, wLoc.isplacing( data->props) ? 1:2, wLoc.isblockenterside( data->props) ? 1:2, NULL );
+
+  /* swap the block enter side flag to be able to use other direction routes */
+  LocOp.swapBlockEnterSide(loc, NULL);
+
+  if( !consist ) {
+    /* only swap if this command did not come from a multiple unit loop */
+    __swapConsist(loc, cmd);
+  }
+
+  if( wLoc.isv0onswap(data->props) && LocOp.getV(loc) == 0 ) {
+    iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+    wLoc.setcmd(cmd, wLoc.velocity );
+    wLoc.setV(cmd, 0 );
+    wLoc.setfn( cmd, data->fn0 );
+    wLoc.setdir( cmd, wLoc.isdir(data->props) );
+    LocOp.cmd(loc, cmd);
+  }
+  __broadcastLocoProps( loc, NULL, NULL, NULL );
+  __checkAction(loc, "dirchange", "");
+
+}
+
+
+static void _resetBBT(iOLoc loc) {
+  iOLocData data = Data(loc);
+  data->bbtEnterBlock = NULL;
+  data->bbtInBlock    = NULL;
+  data->bbtPrevBlock  = NULL;
+  data->bbtRoute      = NULL;
+  data->bbtEnterSpeed = 0;
+  data->bbtCycleSpeed = 0;
+  data->bbtEnter      = 0;
+  data->bbtIn         = 0;
+  data->bbtAtMinSpeed = False;
+  data->bbtGenerateIn = False;
+  data->bbtStepCount  = 0;
+  data->bbtAtMin      = 0;
+}
+
+/**
+ * Block Brake Timer
+ */
+static void __BBT(iOLoc loc) {
+  iOLocData data = Data(loc);
+  int bbtsteps      = wLoc.getbbtsteps(data->props);
+  int bbtmaxdiff    = wLoc.getbbtmaxdiff(data->props);
+  int bbtcorrection = wLoc.getbbtcorrection(data->props);
+
+  if( data->bbtDelay > 0 ) {
+    data->bbtDelay--;
+    return;
+  }
+
+  if( bbtsteps < 4 || bbtsteps > 16 )
+    bbtsteps = 10;
+  if( bbtmaxdiff < 100 || bbtmaxdiff > 500 )
+    bbtmaxdiff = 250;
+  if( bbtcorrection < 10 || bbtcorrection > 100 )
+    bbtcorrection = 25;
+
+  bbtcorrection = 100 / bbtcorrection;
+
+  if( data->bbtEnter != 0 && data->bbtIn == 0  && data->bbtEnterBlock != NULL ) {
+    if( data->bbtInTimer > 0 ) {
+      data->bbtInTimer--;
+      if( data->bbtInTimer == 0 ) {
+        data->bbtIn = SystemOp.getTick();
+        data->bbtInBlock = data->bbtEnterBlock;
+        data->bbtPrevBlock = data->driver->getCurblock(data->driver);
+        data->bbtRoute = data->driver->getCurroute(data->driver);
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT in=%ld block=%s", data->bbtIn, data->bbtInBlock );
+      }
+    }
+
+    if( data->bbtCycleSpeed == 0 ) {
+      const char* key  = NULL;
+      char* key0 = NULL;
+      char* keyV = NULL;
+      iONode bbt  = NULL;
+      iONode bbtV = NULL;
+      int bbtkey = wLoc.getbbtkey(data->props);
+      data->bbtPrevBlock = data->driver->getCurblock(data->driver);
+      data->bbtRoute = data->driver->getCurroute(data->driver);
+      if( bbtkey == 3) {
+        key0 = StrOp.fmt("%s-%d", data->bbtEnterBlock, data->bbtEnterSpeed);
+        keyV = StrOp.fmt("%s-%d", data->bbtEnterBlock, data->bbtEnterSpeed);
+      }
+      else if( bbtkey == 2 && data->bbtRoute != NULL) {
+        key0 = StrOp.fmt("%s-%s", data->bbtEnterBlock, data->bbtRoute);
+        keyV = StrOp.fmt("%s-%s-%d", data->bbtEnterBlock, data->bbtRoute, data->bbtEnterSpeed);
+      }
+      else if( bbtkey == 1 ) {
+        key0 = StrOp.fmt("%s-%s", data->bbtEnterBlock, data->bbtPrevBlock);
+        keyV = StrOp.fmt("%s-%s-%d", data->bbtEnterBlock, data->bbtPrevBlock, data->bbtEnterSpeed);
+      }
+      else {
+        key0 = StrOp.fmt("%s", data->bbtEnterBlock);
+        keyV = StrOp.fmt("%s-%d", data->bbtEnterBlock, data->bbtEnterSpeed);
+      }
+
+      bbt  = (iONode)MapOp.get( data->bbtMap, key0 );
+      bbtV = (iONode)MapOp.get( data->bbtMap, keyV );
+
+      if( bbtV != NULL ) {
+        bbt = bbtV;
+        key = keyV;
+      }
+      else {
+        key = key0;
+      }
+
+      data->bbtCycleNr = 0;
+      if( bbt != NULL ) {
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT-Record found: [%s] keytype=%d", key, bbtkey);
+        data->bbtInterval = wBBT.getinterval(bbt) / bbtsteps;
+        data->bbtGenerateIn = wBBT.isgeneratein(bbt);
+        data->bbtDelay = wBBT.getdelay(bbt);
+        if( wBBT.getinterval(bbt) % bbtsteps > 5 )
+          data->bbtInterval++;
+        wBBT.setsteps(bbt, 0 );
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT-Record **not** found: [%s]", key);
+        data->bbtInterval = wLoc.getbbtstartinterval(data->props);
+      }
+      StrOp.free(key0);
+      StrOp.free(keyV);
+      data->bbtSpeed = data->drvSpeed;
+      data->curSpeed = data->drvSpeed;
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT-ENTER interval=%d block=%s V_enter=%d",
+          bbt != NULL ? wBBT.getinterval(bbt):100, data->bbtEnterBlock, data->bbtSpeed );
+    }
+
+    if( data->bbtInterval == 0 )
+      data->bbtInterval = 10;
+
+    if( data->drvSpeed > 0 && !data->bbtAtMinSpeed && data->bbtCycleSpeed >= 0 && (data->bbtCycleSpeed % data->bbtInterval) == 0 ) {
+      iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      int V_min = wLoc.getV_min( data->props );
+      int speed = 0;
+      data->bbtCycleNr++;
+      /* Subtract the Min. speed from the calculation. */
+      speed = data->bbtSpeed - (((data->bbtSpeed-V_min) * data->bbtCycleNr) / bbtsteps );
+      if( speed <= V_min ) {
+        speed = V_min;
+        data->bbtAtMinSpeed = True;
+        data->bbtAtMin = SystemOp.getTick();
+        wLoc.setV_hint( data->props, wLoc.min );
+      }
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT-SPEED V=%d id=%s mode=%s atminspeed=%d",
+          speed, wLoc.getid(data->props), wLoc.getmode(data->props), data->bbtAtMinSpeed  );
+
+      data->curSpeed = speed;
+      wLoc.setV( cmd, speed );
+      wLoc.setdir( cmd, wLoc.isdir( data->props ) );
+      LocOp.cmd( loc, cmd );
+      data->bbtStepCount++;
+    }
+    data->bbtCycleSpeed++;
+  }
+  else if( data->bbtEnter != 0 && data->bbtIn == 0  && data->bbtEnterBlock == NULL ) {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "BBT-ENTER **block not set**" );
+    data->bbtCycleSpeed = 0;
+    data->bbtEnter      = 0;
+    data->bbtIn         = 0;
+    data->bbtAtMinSpeed = False;
+  }
+
+  if(data->bbtGenerateIn && data->bbtAtMinSpeed) {
+    iIBlockBase block = ModelOp.getBlock( AppOp.getModel(), data->bbtEnterBlock );
+    if( block != NULL ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT-GENERATE-IN id=%s block=%s", wLoc.getid(data->props), data->bbtEnterBlock );
+      LocOp.event(loc, (obj)block, in_event, 0, False, "BBT-IN-Event" );
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
+          "BBT-GENERATE-IN id=%s: Block [%s] does not exist; Stop loco", wLoc.getid(data->props), data->bbtEnterBlock );
+      iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      data->curSpeed = 0;
+      wLoc.setV( cmd, 0 );
+      wLoc.setdir( cmd, wLoc.isdir( data->props ) );
+      LocOp.cmd( loc, cmd );
+    }
+  }
+
+  if( data->bbtEnter != 0 && data->bbtIn != 0 && data->bbtEnterBlock != NULL && data->bbtInBlock != NULL ) {
+    /*data->prevBlock*/
+    int bbtkey = wLoc.getbbtkey(data->props);
+    char* key  = NULL;
+    char* keyV = NULL;
+    if( bbtkey == 3 ) {
+      key  = StrOp.fmt("%s-%d", data->bbtInBlock, data->bbtEnterSpeed);
+      keyV = StrOp.fmt("%s-%d", data->bbtInBlock, data->bbtEnterSpeed);
+    }
+    else if( bbtkey == 2 && data->bbtRoute != NULL ) {
+      key  = StrOp.fmt("%s-%s", data->bbtInBlock, data->bbtRoute);
+      keyV = StrOp.fmt("%s-%s-%d", data->bbtInBlock, data->bbtRoute, data->bbtEnterSpeed);
+    }
+    else if( bbtkey == 1 ) {
+      key  = StrOp.fmt("%s-%s", data->bbtInBlock, data->bbtPrevBlock);
+      keyV = StrOp.fmt("%s-%s-%d", data->bbtInBlock, data->bbtPrevBlock, data->bbtEnterSpeed);
+    }
+    else {
+      key  = StrOp.fmt("%s", data->bbtInBlock);
+      keyV = StrOp.fmt("%s-%d", data->bbtInBlock, data->bbtEnterSpeed);
+    }
+
+    iONode bbt  = (iONode)MapOp.get( data->bbtMap, key );
+    iONode bbtV = (iONode)MapOp.get( data->bbtMap, keyV );
+
+    if( data->bbtIn >= data->bbtEnter && StrOp.equals(data->bbtEnterBlock, data->bbtInBlock) ) {
+      Boolean newBBTRecord = False;
+      int interval = (int)(data->bbtIn - data->bbtEnter);
+
+      if( bbtV != NULL ) {
+        bbt = bbtV;
+      }
+      else if( bbtV == NULL && bbt != NULL && wBBT.getspeed(bbt) == 0 ) {
+        wBBT.setspeed(bbt, data->bbtEnterSpeed);
+        MapOp.put(data->bbtMap, keyV, (obj)bbt);
+      }
+
+      if( bbt == NULL ) {
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT creating node for block=%s from=%s route=%s with key=[%s] keytype=%d",
+            data->bbtInBlock, data->bbtPrevBlock, data->bbtRoute!=NULL?data->bbtRoute:"", key, bbtkey );
+        bbt = NodeOp.inst( wBBT.name(), data->props, ELEMENT_NODE );
+        NodeOp.addChild(data->props, bbt);
+        wBBT.setbk(bbt, data->bbtInBlock);
+        wBBT.setfrombk(bbt, data->bbtPrevBlock);
+        wBBT.setroute(bbt, data->bbtRoute);
+        wBBT.setinterval(bbt, data->bbtInterval * data->bbtCycleNr);
+        wBBT.setsteps(bbt, data->bbtCycleNr);
+        wBBT.setspeed(bbt, data->bbtEnterSpeed);
+        MapOp.put(data->bbtMap, key, (obj)bbt);
+        MapOp.put(data->bbtMap, keyV, (obj)bbt);
+        newBBTRecord = True;
+      }
+
+      int count        = wBBT.getcount(bbt);
+      int oldinterval  = wBBT.getinterval(bbt);
+      int diffinterval = abs(interval - oldinterval);
+
+      if( diffinterval > bbtmaxdiff ) {
+        diffinterval = bbtmaxdiff;
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT interval difference %d exeeds the max. of %d", diffinterval, bbtmaxdiff );
+      }
+
+      if( newBBTRecord ) {
+        bbtcorrection = 1.0;
+      }
+
+      if( interval > oldinterval ) {
+        interval = oldinterval + (diffinterval / bbtcorrection);
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT L-interval %d", interval );
+      }
+      else if( interval < oldinterval ) {
+        interval = oldinterval - (diffinterval / bbtcorrection);
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT S-interval %d", interval );
+      }
+
+      if( !wBBT.isfixed(bbt) )
+        wBBT.setinterval(bbt, interval);
+
+      wBBT.setcount(bbt, wBBT.getcount(bbt) + 1 );
+      if( data->bbtCycleNr > 0 )
+        wBBT.setsteps(bbt, data->bbtStepCount );
+
+      {
+        iONode broadcast = (iONode)NodeOp.base.clone(data->props);
+        wLoc.setV( broadcast, data->drvSpeed );
+        wLoc.setbbtevent(broadcast, True);
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT-IN interval=%d block=%s bbtcorrection=%d count=%d (broadcast)",
+            interval, data->bbtInBlock, bbtcorrection, wBBT.getcount(bbt) );
+        AppOp.broadcastEvent( broadcast );
+      }
+
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+          "BBT-IN interval error in=%d enter=%d enterBlock=%s inBlock=%s",
+          data->bbtIn, data->bbtEnter,
+          data->bbtEnterBlock != NULL ? data->bbtEnterBlock:"?", data->bbtInBlock != NULL ? data->bbtInBlock:"?" );
+    }
+
+    StrOp.free(key);
+    StrOp.free(keyV);
+
+    data->bbtEnterBlock = NULL;
+    data->bbtInBlock    = NULL;
+    data->bbtPrevBlock  = NULL;
+    data->bbtRoute      = NULL;
+    data->bbtEnterSpeed = 0;
+    data->bbtCycleSpeed = 0;
+    data->bbtEnter      = 0;
+    data->bbtIn         = 0;
+    data->bbtAtMinSpeed = False;
+    data->bbtGenerateIn = False;
+    data->bbtStepCount  = 0;
+    data->bbtAtMin      = 0;
+  }
+  else if( data->bbtIn != 0 && data->bbtInBlock == NULL ) {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "BBT-IN **block not set**" );
+    data->bbtCycleSpeed = 0;
+    data->bbtEnter      = 0;
+    data->bbtIn         = 0;
+    data->bbtAtMin      = 0;
+    data->bbtAtMinSpeed = False;
+    data->bbtGenerateIn = False;
+    data->bbtStepCount  = 0;
+  }
+}
+
 
 static void __runner( void* threadinst ) {
   iOThread th = (iOThread)threadinst;
   iOLoc loc = (iOLoc)ThreadOp.getParm( th );
   iOLocData data = Data(loc);
+  iOList queueList = ListOp.inst();
   int   tick = 0;
+  int   virtualtick = 0;
+  int extraTick = 0;
+  int delay = 0;
   Boolean cnfgsend = False;
   Boolean loccnfg = wCtrl.isloccnfg( AppOp.getIniNode( wCtrl.name() ) );
 
+  ThreadOp.sleep(500);
   ThreadOp.setDescription( th, wLoc.getdesc( data->props ) );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Runner for \"%s\" started.", LocOp.getId( loc ) );
@@ -1186,69 +2049,94 @@ static void __runner( void* threadinst ) {
 
   data->runtime = wLoc.getruntime( data->props );
 
+  if( wLoc.getstartuptourid(data->props) != NULL && StrOp.len(wLoc.getstartuptourid(data->props)) > 0 ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "startup tour: %s", wLoc.getstartuptourid(data->props) );
+    LocOp.useTour( loc, wLoc.getstartuptourid(data->props) );
+  }
+  else if( wLoc.getstartupscid(data->props) != NULL && StrOp.len(wLoc.getstartupscid(data->props)) > 0 ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "startup schedule: %s", wLoc.getstartupscid(data->props) );
+    LocOp.useSchedule( loc, wLoc.getstartupscid(data->props) );
+  }
+
   do {
-    iOMsg msg = (iOMsg)ThreadOp.getPost( th );
-    obj    emitter = NULL;
-    iONode fncmd   = NULL;
+    iOMsg  msg       = NULL;
+    obj    emitter   = NULL;
+    iONode fncmd     = NULL;
     iONode broadcast = NULL;
 
     int   i     = 0;
     int   event = -1;
     int   timer = 0;
     int   type  = 0;
+    int   fx    = 0;
+    obj   udata = NULL;
+
+    /* BBT 10ms cycle */
+    if( !data->gomanual && wLoc.isusebbt(data->props) && data->drvSpeed > 0 && data->bbtEnterBlock != NULL) {
+      if( StrOp.equals( wLoc.mode_wait, wLoc.getmode(data->props) )  && !data->bbtExternalStop ) {
+        __BBT(loc);
+      }
+      ThreadOp.sleep( RUNNERBBTTICK );
+      data->bbtCycle++;
+      if( data->bbtCycle < 10 ) {
+        continue;
+      }
+      data->bbtCycle = 0;
+    }
+
+    /* Normal 100ms cycle */
+    msg = __getQueueMsg(data, queueList, (iOMsg)ThreadOp.getPost( th ) );
+
+    data->nrruns++;
 
     if( msg != NULL ) {
       emitter = MsgOp.getSender( msg );
       event   = MsgOp.getEvent( msg );
-      timer   = MsgOp.getTimer( msg );
       type    = MsgOp.getUsrDataType( msg );
+      udata   = MsgOp.getUsrData(msg);
       msg->base.del( msg );
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "new message %d nrruns=%d", event, data->nrruns );
+    }
+
+    if( event == cmd_event ) {
+      event = -1;
+      iONode cmd = (iONode)udata;
+      if( !MutexOp.trywait( data->muxEngine, 1000) ) {
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "loco %s engine blocked...", LocOp.getId( loc ) );
+      }
+      else {
+        iONode consistCmd = (iONode)NodeOp.base.clone(cmd);
+        __engine( loc, cmd );
+        MutexOp.post( data->muxEngine);
+        __checkConsist(loc, consistCmd, False);
+        __broadcastLocoProps( loc, NULL, consistCmd, NULL );
+      }
     }
 
     if( data->driver != NULL ) {
       if( event == swap_event ) {
-        iONode  cmd     = MsgOp.getUsrData(msg);
+        iONode  cmd     = (iONode)udata;
         Boolean swap    = (type & 0x01 ? True:False);
         Boolean consist = (type & 0x02 ? True:False);
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "swap event %d ms", timer );
-
-        /* The swap timer. */
-        if( timer > 0 )
-          ThreadOp.sleep( timer );
-
-        /* The swap: */
-        wLoc.setplacing( data->props, swap );
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "placing for [%s] set to [%s]", wLoc.getid(data->props), wLoc.isplacing( data->props )?"FWD":"REV" );
-        /* inform model to keep this setting in the occupancy file */
-        ModelOp.setBlockOccupancy( AppOp.getModel(), data->curBlock, wLoc.getid(data->props), False, wLoc.isplacing( data->props) ? 1:2, wLoc.isblockenterside( data->props) ? 1:2, NULL );
-
-        /* swap the block enter side flag to be able to use other direction routes */
-        LocOp.swapBlockEnterSide(loc, NULL);
-
-        if( !consist ) {
-          /* only swap if this command did not come from a multiple unit loop */
-          __swapConsist(loc, cmd);
-        }
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "swap event" );
+        __theSwap(loc, swap, consist, cmd);
       }
       else {
-        if( timer > 0 ) {
-          if( type == 0 && wLoc.getevttimer(data->props) > 0 ) {
-            timer = wLoc.getevttimer(data->props);
-            TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loc evttimer %d ms", timer );
-          }
-          else if( event == in_event ) {
-            TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loc evttimer %d ms * %d %%", timer, wLoc.getent2incorr(data->props) );
-            timer = timer * wLoc.getent2incorr(data->props) / 100;
-            if( timer < 1 )
-              timer = 1;
-          }
-          else {
-            TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loc evttimer %d ms", timer );
-          }
-          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "timed event[%d] %d ms", event, timer );
-          ThreadOp.sleep( timer );
+        if( event != -1 ) {
+          TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "inform the driver of event=%d nrruns=%d", event, data->nrruns );
         }
         data->driver->drive( data->driver, emitter, event );
+      }
+    }
+
+    if( ThreadOp.hasPost( th ) ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "more messages available..." );
+      if( data->gomanual || !wLoc.isusebbt(data->props) || data->drvSpeed == 0 || data->bbtEnterBlock == NULL) {
+        if( extraTick < 9 ) {
+          ThreadOp.sleep( RUNNERBBTTICK );
+          extraTick++;
+          continue;
+        }
       }
     }
 
@@ -1281,66 +2169,88 @@ static void __runner( void* threadinst ) {
 
     /* this is approximately a second */
     if( tick % 10 == 0 && tick != 0 ) {
-      if( data->drvSpeed > 0  ) {
-        data->runtime++;
-        wLoc.setruntime( data->props, data->runtime );
-      }
-
-      for( i = 0; i < 28; i++ ) {
-        if( data->fxtimer[i] > 0 ) {
-          data->fxtimer[i]--;
-          if( data->fxtimer[i] == 0 ) {
-            fncmd = __resetTimedFunction(loc, NULL, i);
-          }
-        }
-      }
-
-      if( fncmd == NULL && data->timedfn >= 0 && data->fntimer >= 0 ) {
-        data->fntimer--;
-        if( data->fntimer == 0 ) {
-          fncmd = __resetTimedFunction(loc, NULL, -1);
+      if( data->drvSpeed > 0 || (!data->go && wLoc.getV(data->props) > 0) ) {
+        if( !data->govirtual ) {
+          data->runtime++;
+          wLoc.setruntime( data->props, data->runtime );
         }
       }
       tick = 0;
+
+      if( StrOp.equals( wLoc.mode_auto, wLoc.getmode(data->props) ) ) {
+        if( data->govirtual && data->driver != NULL ) {
+          virtualtick++;
+          if( virtualtick >= wCtrl.getvirtualtimer( AppOp.getIniNode( wCtrl.name() ) ) ) {
+            virtualtick = 0;
+            if( !data->driver->stepvirtual(data->driver) ) {
+              /* Block type not supported. */
+              iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+              wLoc.setid( cmd, LocOp.getId(loc) );
+              wLoc.setcmd( cmd, wLoc.stop );
+              LocOp.cmd( loc, cmd );
+            }
+          }
+        }
+      }
+    }
+
+
+    fx = wLoc.getfx( data->props );
+    for( i = 0; i < 28; i++ ) {
+      if( ( i == 0 && data->fn0 && data->fxtimer[i] > 0 ) || ( i > 0 && (fx & (1 << (i-1))) && data->fxtimer[i] > 0 ) ) {
+        data->fxtimer[i]--;
+        if( data->fxtimer[i] == 0 ) {
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "reset timed function %d", i);
+          fncmd = __resetTimedFunction(loc, NULL, i);
+          break;
+        }
+      }
+    }
+
+    if( fncmd == NULL && data->timedfn >= 0 && data->fntimer >= 0 ) {
+      data->fntimer--;
+      if( data->fntimer == 0 ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "reset timed function %d", data->timedfn);
+        fncmd = __resetTimedFunction(loc, NULL, -1);
+      }
     }
 
 
     if( fncmd != NULL ) {
       wLoc.setV( fncmd, -1 );
       broadcast = (iONode)NodeOp.base.clone(fncmd);
-      __engine( loc, fncmd );
+      if( !MutexOp.trywait( data->muxEngine, 1000) ) {
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "loco %s engine blocked...", LocOp.getId( loc ) );
+        NodeOp.base.del(fncmd);
+      }
+      else {
+        __engine( loc, fncmd );
+        MutexOp.post(data->muxEngine);
+      }
 
       /* Broadcast to clients. */
-      wLoc.setid( broadcast, wLoc.getid( data->props ) );
-      wLoc.setdir( broadcast, wLoc.isdir( data->props ) );
-      wLoc.setaddr( broadcast, wLoc.getaddr( data->props ) );
-      wLoc.setV( broadcast, data->drvSpeed );
-      wLoc.setfn( broadcast, wLoc.isfn( data->props ) );
-      wLoc.setplacing( broadcast, wLoc.isplacing( data->props ) );
-      wLoc.setblockenterside( broadcast, wLoc.isblockenterside( data->props ) );
-      wLoc.setmode( broadcast, wLoc.getmode( data->props ) );
-      wLoc.setresumeauto( broadcast, wLoc.isresumeauto(data->props) );
-      wLoc.setmanual( broadcast, data->gomanual );
-      wLoc.setruntime( broadcast, wLoc.getruntime(data->props) );
-      wLoc.setmtime( broadcast, wLoc.getmtime(data->props) );
-      wLoc.setmint( broadcast, wLoc.getmint(data->props) );
-      wLoc.setthrottleid( broadcast, wLoc.getthrottleid(data->props) );
-      wLoc.setactive( broadcast, wLoc.isactive(data->props) );
-      if( data->driver != NULL ) {
-        wLoc.setscidx( broadcast, data->driver->getScheduleIdx( data->driver ) );
-      }
-      AppOp.broadcastEvent( broadcast );
+      __broadcastLocoProps( loc, NULL, broadcast, NULL );
     }
     else {
       /* call this function for updating velocity for unmanaged decoders */
-      __engine( loc, NULL );
+      if( !MutexOp.trywait( data->muxEngine, 1000) ) {
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "loco %s engine blocked...", LocOp.getId( loc ) );
+      }
+      else {
+        __engine( loc, NULL );
+        MutexOp.post( data->muxEngine);
+      }
     }
 
-
-    ThreadOp.sleep( 100 );
+    if( data->gomanual || !wLoc.isusebbt(data->props) || data->drvSpeed == 0 || data->bbtEnterBlock == NULL) {
+      ThreadOp.sleep( RUNNERTICK - extraTick * RUNNERBBTTICK);
+    }
+    extraTick = 0;
     tick++;
+
   } while( data->run && !ThreadOp.isQuit(th) );
 
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Runner for \"%s\" ended.", LocOp.getId( loc ) );
   data->running = False;
 }
 
@@ -1387,32 +2297,32 @@ static void __funEvent( iOLoc inst, const char* blockid, int evt, int timer ) {
 
     if( isonevent ) {
       TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "onevent[%s] evt[%d]", onevent, evt );
-      if( StrOp.equals( wFunDef.enter_block, onevent ) && evt == enter_event ||
-          StrOp.equals( wFunDef.in_block   , onevent ) && evt == in_event    ||
-          StrOp.equals( wFunDef.exit_block , onevent ) && evt == exit_event  ||
-          StrOp.equals( wFunDef.run        , onevent ) && evt == run_event
+      if( (StrOp.equals( wFunDef.enter_block, onevent ) && evt == enter_event) ||
+          (StrOp.equals( wFunDef.in_block   , onevent ) && evt == in_event)    ||
+          (StrOp.equals( wFunDef.exit_block , onevent ) && evt == exit_event)  ||
+          (StrOp.equals( wFunDef.run        , onevent ) && evt == run_event)
          ) {
         iONode cmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "On Event for funcion %d.", fn );
         wFunCmd.setid( cmd, LocOp.getId( inst ) );
-        __cpFn2Node(inst, cmd, -1);
-        __FnOnOff(inst, fn, True, cmd);
+        __cpFn2Node(inst, cmd, -1, 0);
+        __FnOnOff(inst, fn, True, cmd, True);
         LocOp.cmd( inst, cmd );
       }
     }
 
     if( isoffevent ) {
       TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "offevent[%s] evt[%d]", offevent, evt );
-      if( StrOp.equals( wFunDef.enter_block, offevent ) && evt == enter_event ||
-          StrOp.equals( wFunDef.in_block   , offevent ) && evt == in_event    ||
-          StrOp.equals( wFunDef.exit_block , offevent ) && evt == exit_event  ||
-          StrOp.equals( wFunDef.stall      , offevent ) && evt == stall_event
+      if( (StrOp.equals( wFunDef.enter_block, offevent ) && evt == enter_event) ||
+          (StrOp.equals( wFunDef.in_block   , offevent ) && evt == in_event)    ||
+          (StrOp.equals( wFunDef.exit_block , offevent ) && evt == exit_event)  ||
+          (StrOp.equals( wFunDef.stall      , offevent ) && evt == stall_event)
          ) {
         iONode cmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Off Event for funcion %d.", fn );
         wFunCmd.setid( cmd, LocOp.getId( inst ) );
-        __cpFn2Node(inst, cmd, -1);
-        __FnOnOff(inst, fn, False, cmd);
+        __cpFn2Node(inst, cmd, -1, 0);
+        __FnOnOff(inst, fn, False, cmd, True);
         LocOp.cmd( inst, cmd );
       }
     }
@@ -1432,8 +2342,8 @@ static void __funEvent( iOLoc inst, const char* blockid, int evt, int timer ) {
         iONode cmd = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Off Event for funcion %d.", data->timedfn );
         wFunCmd.setid( cmd, LocOp.getId( inst ) );
-        __cpFn2Node(inst, cmd, -1);
-        __FnOnOff(inst, data->timedfn, False, cmd);
+        __cpFn2Node(inst, cmd, -1, 0);
+        __FnOnOff(inst, data->timedfn, False, cmd, True);
         LocOp.cmd( inst, cmd );
         StrOp.free( data->fneventblock );
         data->fneventblock = NULL;
@@ -1443,17 +2353,109 @@ static void __funEvent( iOLoc inst, const char* blockid, int evt, int timer ) {
   }
 }
 
-static void _event( iOLoc inst, obj emitter, int evt, int timer, Boolean forcewait ) {
+static void _event( iOLoc inst, obj emitter, int evt, int timer, Boolean forcewait, const char* id ) {
   iOLocData data = Data(inst);
-
   iOMsg msg = MsgOp.inst( emitter, evt );
   iIBlockBase block = (iIBlockBase)MsgOp.getSender(msg);
-  const char* blockid = block->base.id( block );
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "event %d from [%s], timer=%d", evt, blockid, timer );
-  MsgOp.setTimer( msg, timer );
-  MsgOp.setUsrData( msg, NULL, forcewait ? 1000:0 );
-  ThreadOp.post( data->runner, (obj)msg );
-  __funEvent(inst, blockid, evt, timer);
+  const char* blockid = block!=NULL ? block->base.id( block ):"?";
+
+  data->curSensor = id;
+
+  if( emitter == (obj)data->driver ) {
+    __checkAction(inst, id, "");
+    return;
+  }
+
+  if( id != NULL && StrOp.len(id) > 0 && StrOp.equals("eventtimeout", id) ) {
+    __checkAction(inst, "eventtimeout", "" );
+  }
+
+  if( evt == enter_event && block != NULL && !StrOp.equals(blockid, data->sbtEnterBlock) ) {
+    iONode sbt = NULL;
+    char* key = NULL;
+
+    data->sbtEnterBlock = blockid;
+    /* default SBT */
+    data->sbtInterval   = wLoc.getV_step(data->props);
+    data->sbtDecelerate = wLoc.getdecelerate(data->props);
+
+    /* block/train related SBT */
+    if( LocOp.getTrain(inst) != NULL && StrOp.len(LocOp.getTrain(inst)) > 0 ) {
+      key = StrOp.fmt("%s-%s", blockid, LocOp.getTrain(inst));
+      if( MapOp.haskey(data->sbtMap, key ) ) {
+        sbt = (iONode)MapOp.get(data->sbtMap, key);
+      }
+    }
+
+    /* block related SBT */
+    if( sbt == NULL ) {
+      key = StrOp.fmt("%s", blockid);
+      if( MapOp.haskey(data->sbtMap, key ) ) {
+        sbt = (iONode)MapOp.get(data->sbtMap, blockid);
+      }
+    }
+
+    if( sbt != NULL ) {
+      data->sbtInterval   = wSBT.getinterval(sbt);
+      data->sbtDecelerate = wSBT.getdecelerate(sbt);
+    }
+
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "SBT enter block=%s interval=%d decelerate=%d key=%s train=%s",
+        data->sbtEnterBlock, data->sbtInterval, data->sbtDecelerate, key, LocOp.getTrain(inst) );
+    StrOp.free(key);
+  }
+
+  /* BBT timers */
+  data->bbtExternalStop = block->hasExtStop(block, NULL);
+  if( wLoc.isusebbt(data->props) && block != NULL && block->allowBBT(block) && !block->hasExtStop(block, NULL) ) {
+    if( evt == enter_event && (data->bbtEnter == 0 || !StrOp.equals(blockid, data->bbtEnterBlock) ) ) {
+      data->bbtEnterBlock = blockid;
+      data->bbtInBlock    = NULL;
+      data->bbtIn         = 0;
+      data->bbtAtMin      = 0;
+      data->bbtCycleSpeed = 0;
+      data->bbtInTimer    = 0;
+      data->bbtStepCount  = 0;
+      data->bbtAtMinSpeed = False;
+      data->bbtAtMin      = 0;
+      data->bbtEnter      = SystemOp.getTick();
+      data->bbtEnterSpeed = wLoc.getV( data->props );
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT enter=%ld block=%s", data->bbtEnter, data->bbtEnterBlock );
+    }
+    else if( evt == pre2in_event && wLoc.isinatpre2in(data->props) && data->bbtIn == 0 && data->bbtEnter > 0 ) {
+      data->bbtInBlock = blockid;
+      data->bbtIn = SystemOp.getTick();
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT pre2in=%ld block=%s", data->bbtIn, data->bbtInBlock );
+    }
+    else if( (evt == in_event || (evt == shortin_event && wLoc.isshortin(data->props) ) ) && data->bbtIn == 0 && data->bbtEnter > 0 && StrOp.equals(blockid, data->bbtEnterBlock) ) {
+      if( timer == 0 ) {
+        data->bbtInBlock = blockid;
+        data->bbtIn = SystemOp.getTick();
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT in=%ld block=%s", data->bbtIn, data->bbtInBlock );
+      }
+      else {
+        data->bbtInTimer = timer / 10;
+        if( data->bbtInTimer == 0 )
+          data->bbtInTimer++;
+      }
+    }
+  }
+  else if(evt == enter_event && block != NULL && !block->allowBBT(block) ) {
+    /* reset BBT */
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "BBT block=%s does not allow BBT", blockid );
+    LocOp.resetBBT(inst);
+  }
+
+  if( data->runner != NULL ) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+        "event %d from [%s], timer=%d, forcewait=%d nrruns=%d", evt, blockid, timer, forcewait, data->nrruns );
+    MsgOp.setTimer( msg, timer );
+    MsgOp.setUsrData( msg, NULL, forcewait ? 1000:0 );
+    ThreadOp.post( data->runner, (obj)msg );
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "event posted");
+    __funEvent(inst, blockid, evt, timer);
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "fun events checked");
+  }
 }
 
 
@@ -1465,10 +2467,197 @@ static const char* _getId( iOLoc inst ) {
   return wLoc.getid( data->props );
 }
 
+static const char* _getEngine( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  return wLoc.getengine( data->props );
+}
+
+
+static const char* _getTrain( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  return wLoc.gettrain(data->props);
+}
+
+
+static void _adjustAccel(iOLoc inst, int p_Accel, int weight) {
+  iOLocData data = Data(inst);
+  iONode cmd = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+  int accel = p_Accel;
+
+  if( accel == -1 ) {
+    float maxload = wLoc.getmaxload(data->props);
+    int accelmin = wLoc.getaccelmin(data->props);
+    int accelmax = wLoc.getaccelmax(data->props);
+    if( weight > 0 && maxload > 0 && accelmin > 0 && accelmax > 0 ) {
+      float faccel = accelmax - accelmin;
+      faccel /= maxload;
+      faccel *= weight;
+      faccel += accelmin;
+      accel = (int)faccel;
+    }
+    else {
+      accel = accelmin;
+    }
+  }
+
+  wProgram.setcmd( cmd, wProgram.set );
+  wProgram.setiid( cmd, wLoc.getiid(data->props) );
+  wProgram.setaddr( cmd, wLoc.getaddr(data->props) );
+  wProgram.setlongaddr( cmd, (wLoc.getaddr(data->props) > 127) ? True:False );
+  wProgram.setdecaddr( cmd, wLoc.getaddr(data->props) );
+  wProgram.setcv( cmd, 3 );
+  wProgram.setvalue( cmd, accel );
+  wProgram.setpom( cmd, True );
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco [%s] adjust acceleration: CV3=%d",
+      wLoc.getid(data->props), (int)accel );
+  ControlOp.cmd( AppOp.getControl(), cmd, NULL );
+
+
+  if( wLoc.getconsist(data->props) != NULL && StrOp.len(wLoc.getconsist(data->props)) > 0) {
+    iOStrTok  consist = StrTokOp.inst( wLoc.getconsist ( data->props ), ',' );
+    while( StrTokOp.hasMoreTokens( consist ) ) {
+      const char* tok = StrTokOp.nextToken( consist );
+      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok, NULL, False );
+      if( consistloc != NULL ) {
+        if( wLoc.isadjustaccel(LocOp.base.properties(consistloc)) && weight != -1 ) {
+          LocOp.adjustAccel(consistloc, -1, weight);
+        }
+      }
+    }
+    StrTokOp.base.del( consist );
+  }
+
+}
+
+
+static void __setCurBlock4Train(iOLoc inst, const char* id) {
+  iOLocData data = Data(inst);
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      OperatorOp.setLocality(train, id);
+    }
+  }
+}
+
+
+static Boolean __matchTrainIdent(iOLoc inst, const char* ident1, const char* ident2, const char* ident3, const char* ident4 ) {
+  iOLocData data = Data(inst);
+  Boolean match = False;
+
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      match = OperatorOp.matchIdent(train, ident1, ident2, ident3, ident4 );
+    }
+  }
+  return match;
+}
+
+
+static void __calcTrainLen(iOLoc inst, Boolean adjust) {
+  iOLocData data = Data(inst);
+  Boolean report = False;
+  int weight = -1;
+
+  wLoc.settrainlen( data->props, wLoc.getlen(data->props));
+
+  /* calculate train length */
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      wLoc.settrainlen( data->props, OperatorOp.getLen(train, &weight) + wLoc.getlen(data->props));
+      wLoc.settrainweight( data->props, weight );
+      report = True;
+
+      if( wLoc.isadjustaccel(data->props) && adjust) {
+        LocOp.adjustAccel(inst, -1, weight);
+      }
+    }
+  }
+
+  /* add consist locos */
+  if( wLoc.getconsist(data->props) != NULL && StrOp.len(wLoc.getconsist(data->props)) > 0) {
+    iOStrTok  consist = StrTokOp.inst( wLoc.getconsist ( data->props ), ',' );
+    while( StrTokOp.hasMoreTokens( consist ) ) {
+      const char* tok = StrTokOp.nextToken( consist );
+      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok, NULL, False );
+      if( consistloc != NULL ) {
+        wLoc.settrainlen( data->props, wLoc.gettrainlen(data->props) + LocOp.getLen(consistloc));
+        report = True;
+      }
+    }
+    StrTokOp.base.del( consist );
+  }
+
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "loco [%s] train length=%d weight=%d",
+      wLoc.getid(data->props), wLoc.gettrainlen(data->props), wLoc.gettrainweight(data->props) );
+}
+
+
 static int _getLen( iOLoc inst ) {
   iOLocData data = Data(inst);
+  __calcTrainLen(inst, False);
+  if( wLoc.gettrainlen( data->props ) > 0 )
+    return wLoc.gettrainlen( data->props );
   return wLoc.getlen( data->props );
 }
+
+
+static Boolean _isCommuter( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  Boolean commuter = wLoc.iscommuter(data->props);
+  if( !commuter && wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      commuter = OperatorOp.isCommuter(train);
+    }
+  }
+  return commuter;
+}
+
+
+static const char* _getCargo( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  const char* cargo = wLoc.getcargo(data->props);
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      cargo = OperatorOp.getCargo(train);
+    }
+  }
+  return cargo;
+}
+
+
+static const char* _getClass( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  const char* l_class = wLoc.getclass(data->props);
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      const char* o_class = OperatorOp.getClass(train);
+      if( o_class != NULL && StrOp.len(o_class) > 0 )
+        l_class = o_class;
+    }
+  }
+  return l_class;
+}
+
+
+static Boolean _hasClass( iOLoc inst, const char* class ) {
+  iOLocData data = Data(inst);
+  const char* l_class = wLoc.getclass(data->props);
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      l_class = OperatorOp.getClass(train);
+    }
+  }
+  return StrOp.find(l_class, class) != NULL ? True:False;
+}
+
 
 static void* _getProperties( void* inst ) {
   iOLocData data = Data((iOLoc)inst);
@@ -1520,81 +2709,99 @@ static void _setCurBlock( iOLoc inst, const char* id ) {
     }
   }
 
-  if( data->curBlock != NULL && StrOp.len(data->curBlock) > 0 && !StrOp.equals(id, data->curBlock) || data->prevBlock == NULL ) {
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "set previous block to [%s]", data->curBlock == NULL ? "":data->curBlock );
+  if( (data->curBlock != NULL && StrOp.len(data->curBlock) > 0 && !StrOp.equals(id, data->curBlock)) || data->prevBlock == NULL ) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+        "set previous block to [%s], new to [%s]", data->curBlock == NULL ? "-":data->curBlock, id==NULL ? "-":id );
     data->prevBlock = data->curBlock;
   }
   data->curBlock = id;
+  __setCurBlock4Train(inst, data->curBlock);
+
+  if( id != NULL && !StrOp.equals(id, wLoc.getblockid(data->props) ) )
+    wLoc.setfifotop(data->props, False);
+
+  wLoc.setblockid( data->props, id==NULL?"":id );
+  wLoc.setblockenterid(data->props, "");
 
   if( data->driver != NULL )
     data->driver->curblock( data->driver, id );
 
   /* Broadcast to clients. */
-  {
-    iONode node = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-    wLoc.setid( node, wLoc.getid( data->props ) );
-    wLoc.setaddr( node, wLoc.getaddr( data->props ) );
-    wLoc.setdir( node, wLoc.isdir( data->props ) );
-    wLoc.setfn( node, wLoc.isfn( data->props ) );
-    wLoc.setV( node, data->drvSpeed );
-    wLoc.setplacing( node, wLoc.isplacing( data->props ) );
-    wLoc.setblockenterside( node, wLoc.isblockenterside( data->props ) );
-    wLoc.setmode( node, wLoc.getmode( data->props ) );
-    wLoc.setresumeauto( node, wLoc.isresumeauto(data->props) );
-    wLoc.setmanual( node, data->gomanual );
-    wLoc.setblockid( node, data->curBlock );
-    wLoc.setdestblockid( node, data->destBlock );
-    wLoc.setruntime( node, wLoc.getruntime(data->props) );
-    wLoc.setmtime( node, wLoc.getmtime(data->props) );
-    wLoc.setmint( node, wLoc.getmint(data->props) );
-    wLoc.setthrottleid( node, wLoc.getthrottleid(data->props) );
-    wLoc.setactive( node, wLoc.isactive(data->props) );
-    if( data->driver != NULL ) {
-      wLoc.setscidx( node, data->driver->getScheduleIdx( data->driver ) );
-    }
-
-    AppOp.broadcastEvent( node );
-  }
+  __broadcastLocoProps( inst, NULL, NULL, NULL );
 }
 
 static void _informBlock( iOLoc inst, const char* destid, const char* curid ) {
   iOLocData data = Data(inst);
-  iONode node = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
   data->destBlock = destid;
   data->curBlock  = curid;
-  /* Broadcast to clients. */
-  wLoc.setid( node, wLoc.getid( data->props ) );
-  wLoc.setaddr( node, wLoc.getaddr( data->props ) );
-  wLoc.setdir( node, wLoc.isdir( data->props ) );
-  wLoc.setfn( node, wLoc.isfn( data->props ) );
-  wLoc.setV( node, data->drvSpeed );
-  wLoc.setplacing( node, wLoc.isplacing( data->props ) );
-  wLoc.setblockenterside( node, wLoc.isblockenterside( data->props ) );
-  wLoc.setmode( node, wLoc.getmode( data->props ) );
-  wLoc.setresumeauto( node, wLoc.isresumeauto(data->props) );
-  wLoc.setmanual( node, data->gomanual );
-  wLoc.setdestblockid( node, destid );
-  wLoc.setruntime( node, wLoc.getruntime(data->props) );
-  wLoc.setmtime( node, wLoc.getmtime(data->props) );
-  wLoc.setmint( node, wLoc.getmint(data->props) );
-  wLoc.setthrottleid( node, wLoc.getthrottleid(data->props) );
-  wLoc.setblockid( node, curid );
-  wLoc.setactive( node, wLoc.isactive(data->props) );
-  if( data->driver != NULL ) {
-    wLoc.setscidx( node, data->driver->getScheduleIdx( data->driver ) );
-  }
-  AppOp.broadcastEvent( node );
+  __broadcastLocoProps( inst, NULL, NULL, NULL );
 }
 
 static void _gotoBlock( iOLoc inst, const char* id ) {
   iOLocData data = Data(inst);
   iIBlockBase block = ModelOp.getBlock( AppOp.getModel(), id );
+  iOLocation location = ModelOp.getLocation( AppOp.getModel(), id );
+
   if( block != NULL ) {
     data->gotoBlock = block->base.id(block);
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco [%s] goto block [%s]", LocOp.getId(inst), data->gotoBlock );
     if( data->driver != NULL )
       data->driver->gotoblock( data->driver, data->gotoBlock );
   }
+  else if( location != NULL ) {
+    data->gotoBlock = location->base.id(location);
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco [%s] goto location [%s]", LocOp.getId(inst), data->gotoBlock );
+    if( data->driver != NULL )
+      data->driver->gotoblock( data->driver, data->gotoBlock );
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "loco [%s] goto block/location [%s] not found", LocOp.getId(inst), id );
+  }
 }
+
+
+static const char* _getNextGotoBlock( iOLoc inst, const char* prevblockid ) {
+  iOLocData data = Data(inst);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "next goto block; prev=[%s]", prevblockid==NULL?"":prevblockid );
+  if( data->blocktrip != NULL ) {
+    iIBlockBase block = NULL;
+    iOStrTok tok = StrTokOp.inst( data->blocktrip, ',' );
+    while( StrTokOp.hasMoreTokens( tok ) ) {
+      const char* bkid = StrTokOp.nextToken( tok );
+
+      if( prevblockid == NULL ) {
+        block = ModelOp.getBlock( AppOp.getModel(), bkid );
+        if( block != NULL ) {
+          data->gotoBlock = block->base.id(block);
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "first goto block [%s]", data->gotoBlock );
+          return data->gotoBlock;
+        }
+        break;
+      }
+      else if( StrOp.equals(bkid, prevblockid) && StrTokOp.hasMoreTokens( tok ) ) {
+        bkid = StrTokOp.nextToken( tok );
+        block = ModelOp.getBlock( AppOp.getModel(), bkid );
+        if( block != NULL ) {
+          data->gotoBlock = block->base.id(block);
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "next goto block [%s] prev=[%s]", data->gotoBlock, prevblockid );
+          return data->gotoBlock;
+        }
+        break;
+      }
+    }
+
+    /* end of block trip */
+    if( !StrTokOp.hasMoreTokens( tok ) ) {
+      StrOp.free(data->blocktrip);
+      data->blocktrip = NULL;
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "end of block trip" );
+    }
+
+    StrTokOp.base.del(tok);
+  }
+  return NULL;
+}
+
 
 static void _useSchedule( iOLoc inst, const char* id ) {
   iOLocData data = Data(inst);
@@ -1602,8 +2809,21 @@ static void _useSchedule( iOLoc inst, const char* id ) {
     iONode schedule = ModelOp.getSchedule( AppOp.getModel(), id );
     if( schedule != NULL )
       data->driver->useschedule( data->driver, wSchedule.getid(schedule) );
+    else {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Schedule [%s] not found; try for tour...", id );
+      LocOp.useTour(inst, id);
+    }
+  }
+}
+
+static void _useTour( iOLoc inst, const char* id ) {
+  iOLocData data = Data(inst);
+  if( data->driver != NULL ) {
+    iONode tour = ModelOp.getTour( AppOp.getModel(), id );
+    if( tour != NULL )
+      data->driver->usetour( data->driver, wTour.getid(tour) );
     else
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Schedule [%s] not found!", id );
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Tour [%s] not found!", id );
   }
 }
 
@@ -1621,35 +2841,29 @@ static const char* _getSchedule( iOLoc inst, int* scidx ) {
 }
 
 
-static void _setMode( iOLoc inst, const char* mode ) {
+static const char* _getTour( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  if( data->driver != NULL ) {
+    const char* tour = data->driver->gettour( data->driver );
+    if( tour != NULL ) {
+      return tour;
+    }
+  }
+  return "";
+}
+
+
+static void _setMode( iOLoc inst, const char* mode, const char* reason ) {
   iOLocData data = Data(inst);
 
   /* Only take over the new mode if it is different; Broadcast to clients. */
   if( !StrOp.equals( wLoc.getmode(data->props), mode ) ) {
-    iONode node = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+        "Loco [%s] mode=%s prevmode=%s reason=%s", LocOp.getId(inst), mode, wLoc.getmode(data->props), reason );
     wLoc.setmode(data->props, mode);
+    wLoc.setmodereason(data->props, reason);
 
-    wLoc.setid( node, wLoc.getid( data->props ) );
-    wLoc.setaddr( node, wLoc.getaddr( data->props ) );
-    wLoc.setdir( node, wLoc.isdir( data->props ) );
-    wLoc.setfn( node, wLoc.isfn( data->props ) );
-    wLoc.setV( node, data->drvSpeed );
-    wLoc.setplacing( node, wLoc.isplacing( data->props ) );
-    wLoc.setblockenterside( node, wLoc.isblockenterside( data->props ) );
-    wLoc.setmode( node, wLoc.getmode( data->props ) );
-    wLoc.setresumeauto( node, wLoc.isresumeauto(data->props) );
-    wLoc.setmanual( node, data->gomanual );
-    wLoc.setblockid( node, data->curBlock );
-    wLoc.setruntime( node, wLoc.getruntime(data->props) );
-    wLoc.setmtime( node, wLoc.getmtime(data->props) );
-    wLoc.setmint( node, wLoc.getmint(data->props) );
-    wLoc.setthrottleid( node, wLoc.getthrottleid(data->props) );
-    wLoc.setactive( node, wLoc.isactive(data->props) );
-    if( data->driver != NULL ) {
-      wLoc.setscidx( node, data->driver->getScheduleIdx( data->driver ) );
-    }
-
-    AppOp.broadcastEvent( node );
+    __broadcastLocoProps( inst, NULL, NULL, NULL );
   }
 }
 
@@ -1657,15 +2871,18 @@ static void _goNet( iOLoc inst, const char* curblock, const char* nextblock, con
   iOLocData data = Data(inst);
   wLoc.setresumeauto( data->props, False);
   data->curBlock = StrOp.dup(curblock); /* make a copy before it is freed up */
+  __setCurBlock4Train(inst, data->curBlock);
   data->goNet = True; /* signal that the current block is from the net */
   data->go = True;
-  data->gomanual = False;
+  data->released = False;
+  data->gomanual = (data->manual?True:False);
   if( data->driver != NULL )
     data->driver->goNet( data->driver, data->gomanual, curblock, nextblock, nextroute );
 }
 
 static Boolean _go( iOLoc inst ) {
   iOLocData data = Data(inst);
+  iOModel model = AppOp.getModel(  );
 
   if( data->driver != NULL && data->driver->isRun( data->driver ) ) {
     TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "Loco [%s] is already running in auto mode; reset wait.", LocOp.getId(inst) );
@@ -1676,13 +2893,30 @@ static Boolean _go( iOLoc inst ) {
   wLoc.setresumeauto( data->props, False);
   if( wLoc.isactive(data->props)) {
     if( data->curBlock != NULL && StrOp.len(data->curBlock) > 0 && ModelOp.isAuto( AppOp.getModel() ) ) {
-      data->go = True;
-      data->gomanual = False;
-      if( data->driver != NULL )
-        data->driver->go( data->driver, data->gomanual );
+      iIBlockBase block = ModelOp.getBlock( model, data->curBlock );
+      if( block != NULL ) {
+        if( StrOp.equals( wStage.name(), NodeOp.getName(block->base.properties(block)) ) &&
+            !block->isDepartureAllowed( block, wLoc.getid(data->props), False ) )
+        {
+          /* Staging block will manage this loco. */
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+              "not starting loco [%s] because it is managed by staging block %s.", LocOp.getId(inst), data->curBlock );
+          return False;
+        }
+
+        data->go = True;
+        data->released = False;
+        data->govirtual = False;
+        data->gomanual = (data->manual?True:False);
+        if( data->driver != NULL )
+          data->driver->go( data->driver, data->gomanual );
+
+      }
     }
     else {
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Loco [%s] cannot be started because it is not in a block.", LocOp.getId(inst) );
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+          "Loco [%s] cannot be started because %s.",
+          LocOp.getId(inst), ModelOp.isAuto( AppOp.getModel() )?"it is not in a block":"auto mode is disabled" );
       return False;
     }
   }
@@ -1690,6 +2924,7 @@ static Boolean _go( iOLoc inst ) {
     TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Loco [%s] is deactivated.", LocOp.getId(inst) );
     return False;
   }
+  LocOp.resetBBT(inst);
   return True;
 }
 
@@ -1701,8 +2936,13 @@ static void _stop( iOLoc inst, Boolean resume ) {
   }
 
   data->go = False;
+  data->released = False;
+
   if( data->driver != NULL )
     data->driver->stop( data->driver );
+
+  __checkAction(inst, "stop", "");
+
 }
 
 static void _stopNet( iOLoc inst ) {
@@ -1750,16 +2990,44 @@ static void _reset( iOLoc inst, Boolean saveCurBlock ) {
   data->in    = False;
   data->exit  = False;
   data->out   = False;
+
+  LocOp.resetBBT(inst);
+
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-      "reset [%s] in block [%s]", LocOp.getId(inst), data->curBlock==NULL?"?":data->curBlock );
+      "reset [%s] in current block [%s]%s",
+      LocOp.getId(inst), data->curBlock==NULL?"?":data->curBlock, saveCurBlock?" (save current block)":"" );
+
+  if( !saveCurBlock ) {
+    wLoc.setblockid(data->props, "");
+    wLoc.setscidx(data->props, -1);
+    data->curBlock = NULL;
+    __setCurBlock4Train(inst, data->curBlock);
+
+    if( data->driver != NULL )
+      data->driver->useschedule(data->driver, NULL);
+  }
+
+  if( data->blocktrip != NULL ) {
+    StrOp.free(data->blocktrip);
+    data->blocktrip = NULL;
+  }
+
+  data->destBlock = NULL;
+  wLoc.setdestblockid(data->props, "");
+
   if( data->driver != NULL )
     data->driver->reset( data->driver, saveCurBlock );
+
+  /* Broadcast to clients. */
+  AppOp.broadcastEvent( (iONode)NodeOp.base.clone( data->props ) );
+
 }
 
 static void __stopgo( iOLoc inst ) {
   iOLocData data = Data(inst);
   data->go = !data->go;
-  data->gomanual = False;
+  data->gomanual = (data->manual?True:False);
+  data->govirtual = False;
   if( data->go )
     _go( inst );
   else
@@ -1767,12 +3035,48 @@ static void __stopgo( iOLoc inst ) {
 }
 
 
-static void __gomanual( iOLoc inst ) {
+static Boolean _gomanual( iOLoc inst ) {
   iOLocData data = Data(inst);
-  data->go = True;
-  data->gomanual = True;
-  if( data->driver != NULL )
-    data->driver->go( data->driver, data->gomanual );
+  iOModel model = AppOp.getModel();
+  if( data->curBlock != NULL && StrOp.len(data->curBlock) > 0 && ModelOp.isAuto( AppOp.getModel() ) ) {
+    iIBlockBase block = ModelOp.getBlock( model, data->curBlock );
+    if( block != NULL ) {
+      data->go = True;
+      data->gomanual = True;
+      data->govirtual = False;
+      data->released = False;
+      if( data->driver != NULL )
+        data->driver->go( data->driver, data->gomanual );
+      return True;
+    }
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Loco [%s] cannot be started because it is not in a block.", LocOp.getId(inst) );
+  }
+  return False;
+}
+
+
+static Boolean _govirtual( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  iOModel model = AppOp.getModel();
+  if( data->curBlock != NULL && StrOp.len(data->curBlock) > 0 && ModelOp.isAuto( AppOp.getModel() ) ) {
+    iIBlockBase block = ModelOp.getBlock( model, data->curBlock );
+    if( block != NULL ) {
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Loco [%s] start virtual in block %s.", LocOp.getId(inst), block->base.id(block) );
+      data->go = True;
+      data->gomanual = (data->manual?True:False);
+      data->govirtual = True;
+      data->released = False;
+      if( data->driver != NULL )
+        data->driver->go( data->driver, data->gomanual );
+      return True;
+    }
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Loco [%s] cannot be started because it is not in a block.", LocOp.getId(inst) );
+  }
+  return False;
 }
 
 
@@ -1792,6 +3096,17 @@ static void __checkConsist( iOLoc inst, iONode nodeA, Boolean byEvent ) {
     return;
   }
 
+  /* check train and send a copy of the nodeA */
+  if( nodeA != NULL && StrOp.len( wLoc.gettrain(data->props) ) > 0 ) {
+    iOOperator opr = ModelOp.getOperator( AppOp.getModel(), wLoc.gettrain(data->props) );
+    if( opr != NULL ) {
+      iONode consistcmd = (iONode)NodeOp.base.clone( nodeA );
+      wLoc.setconsistcmd( consistcmd, True );
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "send command to the operator" );
+      OperatorOp.cmd(opr, (iONode)NodeOp.base.clone( consistcmd ));
+    }
+  }
+
   /* check consist and send a copy of the nodeA */
   if( nodeA != NULL && StrOp.len( wLoc.getconsist(data->props) ) > 0 ) {
     iOStrTok  consist = StrTokOp.inst( wLoc.getconsist ( data->props ), ',' );
@@ -1800,13 +3115,17 @@ static void __checkConsist( iOLoc inst, iONode nodeA, Boolean byEvent ) {
 
     while( StrTokOp.hasMoreTokens( consist ) ) {
       const char* tok = StrTokOp.nextToken( consist );
-      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok );
-      if( consistloc != NULL ) {
+      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok, NULL, False );
+      if( consistloc != NULL && consistloc != inst ) {
         iONode consistcmd = (iONode)NodeOp.base.clone( nodeA );
 
         /* check consist details */
         if( wLoc.isconsist_lightsoff(data->props) ) {
           wLoc.setfn( consistcmd, False );
+        }
+        else {
+          if( !wLoc.isconsist_synclights(data->props) )
+            wLoc.setignorefn(consistcmd, True);
         }
 
         wLoc.setconsistcmd( consistcmd, True );
@@ -1816,7 +3135,18 @@ static void __checkConsist( iOLoc inst, iONode nodeA, Boolean byEvent ) {
           wLoc.setV(consistcmd, V);
         }
 
-        LocOp.cmd( consistloc, consistcmd );
+        if( StrOp.equals(wFunCmd.name(), NodeOp.getName(consistcmd) ) ) {
+          if( wLoc.isconsist_syncfun( data->props ) ) {
+            int fchg = wFunCmd.getfnchanged( consistcmd );
+            int fmap = wLoc.getconsist_syncfunmap( data->props );
+            if( fchg > 0 && (fmap & 1 << (fchg-1) )  )
+              LocOp.cmd( consistloc, consistcmd );
+          }
+        }
+        else if( StrOp.equals(wLoc.name(), NodeOp.getName(consistcmd) ) ) {
+          LocOp.cmd( consistloc, consistcmd );
+        }
+
       }
       else {
         TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "consist loco [%s] not found", tok );
@@ -1838,9 +3168,9 @@ static void __swapConsist( iOLoc inst, iONode cmd ) {
 
     while( StrTokOp.hasMoreTokens( consist ) ) {
       const char* tok = StrTokOp.nextToken( consist );
-      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok );
+      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok, NULL, False );
       if( consistloc != NULL ) {
-        LocOp.swapPlacing( consistloc, cmd, True );
+        LocOp.swapPlacing( consistloc, cmd, True, False );
       }
       else {
         TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "consist loco [%s] not found", tok );
@@ -1849,21 +3179,81 @@ static void __swapConsist( iOLoc inst, iONode cmd ) {
     StrTokOp.base.del( consist );
   }
 
+  /* check train and send a copy of the nodeA */
+  if( StrOp.len( wLoc.gettrain(data->props) ) > 0 ) {
+    iOOperator opr = ModelOp.getOperator( AppOp.getModel(), wLoc.gettrain(data->props) );
+    if( opr != NULL ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "send swap command to the operator" );
+      OperatorOp.swapPlacing( opr, cmd );
+    }
+  }
+
+
+
 }
+
 
 static Boolean _cmd( iOLoc inst, iONode nodeA ) {
   iOLocData data = Data(inst);
   iOControl control = AppOp.getControl(  );
-  iONode nodeF = NULL;
 
   iOModel model = AppOp.getModel(  );
 
   const char* nodename = NodeOp.getName( nodeA );
   const char* cmd  = wLoc.getcmd( nodeA );
 
+  if( !data->run ) {
+    NodeOp.base.del(nodeA);
+    return False;
+  }
+
+  if( !MutexOp.trywait( data->muxCmd, 100 ) ) {
+    char* cmdStr = NodeOp.base.toString(nodeA);
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "timeout on loco command mutex: [%s] [%s:%s]\n%s", wLoc.getid(data->props), nodename, cmd, cmdStr );
+    StrOp.free(cmdStr);
+    NodeOp.base.del(nodeA);
+    return False;
+  }
+
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "%scommand %s:%s for loco %s",
+      wLoc.isconsistcmd(nodeA)?"consist ":"", nodename, (cmd==NULL?"-":cmd), wLoc.getid( data->props ) );
+
+  if( !wLoc.isconsistcmd( nodeA ) && wCtrl.isredirecttomaster(AppOp.getIniNode(wCtrl.name())) ) {
+    iOLoc master = ModelOp.getMasterLoc(model, wLoc.getid( data->props ));
+
+    if( master != NULL && StrOp.equals(wLoc.name(), nodename ) ) {
+      iOLoc slave  = ModelOp.getMasterLoc(model, LocOp.getId(master) );
+      if( slave != inst ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "redirecting command %s:%s from %s to master %s",
+            nodename, (cmd==NULL?"-":cmd), wLoc.getid( data->props ), LocOp.getId(master) );
+        wLoc.setignorefn(nodeA, True);
+        MutexOp.post( data->muxCmd );
+        LocOp.cmd(master, nodeA);
+        return True;
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "rejecting command %s:%s from %s to master %s -> master/slave loop!",
+            nodename, (cmd==NULL?"-":cmd), wLoc.getid( data->props ), LocOp.getId(master) );
+      }
+    }
+  }
+
+  if( StrOp.equals(wBinStateCmd.name(), nodename ) ) {
+    wBinStateCmd.setid(nodeA, wLoc.getid(data->props) );
+    wBinStateCmd.setbus(nodeA, wLoc.getbus(data->props) );
+    wBinStateCmd.setaddr(nodeA, wLoc.getaddr(data->props) );
+    ControlOp.cmd( control, nodeA, NULL );
+    MutexOp.post( data->muxCmd );
+    return True;
+  }
+
+  if( StrOp.equals(wLoc.name(), nodename ) && wLoc.isignorefn(nodeA) ) {
+    wLoc.setfn(nodeA, data->fn0);
+  }
+
   if( wCtrl.isdisablesteal( AppOp.getIniNode( wCtrl.name() ) ) ) {
     if( wLoc.getthrottleid( nodeA ) != NULL && StrOp.len(wLoc.getthrottleid( nodeA)) > 0 ) {
-      if( wLoc.getthrottleid( data->props ) != NULL && StrOp.len(wLoc.getthrottleid( data->props)) > 0 ) {
+      if( wLoc.getthrottleid( data->props ) != NULL && StrOp.len(wLoc.getthrottleid( data->props)) > 0 && !StrOp.equals(wLoc.getthrottleid( data->props), "0") ) {
         if( !StrOp.equals(wLoc.getthrottleid( data->props ), wLoc.getthrottleid( nodeA)) ) {
           TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
               "cmd from %s rejected because this loco is already controlled by %s",
@@ -1871,13 +3261,18 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
               wLoc.getthrottleid( data->props )
               );
           NodeOp.base.del(nodeA);
+          MutexOp.post( data->muxCmd );
           return False;
         }
       }
     }
   }
 
-  wLoc.setthrottleid( data->props, wLoc.getthrottleid(nodeA) );
+  if( StrOp.equals(wLoc.name(), nodename ) && wLoc.getthrottleid(nodeA) != NULL && StrOp.len(wLoc.getthrottleid(nodeA)) > 0 )
+    wLoc.setthrottleid( data->props, wLoc.getthrottleid(nodeA) );
+  else
+    wLoc.setthrottleid( data->props, "" );
+
 
   if( TraceOp.getLevel(NULL) & TRCLEVEL_USER1 ) {
     char* cmdstr = NodeOp.base.toString( nodeA );
@@ -1887,15 +3282,20 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
 
   if( cmd != NULL && !StrOp.equals( wLoc.direction, cmd )  && !StrOp.equals( wLoc.velocity, cmd ) && !StrOp.equals( wLoc.dirfun, cmd ) ) {
     Boolean broadcast = False;
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "cmd \"%s\" for %s.",
-                   cmd, LocOp.getId( inst ) );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "processing cmd=\"%s\" for [%s]",  cmd, LocOp.getId( inst ) );
+
+    /* Reset saved speed. */
+    data->savedSpeed = 0;
 
     if( ModelOp.isAuto( AppOp.getModel() ) ) {
       if( StrOp.equals( wLoc.go, cmd ) ) {
         _go( inst );
       }
       else if( StrOp.equals( wLoc.gomanual, cmd ) ) {
-        __gomanual( inst );
+        _gomanual( inst );
+      }
+      else if( StrOp.equals( wLoc.govirtual, cmd ) ) {
+        _govirtual( inst );
       }
       else if( StrOp.equals( wLoc.stopgo, cmd ) ) {
         __stopgo( inst );
@@ -1908,6 +3308,7 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
                      "Ignoring go commands for %s when not in AutoMode!",
                       LocOp.getId( inst ) );
         nodeA->base.del(nodeA);
+        MutexOp.post( data->muxCmd );
         return False;
       }
     }
@@ -1918,8 +3319,18 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
       LocOp.resetPrevBlock(inst);
     }
     else if( StrOp.equals( wLoc.reset, cmd ) ) {
+      MutexOp.post( data->muxCmd );
       _reset( inst, False );
       LocOp.resetPrevBlock(inst);
+      nodeA->base.del(nodeA);
+      return True;
+    }
+    else if( StrOp.equals( wLoc.softreset, cmd ) ) {
+      MutexOp.post( data->muxCmd );
+      _reset( inst, True );
+      LocOp.resetPrevBlock(inst);
+      nodeA->base.del(nodeA);
+      return True;
     }
     else if( StrOp.equals( wLoc.activate, cmd ) ) {
       wLoc.setactive(data->props, True);
@@ -1930,7 +3341,7 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
       broadcast = True;
     }
     else if( StrOp.equals( wLoc.swap, cmd ) ) {
-      LocOp.swapPlacing(inst, nodeA, False);
+      LocOp.swapPlacing(inst, nodeA, False, False);
       broadcast = True;
     }
     else if( StrOp.equals( wLoc.blockside, cmd ) ) {
@@ -1947,29 +3358,122 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
     else if( StrOp.equals( wLoc.brake, cmd ) ) {
       _brake( inst );
     }
+    else if( StrOp.equals( wLoc.classset, cmd ) ) {
+      LocOp.setClass(inst, wLoc.getclass(nodeA));
+    }
+    else if( StrOp.equals( wLoc.classadd, cmd ) ) {
+      char* newclass = NULL;
+      Boolean isNew = True;
+
+      iOStrTok tok = StrTokOp.inst(wLoc.getclass(data->props), ',');
+      while( StrTokOp.hasMoreTokens(tok) ) {
+        const char* c = StrTokOp.nextToken(tok);
+        if( StrOp.equals(c, wLoc.getclass(nodeA)) ) {
+          isNew = False;
+          break;
+        }
+      }
+      StrTokOp.base.del(tok);
+
+      if( isNew ) {
+        if( StrOp.len(wLoc.getclass(data->props)) > 0 )
+          newclass = StrOp.fmt("%s,%s", wLoc.getclass(data->props), wBlock.getclass(nodeA));
+        else
+          newclass = StrOp.fmt("%s", wLoc.getclass(nodeA));
+        LocOp.setClass(inst, newclass);
+        StrOp.free(newclass);
+      }
+    }
+    else if( StrOp.equals( wLoc.classdel, cmd ) ) {
+      char* newclass = NULL;
+      int idx = 0;
+      iOStrTok tok = StrTokOp.inst(wLoc.getclass(data->props), ',');
+      while( StrTokOp.hasMoreTokens(tok) ) {
+        const char* c = StrTokOp.nextToken(tok);
+        if( StrOp.equals(c, wLoc.getclass(nodeA)) )
+          continue;
+        if( idx > 0 )
+          newclass = StrOp.cat(newclass, ",");
+        newclass = StrOp.cat(newclass, c);
+        idx++;
+      }
+      LocOp.setClass(inst, newclass);
+      StrOp.free(newclass);
+    }
     else if( StrOp.equals( wLoc.gotoblock, cmd ) ) {
       const char* blockid = wLoc.getblockid( nodeA );
-      LocOp.gotoBlock( inst, blockid );
+
+      if( data->blocktrip != NULL ) {
+        /* end of block trip */
+        data->blocktrip = StrOp.cat(data->blocktrip, ",");
+        data->blocktrip = StrOp.cat(data->blocktrip, blockid);
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "block trip end = [%s]", data->blocktrip);
+        LocOp.gotoBlock( inst, LocOp.getNextGotoBlock(inst, NULL) );
+      }
+      else {
+        LocOp.gotoBlock( inst, blockid );
+      }
+    }
+    else if( StrOp.equals( wLoc.addblock2trip, cmd ) ) {
+      const char* blockid = wLoc.getblockid( nodeA );
+      if( data->blocktrip == NULL )
+        data->blocktrip = StrOp.dup(blockid);
+      else {
+        data->blocktrip = StrOp.cat(data->blocktrip, ",");
+        data->blocktrip = StrOp.cat(data->blocktrip, blockid);
+      }
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "block trip = [%s]", data->blocktrip);
     }
     else if( StrOp.equals( wLoc.useschedule, cmd ) ) {
       const char* scheduleid = wLoc.getscheduleid( nodeA );
       LocOp.useSchedule( inst, scheduleid );
     }
+    else if( StrOp.equals( wLoc.usetour, cmd ) ) {
+      const char* tourid = wLoc.gettourid( nodeA );
+      LocOp.useTour( inst, tourid );
+    }
+    else if( StrOp.equals( wLoc.shuntingon, cmd ) || StrOp.equals( wLoc.shuntingoff, cmd ) ) {
+      iONode cmdNode = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      wLoc.setid( cmdNode, wLoc.getid(data->props) );
+      wLoc.setaddr( cmdNode, wLoc.getaddr(data->props) );
+      wLoc.setprot( cmdNode, wLoc.getprot( data->props ) );
+      wLoc.setprotver( cmdNode, wLoc.getprotver( data->props ) );
+      wLoc.setspcnt( cmdNode, wLoc.getspcnt( data->props ) );
+      wLoc.setfncnt( cmdNode, wLoc.getfncnt( data->props ) );
+      wLoc.setcmd( cmdNode, cmd );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "send %s", cmd );
+      ControlOp.cmd( control, cmdNode, NULL );
+    }
+    else if( StrOp.equals( wLoc.manualon, cmd ) || StrOp.equals( wLoc.manualoff, cmd ) ) {
+      iONode cmdNode = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      wLoc.setid( cmdNode, wLoc.getid(data->props) );
+      wLoc.setaddr( cmdNode, wLoc.getaddr(data->props) );
+      wLoc.setprot( cmdNode, wLoc.getprot( data->props ) );
+      wLoc.setprotver( cmdNode, wLoc.getprotver( data->props ) );
+      wLoc.setspcnt( cmdNode, wLoc.getspcnt( data->props ) );
+      wLoc.setfncnt( cmdNode, wLoc.getfncnt( data->props ) );
+      wLoc.setcmd( cmdNode, cmd );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "send %s", cmd );
+      ControlOp.cmd( control, cmdNode, NULL );
+    }
     else if( StrOp.equals( wLoc.shortid, cmd ) ) {
       /* send short ID to command station */
-      if( wLoc.isuseshortid(data->props) && wLoc.getshortid(data->props) != NULL &&
-          StrOp.len(wLoc.getshortid(data->props)) > 0 )
+      if( wLoc.isuseshortid(data->props) )
       {
         iONode cmdNode = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
         wLoc.setid( cmdNode, wLoc.getid(data->props) );
         wLoc.setaddr( cmdNode, wLoc.getaddr(data->props) );
-        wLoc.setshortid( cmdNode, wLoc.getshortid(data->props) );
+        if( wLoc.getshortid(data->props) != NULL && StrOp.len(wLoc.getshortid(data->props)) > 0 )
+          wLoc.setshortid( cmdNode, wLoc.getshortid(data->props) );
+        else
+          wLoc.setshortid( cmdNode, wLoc.getid(data->props) );
         wLoc.setthrottlenr( cmdNode, wLoc.getthrottlenr(data->props) );
         wLoc.setprot( cmdNode, wLoc.getprot( data->props ) );
         wLoc.setprotver( cmdNode, wLoc.getprotver( data->props ) );
         wLoc.setspcnt( cmdNode, wLoc.getspcnt( data->props ) );
         wLoc.setfncnt( cmdNode, wLoc.getfncnt( data->props ) );
         wLoc.setcmd( cmdNode, wLoc.shortid );
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "send (short) ID: %s", wLoc.getshortid(cmdNode) );
         ControlOp.cmd( control, cmdNode, NULL );
       }
     }
@@ -1977,12 +3481,14 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
       const char* blockid = wLoc.getblockid( nodeA );
 
       if( data->curBlock != NULL ) {
-        iIBlockBase block = ModelOp.getBlock( model, data->curBlock );
-        if( block ) {
-          iONode cmd = NodeOp.inst( wBlock.name(), NULL, ELEMENT_NODE );
-          wBlock.setid( cmd, data->curBlock );
-          wBlock.setlocid( cmd, "" );
-          block->cmd( block, cmd );
+        if( blockid == NULL || !StrOp.equals(data->curBlock, blockid) ) {
+          iIBlockBase block = ModelOp.getBlock( model, data->curBlock );
+          if( block ) {
+            iONode cmd = NodeOp.inst( wBlock.name(), NULL, ELEMENT_NODE );
+            wBlock.setid( cmd, data->curBlock );
+            wBlock.setlocid( cmd, "" );
+            block->cmd( block, cmd );
+          }
         }
       }
 
@@ -1997,64 +3503,75 @@ static Boolean _cmd( iOLoc inst, iONode nodeA ) {
       }
     }
 
+    else if( StrOp.equals( wLoc.assigntrain, cmd ) ) {
+      wLoc.settrain(data->props, wLoc.gettrain(nodeA));
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "consist [%s] assigned to loco [%s]", wLoc.gettrain(data->props), wLoc.getid( data->props ) );
+      /* Update train length. */
+      __calcTrainLen(inst, True);
+      __setCurBlock4Train(inst, data->curBlock);
+      broadcast = True;
+    }
+
+    else if( StrOp.equals( wLoc.releasetrain, cmd ) ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "consist [%s] released from loco [%s]", wLoc.gettrain(data->props), wLoc.getid( data->props ) );
+      wLoc.settrain(data->props, "");
+      wLoc.settrainlen(data->props, 0);
+      wLoc.settrainweight( data->props, 0 );
+      if( wLoc.isadjustaccel(data->props) ) {
+        LocOp.adjustAccel(inst, wLoc.getaccelmin(data->props), 0 );
+      }
+      broadcast = True;
+    }
+    else if( StrOp.equals( wLoc.setmanualmode, cmd ) ) {
+      data->manual = True;
+      data->gomanual = True;
+      wLoc.setmanual(data->props, True);
+      broadcast = True;
+    }
+    else if( StrOp.equals( wLoc.resetmanualmode, cmd ) ) {
+      data->manual = False;
+      data->gomanual = False;
+      wLoc.setmanual(data->props, False);
+      broadcast = True;
+    }
+    else if( StrOp.equals( wLoc.consist, cmd ) ) {
+      wLoc.setconsist(data->props, wLoc.getconsist(nodeA));
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco %s consist=[%s]", LocOp.getId(inst), wLoc.getconsist(data->props));
+      broadcast = True;
+    }
 
     if(broadcast) {
-      nodeF = (iONode)NodeOp.base.clone( nodeA );
       /* Broadcast to clients. */
-      wLoc.setid( nodeF, wLoc.getid( data->props ) );
-      wLoc.setaddr( nodeF, wLoc.getaddr( data->props ) );
-      wLoc.setdir( nodeF, wLoc.isdir( data->props ) );
-      wLoc.setV( nodeF, data->drvSpeed );
-      wLoc.setfn( nodeF, wLoc.isfn( data->props ) );
-      wLoc.setplacing( nodeF, wLoc.isplacing( data->props ) );
-      wLoc.setblockenterside( nodeF, wLoc.isblockenterside( data->props ) );
-      if( StrOp.equals( wLoc.blockside, cmd ) && data->curBlock != NULL )
-        wLoc.setblockid( nodeF, data->curBlock );
-      wLoc.setmode( nodeF, wLoc.getmode( data->props ) );
-      wLoc.setresumeauto( nodeF, wLoc.isresumeauto(data->props) );
-      wLoc.setmanual( nodeF, data->gomanual );
-      wLoc.setruntime( nodeF, wLoc.getruntime(data->props) );
-      wLoc.setmtime( nodeF, wLoc.getmtime(data->props) );
-      wLoc.setmint( nodeF, wLoc.getmint(data->props) );
-      wLoc.setthrottleid( nodeF, wLoc.getthrottleid(data->props) );
-      wLoc.setactive( nodeF, wLoc.isactive(data->props) );
-      AppOp.broadcastEvent( nodeF );
+      __broadcastLocoProps( inst, NULL, (iONode)NodeOp.base.clone( nodeA ), NULL );
     }
 
     nodeA->base.del(nodeA);
 
+    MutexOp.post( data->muxCmd );
     return True;
   }
+  else {
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "processing cmd=\"%s\" for [%s]",  cmd==NULL?"-":cmd, LocOp.getId( inst ) );
+  }
 
-  nodeF = (iONode)NodeOp.base.clone( nodeA );
+  if( StrOp.equals(wFunCmd.name(), NodeOp.getName(nodeA))) {
+    data->lastfncmd = SystemOp.getTick();
+  }
 
   /* Inform Driver. */
   if( data->driver != NULL )
     data->driver->info( data->driver, nodeA );
 
-  __engine( inst, nodeA );
-  __checkConsist(inst, nodeF, False);
+  /* release mutex to avoid blocking */
+  MutexOp.post( data->muxCmd );
 
-  /* Broadcast to clients. */
-  wLoc.setid( nodeF, wLoc.getid( data->props ) );
-  wLoc.setaddr( nodeF, wLoc.getaddr( data->props ) );
-  wLoc.setdir( nodeF, wLoc.isdir( data->props ) );
-  wLoc.setV( nodeF, data->drvSpeed );
-  wLoc.setfn( nodeF, wLoc.isfn( data->props ) );
-  wLoc.setplacing( nodeF, wLoc.isplacing( data->props ) );
-  wLoc.setblockenterside( nodeF, wLoc.isblockenterside( data->props ) );
-  wLoc.setmode( nodeF, wLoc.getmode( data->props ) );
-  wLoc.setresumeauto( nodeF, wLoc.isresumeauto(data->props) );
-  wLoc.setmanual( nodeF, data->gomanual );
-  wLoc.setruntime( nodeF, wLoc.getruntime(data->props) );
-  wLoc.setmtime( nodeF, wLoc.getmtime(data->props) );
-  wLoc.setmint( nodeF, wLoc.getmint(data->props) );
-  wLoc.setthrottleid( nodeF, wLoc.getthrottleid(data->props) );
-  wLoc.setactive( nodeF, wLoc.isactive(data->props) );
-  if( data->driver != NULL ) {
-    wLoc.setscidx( nodeF, data->driver->getScheduleIdx( data->driver ) );
+  if( nodeA != NULL ) {
+    iOMsg msg = MsgOp.inst( NULL, cmd_event );
+    MsgOp.setTimer( msg, wLoc.getcmdDelay(nodeA) );
+    MsgOp.setEvent( msg, cmd_event );
+    MsgOp.setUsrData(msg, nodeA, 0 );
+    ThreadOp.post( data->runner, (obj)msg );
   }
-  AppOp.broadcastEvent( nodeF );
 
   return True;
 }
@@ -2090,12 +3607,6 @@ static void _modify( iOLoc inst, iONode props ) {
       wLoc.setV_Rmid( data->props, wLoc.getV_Rmid(props) );
     if(NodeOp.findAttr(props, "V_Rmin"))
       wLoc.setV_Rmin( data->props, wLoc.getV_Rmin(props) );
-    if(NodeOp.findAttr(props, "trysamedir"))
-      wLoc.settrysamedir( data->props, wLoc.istrysamedir(props) );
-    if(NodeOp.findAttr(props, "tryoppositedir"))
-      wLoc.settryoppositedir( data->props, wLoc.istryoppositedir(props) );
-    if(NodeOp.findAttr(props, "forcesamedir"))
-      wLoc.setforcesamedir( data->props, wLoc.isforcesamedir(props) );
     if(NodeOp.findAttr(props, "desc"))
       wLoc.setdesc( data->props, wLoc.getdesc(props) );
     if(NodeOp.findAttr(props, "rmark"))
@@ -2108,8 +3619,14 @@ static void _modify( iOLoc inst, iONode props ) {
       wLoc.setcargo( data->props, wLoc.getcargo(props) );
     if(NodeOp.findAttr(props, "engine"))
       wLoc.setengine( data->props, wLoc.getengine(props) );
-    if(NodeOp.findAttr(props, "consist"))
-      wLoc.setconsist( data->props, wLoc.getconsist(props) );
+    if(NodeOp.findAttr(props, "consist")) {
+      if( StrOp.find( wLoc.getconsist(props), LocOp.getId(inst) ) == NULL ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "modify: %s consist=\"%s\"", LocOp.getId(inst), wLoc.getconsist(props));
+        wLoc.setconsist( data->props, wLoc.getconsist(props) );
+      }
+      else
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "consist rejected: %s consist=\"%s\"", LocOp.getId(inst), wLoc.getconsist(props));
+    }
   }
   else {
     int cnt = NodeOp.getAttrCnt( props );
@@ -2117,37 +3634,73 @@ static void _modify( iOLoc inst, iONode props ) {
 
     for( i = 0; i < cnt; i++ ) {
       iOAttr attr = NodeOp.getAttr( props, i );
-      const char* name  = AttrOp.getName( attr );
+      const char* attname  = AttrOp.getName( attr );
       const char* value = AttrOp.getVal( attr );
 
-      if( StrOp.equals("id", name) && StrOp.equals( value, wLoc.getid(data->props) ) )
+      if( StrOp.equals("id", attname) && StrOp.equals( value, wLoc.getid(data->props) ) )
         continue; /* skip to avoid making invalid pointers */
 
-      if( !StrOp.equals( "runtime", name ) )
-        NodeOp.setStr( data->props, name, value );
+
+      if( StrOp.equals( "blockid", attname ) ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "modify: %s blockid=\"%s\" (%s)",
+            LocOp.getId(inst), value, wLoc.getblockid(data->props)!=NULL?wLoc.getblockid(data->props):"-" );
+      }
+      if( StrOp.equals( "destblockid", attname ) )
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "modify: %s destblockid=\"%s\"", LocOp.getId(inst), value );
+
+      if( StrOp.equals( "consist", attname ) ) {
+        if( StrOp.find( wLoc.getconsist(props), LocOp.getId(inst) ) == NULL ) {
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "modify: %s consist=\"%s\"", LocOp.getId(inst), wLoc.getconsist(props));
+          wLoc.setconsist( data->props, wLoc.getconsist(props) );
+        }
+        else {
+          TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "consist rejected: %s consist=\"%s\"", LocOp.getId(inst), wLoc.getconsist(props));
+          continue;
+        }
+      }
+
+      if( !StrOp.equals( "runtime", attname ) )
+        NodeOp.setStr( data->props, attname, value );
+
     }
 
-    /* Leave the childs if no new are comming */
-    if( NodeOp.getChildCnt( props ) > 0 ) {
+    cnt = NodeOp.getChildCnt( data->props );
+    while( cnt > 0 ) {
+      iONode child = NodeOp.getChild( data->props, 0 );
+      iONode removedChild = NodeOp.removeChild( data->props, child );
+      if( removedChild != NULL) {
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "remove child node %s of %s", NodeOp.getName(removedChild), LocOp.getId(inst));
+        NodeOp.base.del(removedChild);
+      }
       cnt = NodeOp.getChildCnt( data->props );
-      while( cnt > 0 ) {
-        iONode child = NodeOp.getChild( data->props, 0 );
-        NodeOp.removeChild( data->props, child );
-        cnt = NodeOp.getChildCnt( data->props );
-      }
-      cnt = NodeOp.getChildCnt( props );
-      for( i = 0; i < cnt; i++ ) {
-        iONode child = NodeOp.getChild( props, i );
-        NodeOp.addChild( data->props, (iONode)NodeOp.base.clone(child) );
-      }
     }
+    cnt = NodeOp.getChildCnt( props );
+    for( i = 0; i < cnt; i++ ) {
+      iONode child = NodeOp.getChild( props, i );
+      NodeOp.addChild( data->props, (iONode)NodeOp.base.clone(child) );
+    }
+
   }
 
   data->secondnextblock = wLoc.issecondnextblock( data->props );
 
+  __initBBTmap(inst);
+  __initSBTmap(inst);
+
+  __initCVmap(inst);
+
+  if( wLoc.isshow(data->props) && data->runner == NULL && __loadDriver( inst ) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco [%s] enterside=[%c]", wLoc.getid(data->props), wLoc.isblockenterside(data->props)?'+':'-');
+    data->runner = ThreadOp.inst( LocOp.getId(inst), &__runner, inst );
+    data->run = True;
+    ThreadOp.start( data->runner );
+  }
+
+
   /* Broadcast to clients. */
   {
     iONode clone = (iONode)props->base.clone( props );
+    wLoc.setid(clone, wLoc.getid( data->props ) );
     wLoc.setcmd(clone, wModelCmd.modify );
     AppOp.broadcastEvent( clone );
   }
@@ -2320,15 +3873,81 @@ static int _getAddress( iOLoc loc ) {
   iOLocData data = Data(loc);
   return wLoc.getaddr( data->props );
 }
-static long _getIdent( iOLoc loc ) {
+static int _getSecAddress( iOLoc loc ) {
+  iOLocData data = Data(loc);
+  return wLoc.getsecaddr( data->props );
+}
+static const char* _getIdent( iOLoc loc ) {
   iOLocData data = Data(loc);
   return wLoc.getidentifier( data->props );
 }
 
 
+static void __initSBTmap( iOLoc loc ) {
+  iOLocData data = Data(loc);
+  iONode sbt = NodeOp.findNode( data->props, wSBT.name() );
+  MapOp.clear(data->sbtMap);
+  while( sbt != NULL ) {
+    char* key  = NULL;
+    if( wSBT.gettrain(sbt) != NULL && StrOp.len(wSBT.gettrain(sbt)) > 0 )
+      key  = StrOp.fmt("%s-%s", wSBT.getbk(sbt), wSBT.gettrain(sbt));
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "add SBT record with keys [%s][%s]", wSBT.getbk(sbt), key==NULL?"":key);
+
+    MapOp.put( data->sbtMap, wSBT.getbk(sbt), (obj)sbt );
+    if( key != NULL ) {
+      MapOp.put( data->sbtMap, key, (obj)sbt );
+      StrOp.free(key);
+    }
+    sbt = NodeOp.findNextNode( data->props, sbt );
+  };
+}
+
+static void __initBBTmap( iOLoc loc ) {
+  iOLocData data = Data(loc);
+  iONode bbt = NodeOp.findNode( data->props, wBBT.name() );
+  int bbtkey = wLoc.getbbtkey(data->props);
+  MapOp.clear(data->bbtMap);
+  while( bbt != NULL ) {
+    char* key  = NULL;
+    char* keyV = NULL;
+    if( bbtkey == 3 ) {
+      key  = StrOp.fmt("%s-%d", wBBT.getbk(bbt), wBBT.getspeed(bbt));
+      keyV = StrOp.fmt("%s-%d", wBBT.getbk(bbt), wBBT.getspeed(bbt));
+    }
+    else if( bbtkey == 2 ) {
+      key  = StrOp.fmt("%s-%s", wBBT.getbk(bbt), wBBT.getroute(bbt));
+      keyV = StrOp.fmt("%s-%s-%d", wBBT.getbk(bbt), wBBT.getroute(bbt), wBBT.getspeed(bbt));
+    }
+    else if( bbtkey == 1 ) {
+      key  = StrOp.fmt("%s-%s", wBBT.getbk(bbt), wBBT.getfrombk(bbt));
+      keyV = StrOp.fmt("%s-%s-%d", wBBT.getbk(bbt), wBBT.getfrombk(bbt), wBBT.getspeed(bbt));
+    }
+    else {
+      key = StrOp.fmt("%s", wBBT.getbk(bbt));
+      keyV = StrOp.fmt("%s-%d", wBBT.getbk(bbt), wBBT.getspeed(bbt));
+    }
+
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "add BBT record with key [%s] keytype=%d", key, bbtkey);
+    MapOp.put( data->bbtMap, key, (obj)bbt );
+    if( wBBT.getspeed(bbt) > 0 )
+      MapOp.put( data->bbtMap, keyV, (obj)bbt );
+    StrOp.free(key);
+    StrOp.free(keyV);
+    bbt = NodeOp.findNextNode( data->props, bbt );
+  };
+  data->bbtEnterBlock = NULL;
+  data->bbtInBlock    = NULL;
+  data->bbtEnterSpeed = 0;
+  data->bbtCycleSpeed = 0;
+  data->bbtEnter      = 0;
+  data->bbtIn         = 0;
+  data->bbtAtMinSpeed = False;
+}
+
 static void __initCVmap( iOLoc loc ) {
   iOLocData data = Data(loc);
   iONode cv = NodeOp.findNode( data->props, wCVByte.name() );
+  MapOp.clear(data->cvMap);
   while( cv != NULL ) {
     char* key = StrOp.fmt( "%d", wCVByte.getnr( cv ) );
     MapOp.put( data->cvMap, key, (obj)cv );
@@ -2363,6 +3982,7 @@ static void _setCV( iOLoc loc, int nr, int value ) {
     NodeOp.addChild( data->props, cv );
     MapOp.put( data->cvMap, key, (obj)cv );
   }
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "%s: set cv %d to %d", wLoc.getid(data->props), nr, value);
 
   StrOp.free( key );
 
@@ -2377,19 +3997,36 @@ static void _setCV( iOLoc loc, int nr, int value ) {
 /**
  * swap placing to run in defaults routes after reaching an terminal station
  */
-static void _swapPlacing( iOLoc loc, iONode cmd, Boolean consist ) {
+static void _swapPlacing( iOLoc loc, iONode cmd, Boolean consist, Boolean direct ) {
   iOLocData data = Data(loc);
+  Boolean swap = False;
 
-  Boolean swap = wLoc.isplacing( cmd );
+  if( cmd != NULL )
+    swap = wLoc.isplacing( cmd );
 
-  iOMsg msg = MsgOp.inst( NULL, swap_event );
-  MsgOp.setTimer( msg, wLoc.getswaptimer(data->props) );
-  MsgOp.setEvent( msg, swap_event );
   if( cmd == NULL || !NodeOp.findAttr(cmd, "placing"))
     swap = !wLoc.isplacing( data->props );
-  MsgOp.setUsrData(msg, cmd, (swap ? 0x01:0x00) | (consist ? 0x02:0x00) );
-  ThreadOp.post( data->runner, (obj)msg );
 
+  if( direct ) {
+    __theSwap(loc, swap, consist, cmd);
+  }
+  else if( data->runner != NULL ) {
+    iOMsg msg = MsgOp.inst( NULL, swap_event );
+    if( wLoc.getswaptimer(data->props) > 0 ) {
+      if( wLoc.getswaptimer(data->props) > 1000 )
+        wLoc.setswaptimer(data->props, 1000 );
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "%s: sync swap sleep %d", wLoc.getid(data->props), wLoc.getswaptimer(data->props));
+      ThreadOp.sleep(wLoc.getswaptimer(data->props));
+    }
+    MsgOp.setTimer( msg, 0 );
+    MsgOp.setEvent( msg, swap_event );
+    if( cmd == NULL )
+      MsgOp.setUsrData(msg, NULL, (swap ? 0x01:0x00) | (consist ? 0x02:0x00) );
+    else
+      MsgOp.setUsrData(msg, (iONode)NodeOp.base.clone(cmd), (swap ? 0x01:0x00) | (consist ? 0x02:0x00) );
+
+    ThreadOp.post( data->runner, (obj)msg );
+  }
 }
 
 
@@ -2425,6 +4062,23 @@ static int _getV( iOLoc loc ) {
 }
 
 
+static int _saveSpeed( iOLoc loc, Boolean reset ) {
+  iOLocData data = Data(loc);
+  if( reset ) {
+    int savedSpeed = data->savedSpeed;
+    data->savedSpeed = 0;
+    return savedSpeed;
+  }
+  data->savedSpeed = data->drvSpeed;
+  return data->savedSpeed;
+}
+
+static void _fifoTop( iOLoc loc ) {
+  iOLocData data = Data(loc);
+  wLoc.setfifotop(data->props, True);
+  __broadcastLocoProps( loc, NULL, NULL, NULL );
+}
+
 static const char* _getV_hint( iOLoc loc ) {
   iOLocData data = Data(loc);
   return wLoc.getV_hint( data->props );
@@ -2433,7 +4087,10 @@ static const char* _getV_hint( iOLoc loc ) {
 
 static Boolean _isAutomode( iOLoc loc ) {
   iOLocData data = Data(loc);
-  return data->go;
+  Boolean isRun = False;
+  if( data->driver != NULL )
+    isRun = data->driver->isRun( data->driver );
+  return (data->go || isRun);
 }
 
 
@@ -2455,20 +4112,64 @@ static Boolean _isUseManualRoutes( iOLoc loc ) {
 }
 
 
-static Boolean _matchIdent( iOLoc loc, long ident ) {
+static Boolean _isGoManual( iOLoc loc ) {
+  iOLocData data = Data(loc);
+  return data->gomanual;
+}
+
+
+static Boolean _isManually( iOLoc loc ) {
+  iOLocData data = Data(loc);
+  return wLoc.ismanually( data->props );
+}
+
+
+static Boolean _isReduceSpeedAtEnter( iOLoc loc ) {
+  iOLocData data = Data(loc);
+  return wLoc.isreducespeedatenter( data->props );
+}
+
+
+static Boolean _matchIdent( iOLoc loc, const char* ident, const char* ident2, const char* ident3, const char* ident4 ) {
   iOLocData data = Data(loc);
   Boolean match = False;
 
-  if( wLoc.getidentifier( data->props ) == ident )
+  if( ident != NULL && StrOp.len(ident) > 0 && StrOp.equals( wLoc.getidentifier( data->props ), ident) )
+    match = True;
+  else if( ident != NULL && StrOp.len(ident) > 0 && wLoc.getaddr(data->props) == atoi(ident) )
+    match = True;
+  else if( ident2 != NULL && StrOp.len(ident2) > 0 && StrOp.equals( wLoc.getidentifier( data->props ), ident2) )
+    match = True;
+  else if( ident2 != NULL && StrOp.len(ident2) > 0 && wLoc.getaddr(data->props) == atoi(ident2) )
+    match = True;
+  else if( ident3 != NULL && StrOp.len(ident3) > 0 && StrOp.equals( wLoc.getidentifier( data->props ), ident3) )
+    match = True;
+  else if( ident3 != NULL && StrOp.len(ident3) > 0 && wLoc.getaddr(data->props) == atoi(ident3) )
+    match = True;
+  else if( ident4 != NULL && StrOp.len(ident4) > 0 && StrOp.equals( wLoc.getidentifier( data->props ), ident4) )
+    match = True;
+  else if( ident4 != NULL && StrOp.len(ident4) > 0 && wLoc.getaddr(data->props) == atoi(ident4) )
     match = True;
   else {
     /* check consist */
     iOStrTok  consist = StrTokOp.inst( wLoc.getconsist ( data->props ), ',' );
     while( StrTokOp.hasMoreTokens( consist ) ) {
       const char* tok = StrTokOp.nextToken( consist );
-      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok );
+      iOLoc consistloc = ModelOp.getLoc( AppOp.getModel(), tok, NULL, False );
       if( consistloc != NULL ) {
-        if( ident == LocOp.getIdent(consistloc) ) {
+        if( ident != NULL && StrOp.len(ident) > 0 && StrOp.equals( ident, LocOp.getIdent(consistloc) ) ) {
+          match = True;
+          break;
+        }
+        else if( ident2 != NULL && StrOp.len(ident2) > 0 && StrOp.equals( ident2, LocOp.getIdent(consistloc) ) ) {
+          match = True;
+          break;
+        }
+        else if( ident3 != NULL && StrOp.len(ident3) > 0 && StrOp.equals( ident3, LocOp.getIdent(consistloc) ) ) {
+          match = True;
+          break;
+        }
+        else if( ident4 != NULL && StrOp.len(ident4) > 0 && StrOp.equals( ident4, LocOp.getIdent(consistloc) ) ) {
           match = True;
           break;
         }
@@ -2477,6 +4178,9 @@ static Boolean _matchIdent( iOLoc loc, long ident ) {
     StrTokOp.base.del( consist );
   }
 
+  if( !match )
+    match = __matchTrainIdent(loc, ident, ident2, ident3, ident4);
+
   return match;
 }
 
@@ -2484,7 +4188,7 @@ static Boolean _matchIdent( iOLoc loc, long ident ) {
 static iONode _getFunctionStatus( iOLoc loc, iONode cmd ) {
   iOLocData data = Data(loc);
   /* save the function status: */
-  __cpFn2Node(loc, cmd, -1);
+  __cpFn2Node(loc, cmd, -1, 0);
   wFunCmd.setf0( cmd, wLoc.isfn(data->props) );
   return cmd;
 }
@@ -2507,37 +4211,17 @@ static void _setBlockEnterSide( iOLoc loc, Boolean enterside, const char* blockI
   iOLocData data = Data(loc);
 
   wLoc.setblockenterside(data->props, enterside);
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "block enter side for [%s] set to [%s]",
-      wLoc.getid(data->props), wLoc.isblockenterside( data->props )?"+":"-" );
+  wLoc.setblockenterid(data->props, blockId!=NULL?blockId:"");
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "block[%s] enter side for [%s] set to [%s]",
+      blockId!=NULL?blockId:"-", wLoc.getid(data->props), wLoc.isblockenterside( data->props )?"+":"-" );
   ModelOp.setBlockOccupancy( AppOp.getModel(), data->curBlock, wLoc.getid(data->props), False, wLoc.isplacing( data->props) ? 1:2, wLoc.isblockenterside( data->props) ? 1:2, NULL );
 
   /* Broadcast to clients. */
-  {
-    iONode node = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-    wLoc.setid( node, wLoc.getid( data->props ) );
-    wLoc.setdir( node, wLoc.isdir( data->props ) );
-    wLoc.setaddr( node, wLoc.getaddr( data->props ) );
-    wLoc.setV( node, data->drvSpeed );
-    wLoc.setfn( node, wLoc.isfn( data->props ) );
-    wLoc.setplacing( node, wLoc.isplacing( data->props ) );
-    wLoc.setblockenterside( node, wLoc.isblockenterside( data->props ) );
-    wLoc.setmode( node, wLoc.getmode( data->props ) );
-    wLoc.setresumeauto( node, wLoc.isresumeauto(data->props) );
-    wLoc.setmanual( node, data->gomanual );
-    if( blockId != NULL )
-      wLoc.setblockid(node, blockId );
-    else
-      wLoc.setblockid( node, data->curBlock );
-    wLoc.setruntime( node, wLoc.getruntime(data->props) );
-    wLoc.setmtime( node, wLoc.getmtime(data->props) );
-    wLoc.setmint( node, wLoc.getmint(data->props) );
-    wLoc.setthrottleid( node, wLoc.getthrottleid(data->props) );
-    wLoc.setactive( node, wLoc.isactive(data->props) );
-    if( data->driver != NULL ) {
-      wLoc.setscidx( node, data->driver->getScheduleIdx( data->driver ) );
-    }
-
-    AppOp.broadcastEvent( node );
+  if( blockId != NULL )
+    __broadcastLocoProps( loc, NULL, NULL, blockId );
+  else {
+    /*__broadcastLocoProps( loc, NULL, NULL, NULL );*/
+    __broadcastLocoProps( loc, NULL, NULL, data->curBlock );
   }
 }
 
@@ -2554,6 +4238,33 @@ static Boolean _trySecondNextBlock( iOLoc inst ) {
   return data->secondnextblock;
 }
 
+static Boolean _isCheck2In( iOLoc inst ) {
+  iOLocData data = Data(inst);
+  return data->check2in;
+}
+
+static void _setClass( iOLoc inst, const char* p_Class ) {
+  iOLocData data = Data(inst);
+
+  if( wLoc.gettrain( data->props) != NULL && StrOp.len(wLoc.gettrain( data->props)) > 0 ) {
+    iOOperator train = ModelOp.getOperator(AppOp.getModel(), wLoc.gettrain( data->props) );
+    if( train != NULL ) {
+      OperatorOp.setClass(train, p_Class);
+    }
+  }
+  else {
+    wLoc.setclass(data->props, p_Class);
+    /* Broadcast to clients. */
+    AppOp.broadcastEvent( (iONode)NodeOp.base.clone( data->props ) );
+  }
+}
+
+static void _setMaxKmh( iOLoc inst, int maxkmh ) {
+  iOLocData data = Data(inst);
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loco [%s] maxkmh=%d", wLoc.getid(data->props), maxkmh);
+  data->maxkmh = maxkmh;
+}
+
 
 static iOLoc _inst( iONode props ) {
   iOLoc     loc  = allocMem( sizeof( struct OLoc ) );
@@ -2565,25 +4276,67 @@ static iOLoc _inst( iONode props ) {
   data->props = props;
   data->cvMap = MapOp.inst();
   data->secondnextblock = wLoc.issecondnextblock( data->props );
+  data->check2in = wLoc.ischeck2in( data->props );
   data->timedfn = -1; /* function 0 is also used */
+  data->released = True;
+  data->bbtMap = MapOp.inst();
+  data->sbtMap = MapOp.inst();
+  data->muxEngine = MutexOp.inst( NULL, True );
+  data->muxCmd = MutexOp.inst( NULL, True );
+  data->destBlock = NULL;
 
-  /* reset velocity to zero */
-  wLoc.setV( data->props, 0 );
-  if( !wLoc.isrestorefx(data->props))
+  wLoc.setdestblockid(data->props, "");
+
+  wLoc.setmode(data->props, wLoc.mode_idle);
+
+  wLoc.setfifotop(data->props, False);
+
+  if( wFreeRail.isresetspfx(AppOp.getIni()) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "global reset speed and functions for loco [%s]", wLoc.getid(props));
+    wLoc.setV( data->props, 0 );
     wLoc.setfx( data->props, 0 );
+    wLoc.setfn( data->props, False );
+  }
+  else {
+    /* reset velocity to zero */
+    if( !wLoc.isrestorespeed(data->props)) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "no restore wanted: reset speed for loco [%s]", wLoc.getid(props));
+      wLoc.setV( data->props, 0 );
+    }
+    if( !wLoc.isrestorefx(data->props)) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "no restore wanted: reset functions for loco [%s]", wLoc.getid(props));
+      wLoc.setfx( data->props, 0 );
+    }
+  }
+
+  if( wLoc.isresetplacing(data->props) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "reset placing and direction to default of loco [%s]", wLoc.getid(props));
+    wLoc.setplacing( data->props, True );
+    wLoc.setdir( data->props, True );
+  }
 
   data->fn0 = wLoc.isfn(data->props);
   wLoc.setthrottleid( data->props, "" );
 
+  data->manual   = wLoc.ismanual(data->props);
+  data->gomanual = wLoc.ismanual(data->props);
+
+
   __initCVmap( loc );
+  __initBBTmap( loc );
+  __initSBTmap( loc );
 
   ModelOp.addSysEventListener( AppOp.getModel(), (obj)loc );
 
   /*data->driver = (iILcDriverInt)LcDriverOp.inst( loc );*/
-  if( __loadDriver( loc ) ) {
+  if( wLoc.isshow(data->props) && __loadDriver( loc ) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco [%s] enterside=[%c]", wLoc.getid(props), wLoc.isblockenterside(props)?'+':'-');
     data->runner = ThreadOp.inst( _getId(loc), &__runner, loc );
     data->run = True;
     ThreadOp.start( data->runner );
+  }
+  else if(!wLoc.isshow(data->props)) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco [%s][%d] is invisible; no runner started", wLoc.getid(props), wLoc.isblockenterside(props));
   }
 
   instCnt++;

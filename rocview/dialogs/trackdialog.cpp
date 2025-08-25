@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -43,6 +46,8 @@
 #include "rocrail/wrapper/public/Plan.h"
 #include "rocrail/wrapper/public/Block.h"
 #include "rocrail/wrapper/public/Feedback.h"
+#include "rocrail/wrapper/public/Output.h"
+#include "rocrail/wrapper/public/ModelCmd.h"
 #include "rocview/public/guiapp.h"
 
 ////@begin XPM images
@@ -62,9 +67,8 @@ BEGIN_EVENT_TABLE( TrackDialog, wxDialog )
 
 ////@begin TrackDialog event table entries
     EVT_BUTTON( wxID_OK, TrackDialog::OnOkClick )
-
     EVT_BUTTON( wxID_CANCEL, TrackDialog::OnCancelClick )
-
+    EVT_BUTTON( wxID_HELP, TrackDialog::OnHelpClick )
 ////@end TrackDialog event table entries
 
 END_EVENT_TABLE()
@@ -135,6 +139,14 @@ void TrackDialog::initLabels() {
         ListOp.add(list, (obj)wFeedback.getid( fb ));
       }
     }
+    iONode colist = wPlan.getcolist( model );
+    if( colist != NULL ) {
+      int cnt = NodeOp.getChildCnt( colist );
+      for( int i = 0; i < cnt; i++ ) {
+        iONode co = NodeOp.getChild( colist, i );
+        ListOp.add(list, (obj)wOutput.getid( co ));
+      }
+    }
 
     ListOp.sort(list, &__sortStr);
     int cnt = ListOp.size( list );
@@ -154,6 +166,11 @@ void TrackDialog::initLabels() {
   m_Type->Append( wxString(wTrack.buffer,wxConvUTF8) );
   m_Type->Append( wxString(wTrack.connector,wxConvUTF8) );
   m_Type->Append( wxString(wTrack.tracknr,wxConvUTF8) );
+  m_Type->Append( wxString(wTrack.curvenr,wxConvUTF8) );
+  m_Type->Append( wxString(wTrack.curve90,wxConvUTF8) );
+  m_Type->Append( wxString(wTrack.dcurve,wxConvUTF8) );
+  m_Type->Append( wxString(wTrack.concurveleft,wxConvUTF8) );
+  m_Type->Append( wxString(wTrack.concurveright,wxConvUTF8) );
 
   // Location
   m_LabelX->SetLabel( wxGetApp().getMsg( "x" ) );
@@ -204,11 +221,14 @@ bool TrackDialog::evaluate() {
   if( m_Props == NULL )
     return false;
 
-  if( m_ID->GetValue().Len() == 0 ) {
-    wxMessageDialog( this, wxGetApp().getMsg("invalidid"), _T("Rocrail"), wxOK | wxICON_ERROR ).ShowModal();
-    m_ID->SetValue( wxString(wTrack.getid( m_Props ),wxConvUTF8) );
+  iONode model  = wxGetApp().getModel();
+  iONode tklist = wPlan.gettklist( model );
+
+  if( existID( this, tklist, m_Props, m_ID->GetValue() ) ) {
+    m_ID->SetValue( wxString(wItem.getid( m_Props ),wxConvUTF8) );
     return false;
   }
+
 
   // General
   wItem.setprev_id( m_Props, wItem.getid(m_Props) );
@@ -302,8 +322,7 @@ void TrackDialog::CreateControls()
     wxBoxSizer* itemBoxSizer5 = new wxBoxSizer(wxVERTICAL);
     m_GeneralPanel->SetSizer(itemBoxSizer5);
 
-    wxFlexGridSizer* itemFlexGridSizer6 = new wxFlexGridSizer(2, 2, 0, 0);
-    itemFlexGridSizer6->AddGrowableCol(1);
+    wxFlexGridSizer* itemFlexGridSizer6 = new wxFlexGridSizer(0, 2, 0, 0);
     itemBoxSizer5->Add(itemFlexGridSizer6, 0, wxGROW|wxALL, 5);
     m_LabelID = new wxStaticText( m_GeneralPanel, wxID_STATIC_TK_ID, _("id"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer6->Add(m_LabelID, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
@@ -337,7 +356,9 @@ void TrackDialog::CreateControls()
     m_TrackNr = new wxSpinCtrl( m_GeneralPanel, wxID_ANY, _T("0"), wxDefaultPosition, wxSize(100, -1), wxSP_ARROW_KEYS, 0, 99, 0 );
     itemFlexGridSizer6->Add(m_TrackNr, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    wxFlexGridSizer* itemFlexGridSizer17 = new wxFlexGridSizer(2, 2, 0, 0);
+    itemFlexGridSizer6->AddGrowableCol(1);
+
+    wxFlexGridSizer* itemFlexGridSizer17 = new wxFlexGridSizer(0, 2, 0, 0);
     itemBoxSizer5->Add(itemFlexGridSizer17, 0, wxGROW|wxALL, 5);
     m_Road = new wxCheckBox( m_GeneralPanel, wxID_ANY, _("Road"), wxDefaultPosition, wxDefaultSize, 0 );
     m_Road->SetValue(false);
@@ -349,7 +370,7 @@ void TrackDialog::CreateControls()
     wxBoxSizer* itemBoxSizer20 = new wxBoxSizer(wxHORIZONTAL);
     m_LocationPanel->SetSizer(itemBoxSizer20);
 
-    wxFlexGridSizer* itemFlexGridSizer21 = new wxFlexGridSizer(2, 2, 0, 0);
+    wxFlexGridSizer* itemFlexGridSizer21 = new wxFlexGridSizer(0, 2, 0, 0);
     itemBoxSizer20->Add(itemFlexGridSizer21, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5);
     m_LabelX = new wxStaticText( m_LocationPanel, wxID_STATIC_TK_X, _("x"), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer21->Add(m_LabelX, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
@@ -392,6 +413,9 @@ void TrackDialog::CreateControls()
     m_Cancel = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
     itemStdDialogButtonSizer29->AddButton(m_Cancel);
 
+    wxButton* itemButton32 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer29->AddButton(itemButton32);
+
     itemStdDialogButtonSizer29->Realize();
 
 ////@end TrackDialog content construction
@@ -403,9 +427,22 @@ void TrackDialog::CreateControls()
 
 void TrackDialog::OnOkClick( wxCommandEvent& event )
 {
+  if( !m_Props )
+    return;
   if( !evaluate() )
     return;
-
+  if( !wxGetApp().isStayOffline() ) {
+    /* Notify RocRail. */
+    iONode cmd = NodeOp.inst( wModelCmd.name(), NULL, ELEMENT_NODE );
+    wModelCmd.setcmd( cmd, wModelCmd.modify );
+    NodeOp.addChild( cmd, (iONode)m_Props->base.clone( m_Props ) );
+    wxGetApp().sendToRocrail( cmd );
+    cmd->base.del(cmd);
+  }
+  else {
+    wxGetApp().setLocalModelModified(true);
+  }
+ 
   EndModal( wxID_OK );
 }
 
@@ -452,3 +489,18 @@ wxIcon TrackDialog::GetIconResource( const wxString& name )
     return wxNullIcon;
 ////@end TrackDialog icon retrieval
 }
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void TrackDialog::OnHelpClick( wxCommandEvent& event )
+{
+  switch( m_Notebook->GetSelection() ) {
+  case 0: wxGetApp().openLink( "tracks-gen" ); break;
+  case 1: wxGetApp().openLink( "tracks-pos" ); break;
+  default: wxGetApp().openLink( "tracks-gen" ); break;
+  }
+}
+

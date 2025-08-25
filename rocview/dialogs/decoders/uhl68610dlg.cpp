@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -255,10 +258,12 @@ void Uhl68610Dlg::onWrite( wxCommandEvent& event ) {
 }
 
 void Uhl68610Dlg::onCancel( wxCommandEvent& event ) {
+  delete m_Timer;
   EndModal( 0 );
 }
 
 void Uhl68610Dlg::onOK( wxCommandEvent& event ) {
+  delete m_Timer;
   EndModal( wxID_OK );
 }
 
@@ -371,3 +376,9 @@ void Uhl68610Dlg::onScale( wxCommandEvent& event ) {
 void Uhl68610Dlg::onGap( wxSpinEvent& event ) {
   getFactor();
 }
+
+
+void Uhl68610Dlg::onHelp( wxCommandEvent& event ) {
+  wxGetApp().openLink( "lissy-programming" );
+}
+

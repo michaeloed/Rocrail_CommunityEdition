@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -123,27 +126,27 @@ static int __availBytes(iOHSI88Data o) {
     return SerialOp.available(o->serial);
 }
 
-static Boolean __readBytes(iOHSI88Data o, byte* buffer, int cnt) {
+static Boolean __readBytes(iOHSI88Data o, char* buffer, int cnt) {
   TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "reading %d bytes from %s", cnt, o->usb?"USB":"RS232" );
   if( o->usb ) {
     /*
     FileOp.setpos( o->usbh, 0 );
     return FileOp.read( o->usbh, (char*)buffer, cnt );
     */
-    return SystemOp.readDevice( o->devh, (char*)buffer, cnt);
+    return SystemOp.readDevice( o->devh, buffer, cnt);
   }
   else
-    return SerialOp.read( o->serial, (char*)buffer, cnt );
+    return SerialOp.read( o->serial, buffer, cnt );
 }
 
-static Boolean __writeBytes(iOHSI88Data o, byte* buffer, int cnt) {
+static Boolean __writeBytes(iOHSI88Data o, char* buffer, int cnt) {
   TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "writing %d bytes to %s", cnt, o->usb?"USB":"RS232" );
   if( o->usb ) {
     /*return FileOp.write( o->usbh, (char*)buffer, cnt );*/
-    return SystemOp.writeDevice( o->devh, (char*)buffer, cnt);
+    return SystemOp.writeDevice( o->devh, buffer, cnt);
   }
   else
-    return SerialOp.write( o->serial, (char*)buffer, cnt );
+    return SerialOp.write( o->serial, buffer, cnt );
 }
 
 static int __getRC(iOHSI88Data o) {
@@ -161,6 +164,9 @@ static int __getRC(iOHSI88Data o) {
 /* Check if CTS is set. Retry configured times */
 static Boolean CheckCTS( iOHSI88Data o ) {
   int wait4cts = 0;
+  if( o->flow == none ) {
+    return True;
+  }
   if( o->usb ) {
     return True;
   }
@@ -183,31 +189,40 @@ static Boolean __sendHSI88( iOHSI88 inst, char* out, int size ) {
 
   TraceOp.dump( name, TRCLEVEL_BYTE, (char*)out, size );
 
-  for( i = 0; i < size; i++ ) {
-    if( CheckCTS(o) ) {
-      int rc = 0;
-      ok = __writeBytes( o, &out[i], 1 );
-      rc = __getRC(o);
+  if( CheckCTS(o) ) {
+    int rc = 0;
+    ok = __writeBytes( o, out, size );
+    rc = __getRC(o);
 
-      if( !ok ) {
-        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Problem writing data, rc=%d", rc );
-        return False;
-      }
-      ThreadOp.sleep(50);
-    }
-    else {
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "CTS timeout, check the connection." );
+    if( !ok ) {
+      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Problem writing data, rc=%d", rc );
       return False;
     }
+    ThreadOp.sleep(50);
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "CTS timeout, check the connection." );
+    return False;
   }
   return True;
 }
 
 
+/*
+offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F |ASCII...........|
+--------------------------------------------------------- |----------------|
+00000000: 69 0D 01 00 00 02 00 00 03 00 00 04 00 00 05 00 |i...............|
+00000010: 00 06 00 00 07 00 00 08 00 00 09 00 00 0A 00 00 |................|
+00000020: 0B 00 00 0C 00 00 0D 00 00 0D 56 65 72 2E 20 30 |..........Ver. 0|
+00000030: 2E 36 32 20 2F 20 30 38 2E 30 37 2E 30 32 20 2F |.62 / 08.07.02 /|
+00000040: 20 48 53 49 2D 38 38 20 2F 20 28 63 29 20 4C 44 | HSI-88 / (c) LD|
+00000050: 54 0D |T. |
+ */
 static int __recvHSI88( iOHSI88 inst, char* in, const char* cmd ) {
   iOHSI88Data o = Data(inst);
   int waitcounter = 0;
   int idx = 0;
+  int data2read = 2;
   
   while( waitcounter < 50 && idx < 256 ) {
     /* check for waiting bytes: */
@@ -227,12 +242,39 @@ static int __recvHSI88( iOHSI88 inst, char* in, const char* cmd ) {
 
     if( OK ) {
       waitcounter = 0;
-      idx++;
-      in[idx] = '\0';
-      if( in[idx-1] == '\r' ) {
-        TraceOp.dump( name, TRCLEVEL_BYTE, (char*)in, idx );
+      in[idx+1] = '\0';
+
+      if( idx == 0 && in[0] == 's' ) {
+        /* Total number of modules. */
+        data2read = 3;
+      }
+      else if( idx == 0 && in[0] == 'V' ) {
+        /* Version string: Read ASCII until <CR>. */
+        data2read = 0;
+      }
+      else if( idx == 0 && ( in[0] == 'i' || in[0] == 'm' ) ) {
+        /* Report: At least 3 bytes in case of zero modules. */
+        data2read = 3;
+      }
+
+      if( idx == 1 && (in[0] == 'i' || in[0] == 'm') ) {
+        /* Report. */
+        data2read = 3 + (3 * in[1]);
+      }
+
+      if( ((idx+1) >= data2read || data2read == 0) && in[idx] == '\r' ) {
+        /* End of data. */
+        TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "end of data: [%c] expected length: %d idx=%d", in[0], data2read, idx );
+        TraceOp.dump( name, TRCLEVEL_BYTE, (char*)in, idx+1 );
+        idx++;
         break;
       }
+
+      if( idx == 0 ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "response: [%c] expected length: %d", in[0], data2read );
+      }
+
+      idx++;
     }
     else {
       TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Read error; check the connection." );
@@ -312,15 +354,15 @@ static iONode _cmd( obj inst ,const iONode cmd )
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOHSI88Data data = Data(inst);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
   data->run = False;
+  ThreadOp.sleep(100);
   if( data->usb && data->usbh != NULL )
     FileOp.close( data->usbh );
   else if( !data->usb && data->serial != NULL )
     SerialOp.close( data->serial );
-
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
   return;
 }
 
@@ -343,28 +385,38 @@ static Boolean _supportPT( obj inst ) {
   */
 static void __fbstatetrigger( iOHSI88 inst, iONode fbnode ) {
   iOHSI88Data data = Data(inst);
+  int addr = wFeedback.getaddr( fbnode );
+  Boolean state = wFeedback.isstate( fbnode );
 
-  if( !data->smooth ) {
+  if( !data->smooth && fbnode != NULL ) {
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "sensor %d is %s; report", addr, state?"ON":"OFF" );
     if( data->listenerFun != NULL )
       data->listenerFun( data->listenerObj, fbnode, TRCLEVEL_INFO );
     return;
   }
 
   if( fbnode != NULL ) {
-    int addr = wFeedback.getaddr( fbnode );
-    Boolean state = wFeedback.isstate( fbnode );
     iOFBState fb = NULL;
 
     fb = &data->fbstate[ addr-1 ];
 
     if( state && !fb->state ) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "sensor %d is ON and was OFF; report", addr );
       /* Current state is low. */
       fb->hightime = SystemOp.getTick();
+      fb->lowtime = SystemOp.getTick();
       fb->state = state;
       if( data->listenerFun != NULL )
         data->listenerFun( data->listenerObj, fbnode, TRCLEVEL_INFO );
     }
+    else if( state && fb->state ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sensor %d is ON and was ON", addr );
+      fb->hightime = SystemOp.getTick();
+      fb->lowtime = SystemOp.getTick();
+      NodeOp.base.del( fbnode );
+    }
     else if( !state && fb->state ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sensor %d is OFF and was ON", addr );
       fb->lowtime = SystemOp.getTick();
       NodeOp.base.del( fbnode );
     }
@@ -372,27 +424,6 @@ static void __fbstatetrigger( iOHSI88 inst, iONode fbnode ) {
       NodeOp.base.del( fbnode );
     }
   }
-
-  /* Loop throug all feedbacks to check for low state. */
-  {
-    int i = 0;
-    int modcnt = (data->fbleft + data->fbmiddle + data->fbright) * 16;
-    for( i = 0; i < modcnt; i++ ) {
-      iOFBState fb = &data->fbstate[ i ];
-      if( fb->state && fb->lowtime >= fb->hightime && SystemOp.getTick() - fb->lowtime >= 10 ) {
-        iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-        fb->state = False;
-        wFeedback.setstate( evt, fb->state );
-        wFeedback.setaddr( evt, i+1 );
-        if( data->iid != NULL )
-          wFeedback.setiid( evt, data->iid );
-
-        if( data->listenerFun != NULL )
-          data->listenerFun( data->listenerObj, evt, TRCLEVEL_INFO );
-      }
-    }
-  }
-
 }
 
 
@@ -430,7 +461,7 @@ static Boolean __flushHSI88( iOHSI88 inst, Boolean forcetrace ) {
 
   /* Read all pending information on serial port. Interface Hickups if data is pending from previous init! */
   {
-    byte tmp[1000];
+    char tmp[1000];
     int bAvail = 0;
 
     if( o->usb ) {
@@ -480,13 +511,13 @@ static Boolean __flushHSI88( iOHSI88 inst, Boolean forcetrace ) {
 static Boolean __preinitHSI88( iOHSI88 inst ) {
   iOHSI88 pHSI88 = inst;
   iOHSI88Data o = Data(pHSI88);
-  static char* hello = "\r\r\r\r\r\r\r\r\r\r";
+  static char* wakeup = "\r\r\r\r\r\r\r\r\r\r";
   char b;
   int i;
   Boolean ok = True;
 
   /* Say "hello": */
-  if( __sendHSI88( inst, hello, StrOp.len( hello ) ) ) {
+  if( __sendHSI88( inst, wakeup, StrOp.len( wakeup ) ) ) {
 
     /* After ten times it should detect at least 1 cr: */
     ok = __readBytes( o, &b, 1 );
@@ -511,9 +542,7 @@ static Boolean __initHSI88( iOHSI88 inst ) {
   int len = 0;
   int modcnt = o->fbleft + o->fbmiddle + o->fbright;
 
-  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "HSI-88 init");
-  __flushHSI88(inst, True);
-
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "HSI-88 init nr of modules");
   if( __sendHSI88( inst, out, 5 ) )
   {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Init sent. Waiting for response...");
@@ -554,26 +583,67 @@ static Boolean __initHSI88( iOHSI88 inst ) {
 }
 
 
+static void __delayedOffHandler( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOHSI88 pHSI88 = (iOHSI88)ThreadOp.getParm( th );
+  iOHSI88Data data = Data(pHSI88);
+
+  ThreadOp.sleep(1000);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "HSI88 delayed OFF handler started");
+
+  while( data->run ) {
+    /* Loop throug all feedbacks to check for low state. */
+    int i = 0;
+    int modcnt = (data->fbleft + data->fbmiddle + data->fbright) * 16;
+    for( i = 0; i < modcnt; i++ ) {
+      iOFBState fb = &data->fbstate[ i ];
+      if( fb->state && fb->lowtime > fb->hightime && (SystemOp.getTick() - fb->lowtime) >= data->triggertime ) {
+        iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "sensor %d delayed OFF; report", i+1 );
+        fb->state = False;
+        wFeedback.setstate( evt, fb->state );
+        wFeedback.setaddr( evt, i+1 );
+        if( data->iid != NULL )
+          wFeedback.setiid( evt, data->iid );
+
+        if( data->listenerFun != NULL )
+          data->listenerFun( data->listenerObj, evt, TRCLEVEL_INFO );
+      }
+    }
+    ThreadOp.sleep(100);
+  }
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "HSI88 delayed OFF handler ended");
+}
+
+
 static void __HSI88feedbackReader( void* threadinst ) {
   iOThread th = (iOThread)threadinst;
   iOHSI88 pHSI88 = (iOHSI88)ThreadOp.getParm( th );
   iOHSI88Data o = Data(pHSI88);
   unsigned char* fb = allocMem(256);
-  unsigned char out[6];
-  unsigned char buffer [512];
+  char out[6];
+  char buffer [512];
   int k = 0;
   Boolean crDetected = False;
   int waitcounter = 0;
   Boolean ok;
   int avail = 0;
+  Boolean l_dummy = True;
+  int l_iLoop = 0;
 
   memset(fb,0,256);
 
+  ThreadOp.sleep(1000);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "HSI88 Reader started");
+  if( !o->usb ) {
+    __preinitHSI88(pHSI88);
+    ThreadOp.sleep(100);
+  }
 
   while( o->run ) {
 
     if( !o->dummyio && !o->initOK ) {
-      /*__preinitHSI88(pHSI88);*/
+      __flushHSI88(pHSI88, True);
       __getVersion(pHSI88);
       o->initOK = __initHSI88(pHSI88);
       if( !o->initOK ) {
@@ -585,10 +655,22 @@ static void __HSI88feedbackReader( void* threadinst ) {
     ThreadOp.sleep(10);
 
 
-    __fbstatetrigger( pHSI88, NULL );
-
-    if( o->dummyio )
+    if( o->dummyio ) {
+      l_iLoop++;
+      if( l_iLoop > 200 ) {
+        iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+        int addr = 4;
+        wFeedback.setaddr( nodeC, addr );
+        wFeedback.setstate( nodeC, l_dummy );
+        if( o->iid != NULL )
+          wFeedback.setiid( nodeC, o->iid );
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "sensor %d %s",addr, wFeedback.isstate( nodeC )?"high":"low" );
+        __fbstatetrigger( pHSI88, nodeC );
+        l_dummy = !l_dummy;
+        l_iLoop = 0;
+      }
       continue;
+    }
 
     avail = __availBytes(o);
 
@@ -633,7 +715,7 @@ static void __HSI88feedbackReader( void* threadinst ) {
             if( o->iid != NULL )
               wFeedback.setiid( nodeC, o->iid );
 
-            TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "sensor %d %s",addr, wFeedback.isstate( nodeC )?"high":"low" );
+            TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "sensor %d %s",addr, wFeedback.isstate( nodeC )?"high":"low" );
             __fbstatetrigger( pHSI88, nodeC );
           }
           if ( ( lowbyte & (0x01 << j)) != (fb[modnr*2 +1]&(0x01 << j)))
@@ -645,7 +727,7 @@ static void __HSI88feedbackReader( void* threadinst ) {
             if( o->iid != NULL )
               wFeedback.setiid( nodeC, o->iid );
 
-            TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "sensor %d %s",addr, wFeedback.isstate( nodeC )?"high":"low" );
+            TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "sensor %d %s",addr, wFeedback.isstate( nodeC )?"high":"low" );
             __fbstatetrigger( pHSI88, nodeC );
           }
 
@@ -737,9 +819,12 @@ static struct OHSI88* _inst( const iONode ini ,const iOTrace trc )
   data->stopBits = 1;
   data->timeout  = wDigInt.gettimeout( ini );
   data->parity   = none;
-  data->flow     = cts;
+  data->flow     = 0;
   data->ctsretry = wDigInt.getctsretry( ini );
   data->dummyio  = wDigInt.isdummyio( ini );
+
+  if( StrOp.equals( wDigInt.cts, wDigInt.getflow(ini) ) )
+    data->flow = cts;
 
   hsi88ini = wDigInt.gethsi88(ini);
   if( hsi88ini == NULL ) {
@@ -748,6 +833,10 @@ static struct OHSI88* _inst( const iONode ini ,const iOTrace trc )
   }
 
   data->smooth   = wHSI88.issmooth( hsi88ini );
+  data->triggertime = wHSI88.gettriggertime( hsi88ini ) / 10;
+
+  if( data->triggertime < 10 )
+    data->triggertime = 10;
 
   /* HSI-88 specific settings */
   data->fbleft   = wHSI88.getfbleft( hsi88ini );
@@ -758,14 +847,16 @@ static struct OHSI88* _inst( const iONode ini ,const iOTrace trc )
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "hsi88 %d.%d.%d", vmajor, vminor, patch );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid     =%s", wDigInt.getiid( ini ) != NULL ? wDigInt.getiid( ini ):"");
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device  =%s", data->device );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "type    =%s", data->usb ? "USB":"RS232" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbleft  =%d", data->fbleft );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbmiddle=%d", data->fbmiddle );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbright =%d", data->fbright );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "timeout =%d", data->timeout );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dummyio =%s", data->dummyio?"true":"false" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid          = %s", wDigInt.getiid( ini ) != NULL ? wDigInt.getiid( ini ):"");
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device       = %s", data->device );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "type         = %s", data->usb ? "USB":"RS232" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "handshake    = %s", wDigInt.getflow(ini) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbleft       = %d", data->fbleft );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbmiddle     = %d", data->fbmiddle );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbright      = %d", data->fbright );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "timeout      = %d", data->timeout );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "trigger      = %s", data->smooth ? "ON":"OFF" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "trigger time = %d", data->triggertime * 10 );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
   if( data->usb ) {
@@ -789,6 +880,11 @@ static struct OHSI88* _inst( const iONode ini ,const iOTrace trc )
     SystemOp.inst();
     data->feedbackReader = ThreadOp.inst( "hsi88fb", &__HSI88feedbackReader, __HSI88 );
     ThreadOp.start( data->feedbackReader );
+
+    if( data->smooth ) {
+      data->delayedOffHandler = ThreadOp.inst( "hsi88Off", &__delayedOffHandler, __HSI88 );
+      ThreadOp.start( data->delayedOffHandler );
+    }
   }
   else
     TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Could not init HSI88 port!" );

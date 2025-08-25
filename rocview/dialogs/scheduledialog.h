@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -30,6 +33,7 @@
 
 ////@begin includes
 #include "wx/notebook.h"
+#include "wx/listctrl.h"
 #include "wx/spinctrl.h"
 #include "wx/statline.h"
 #include "wx/grid.h"
@@ -46,8 +50,10 @@
 
 ////@begin forward declarations
 class wxNotebook;
+class wxListCtrl;
 class wxSpinCtrl;
 class wxGrid;
+class ScheduleGraph;
 ////@end forward declarations
 
 /*!
@@ -63,6 +69,7 @@ class wxGrid;
 #define ID_BUTTON_SCHEDULE_NEW 10295
 #define ID_BUTTON_SCHEDULE_DELETE 10296
 #define ID_BUTTON_SC_DOC 10353
+#define ID_BUTTON_SCHEDULE_COPY 10402
 #define ID_PANEL_SCHEDULE_DESTINATIONS 10293
 #define wxID_STATIC_SCHEDULE_ID 10308
 #define ID_TEXTCTRL_SCHEDULE_ID 10307
@@ -75,11 +82,15 @@ class wxGrid;
 #define ID_COMBOBOX_SCHEDULE_TO_LOCATION 10006
 #define wxID_BUTTON_SCHEDULE_ADD_LOCATION 10243
 #define wxID_BUTTON_SCHEDULE_ADD_BLOCK 10274
+#define wxID_BUTTON_SCHEDULE_ENTRY_ACTIONS 10343
 #define wxID_BUTTON_SCHEDULE_REMOVE_DESTINATION 10297
 #define wxID_BUTTON_SCHEDULE_MODIFY_DESTINATION 10330
-#define wxID_BUTTON_SCHEDULE_ENTRY_ACTIONS 10343
+#define ID_DESTUP 10397
+#define ID_DESTDOWN 10398
 #define ID_PANEL_SCHEDULES_ACTIONS 10079
 #define ID_SCHEDULE_ACTIONS 10209
+#define ID_PANEL_SCHEDULE_GRAPH 10439
+#define ID_BUTTON_GRAPH_GEN 10440
 #define SYMBOL_SCHEDULEDIALOG_STYLE wxCAPTION|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCLOSE_BOX
 #define SYMBOL_SCHEDULEDIALOG_TITLE _("Schedule")
 #define SYMBOL_SCHEDULEDIALOG_IDNAME ID_DIALOG_SCHEDULE
@@ -115,10 +126,13 @@ class ScheduleDialog: public wxDialog, public BaseDialog
   void initOutputList();
   void initLocIDList();
   void initActions();
-
+  void setSelection(const char* ID);
+  int findID( const char* ID );
 
 
 public:
+  static const char* getStart( iONode sc );
+  static const char* getEnd( iONode sc );
     /// Constructors
     ScheduleDialog( );
     ~ScheduleDialog( );
@@ -134,8 +148,11 @@ public:
 
 ////@begin ScheduleDialog event handler declarations
 
-    /// wxEVT_COMMAND_LISTBOX_SELECTED event handler for ID_LISTBOX_SCHEDULE_LIST
-    void OnListboxScheduleListSelected( wxCommandEvent& event );
+    /// wxEVT_COMMAND_LIST_ITEM_SELECTED event handler for ID_LISTBOX_SCHEDULE_LIST
+    void OnListboxScheduleListSelected( wxListEvent& event );
+
+    /// wxEVT_COMMAND_LIST_COL_CLICK event handler for ID_LISTBOX_SCHEDULE_LIST
+    void OnListboxScheduleListColLeftClick( wxListEvent& event );
 
     /// wxEVT_COMMAND_CHECKBOX_CLICKED event handler for ID_CHECKBOX_SCHEDULES_SHOW_ALL
     void OnCheckboxSchedulesShowAllClick( wxCommandEvent& event );
@@ -148,6 +165,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_SC_DOC
     void OnButtonScDocClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_SCHEDULE_COPY
+    void OnButtonScheduleCopyClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_TEXT_UPDATED event handler for ID_TEXTCTRL_SCHEDULE_ID
     void OnTextctrlScheduleIdUpdated( wxCommandEvent& event );
@@ -176,17 +196,26 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_BUTTON_SCHEDULE_ADD_BLOCK
     void OnAddBlockClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_BUTTON_SCHEDULE_ENTRY_ACTIONS
+    void OnButtonScheduleEntryActionsClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_BUTTON_SCHEDULE_REMOVE_DESTINATION
     void OnRemoveDestinationClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_BUTTON_SCHEDULE_MODIFY_DESTINATION
     void OnModifyDestinationClick( wxCommandEvent& event );
 
-    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_BUTTON_SCHEDULE_ENTRY_ACTIONS
-    void OnButtonScheduleEntryActionsClick( wxCommandEvent& event );
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_DESTUP
+    void OnDestupClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_DESTDOWN
+    void OnDestdownClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_SCHEDULE_ACTIONS
     void OnScheduleActionsClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_GRAPH_GEN
+    void OnButtonGraphGenClick( wxCommandEvent& event );
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_OK
     void OnOkClick( wxCommandEvent& event );
@@ -196,6 +225,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_APPLY
     void OnApplyClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end ScheduleDialog event handler declarations
 
@@ -217,13 +249,14 @@ public:
 ////@begin ScheduleDialog member variables
     wxNotebook* m_NoteBook;
     wxPanel* m_Index;
-    wxListBox* m_List;
+    wxListCtrl* m_List;
     wxCheckBox* m_ShowAll;
     wxStaticText* m_labStartBlock;
     wxTextCtrl* m_StartBlockID;
     wxButton* m_New;
     wxButton* m_Delete;
     wxButton* m_Doc;
+    wxButton* m_CopySchedule;
     wxPanel* m_Destinations;
     wxStaticText* m_LabelID;
     wxTextCtrl* m_ID;
@@ -235,6 +268,9 @@ public:
     wxSpinCtrl* m_ToHour;
     wxStaticText* m_labCycle;
     wxSpinCtrl* m_Cycle;
+    wxStaticText* m_labMaxDelay;
+    wxSpinCtrl* m_MaxDelay;
+    wxStaticText* m_labMaxDelaySec;
     wxRadioBox* m_TimeProcessing;
     wxGrid* m_Entries;
     wxStaticText* m_LabelLocation;
@@ -253,13 +289,18 @@ public:
     wxCheckBox* m_Free2Go;
     wxStaticText* m_labInDelay;
     wxSpinCtrl* m_InDelay;
+    wxStaticText* m_labInDelayMS;
+    wxButton* m_EntryActions;
     wxButton* m_RemoveDestination;
     wxButton* m_ModifyDestination;
-    wxButton* m_EntryActions;
+    wxButton* m_DestUp;
+    wxButton* m_DestDown;
     wxPanel* m_ScheduleActions;
     wxStaticBox* m_ScheduleBox;
     wxComboBox* m_ScheduleAction;
     wxButton* m_Actions;
+    ScheduleGraph* m_Graph;
+    wxButton* m_GraphGen;
     wxButton* m_OK;
     wxButton* m_Cancel;
     wxButton* m_Apply;
@@ -269,6 +310,8 @@ public:
     int m_SelectedRow;
     bool m_bSave;
     const char* m_StartBlock;
+    int m_SortCol;
+
 };
 
 #endif

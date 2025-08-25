@@ -1,13 +1,9 @@
-/** ------------------------------------------------------------
-  * Module:
-  * Object:
-  * ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocgui/dialogs/rocgui-dialogs.pjd,v $
-  * $Author: robvrs $
-  * $Date: 2006/02/22 14:10:57 $
-  * $Revision: 1.63 $
-  * $Name:  $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef _MODULEPROPSDLG_H_
 #define _MODULEPROPSDLG_H_
 
@@ -94,6 +90,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end ModulePropsDlg event handler declarations
 
 ////@begin ModulePropsDlg member function declarations
@@ -115,6 +114,8 @@ public:
     wxTextCtrl* m_Title;
     wxStaticText* m_labID;
     wxTextCtrl* m_ModuleID;
+    wxStaticText* m_labModNr;
+    wxSpinCtrl* m_ModNr;
     wxStaticText* m_labFile;
     wxTextCtrl* m_File;
     wxStaticText* m_labX;
@@ -122,7 +123,6 @@ public:
     wxStaticText* m_labY;
     wxSpinCtrl* m_Y;
     wxRadioBox* m_Rotation;
-    wxCheckBox* m_SwapRRD;
     wxPanel* m_ConnectionPanel;
     wxStaticBox* m_NorthBox;
     wxStaticText* m_labNorthModID;

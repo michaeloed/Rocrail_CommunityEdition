@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -126,6 +129,17 @@ Boolean rocs_socket_init( iOSocketData o ) {
 #endif
   return True;
 }
+
+Boolean rocs_socket_istimedout( iOSocketData o ) {
+#ifdef __ROCS_SOCKET__
+  if( o->rc == WSAETIMEDOUT )
+    return True;
+#endif
+  return False;
+}
+
+
+
 
 /* OS dependent */
 static Boolean __resolveHost( iOSocketData o, const char* hostname ) {
@@ -497,7 +511,7 @@ Boolean rocs_socket_write( iOSocket inst, char* buf, int size ) {
 
   while( size > 0 && twritten < size && !o->broken ) {
 
-    if( o->ssl && o->openssl_support ) {
+    if( o->ssl ) {
       #ifdef __OPENSSL__
       if (o->ssl_sh){
         l_InvalidSocketHandle = 0;
@@ -529,6 +543,13 @@ Boolean rocs_socket_write( iOSocket inst, char* buf, int size ) {
 
       rocs_socket_close(o);
 
+      if( o->ssl ) {
+      #ifdef __OPENSSL__
+        ERR_print_errors_fp( (FILE*)TraceOp.getF(NULL) );
+        fflush( (FILE*)TraceOp.getF(NULL) );
+      #endif
+      }
+
       TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "send() failed [%d]", o->rc );
       o->broken = True;
       return False;
@@ -553,8 +574,11 @@ Boolean rocs_socket_readpeek( iOSocket inst, char* buf, int size, Boolean peek )
 
   while( treaded < size ) {
 
-    if( o->ssl && o->openssl_support && !peek ) {
+    if( o->ssl ) {
       #ifdef __OPENSSL__
+      if( peek )
+        readed = SSL_peek( o->ssl_sh, buf + treaded, size - treaded );
+      else
       readed = SSL_read( o->ssl_sh, buf + treaded, size - treaded );
       #endif
     }
@@ -574,7 +598,14 @@ Boolean rocs_socket_readpeek( iOSocket inst, char* buf, int size, Boolean peek )
       o->rc = WSAGetLastError();
       o->peeked = readed;
       if( readed == -1 && o->rc != 0 && o->rc != WSAETIMEDOUT && o->rc != WSAEINTR && o->rc != WSAEWOULDBLOCK ) {
-        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "*broken* errno=%d, rc=%d, read=%d", errno, o->rc, readed );
+        if( o->ssl ) {
+        #ifdef __OPENSSL__
+          ERR_print_errors_fp( (FILE*)TraceOp.getF(NULL) );
+          fflush( (FILE*)TraceOp.getF(NULL) );
+        #endif
+        }
+
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "*broken* errno=%d, rc=%d, readed=%d", errno, o->rc, readed );
         o->broken = True;
       }
         /* WinSock problems: http://sources.redhat.com/ml/cygwin/2001-08/msg00628.html
@@ -592,10 +623,20 @@ Boolean rocs_socket_readpeek( iOSocket inst, char* buf, int size, Boolean peek )
         continue;
       }
       */
-      if( o->rc == WSAEWOULDBLOCK || o->rc == WSAESHUTDOWN || o->rc == WSAENOTSOCK || o->rc == WSAETIMEDOUT || o->rc == WSAECONNRESET )
-        rocs_socket_close(o);
+      if( o->rc != WSAETIMEDOUT ) {
+        if( o->rc == WSAEWOULDBLOCK || o->rc == WSAESHUTDOWN || o->rc == WSAENOTSOCK || o->rc == WSAECONNRESET )
+          rocs_socket_close(o);
+      }
 
-      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "recv() failed [%d] size=%d read=%d", o->rc, size, treaded );
+      if( o->ssl ) {
+      #ifdef __OPENSSL__
+        ERR_print_errors_fp( (FILE*)TraceOp.getF(NULL) );
+        fflush( (FILE*)TraceOp.getF(NULL) );
+      #endif
+      }
+
+      TraceOp.trc( name, o->rc == WSAETIMEDOUT ? TRCLEVEL_DEBUG:TRCLEVEL_EXCEPTION, __LINE__, 9999, "recv() failed [%d] size=%d readed=%d", o->rc, size, treaded );
+
       return False;
     }
     treaded += readed;
@@ -621,7 +662,15 @@ int rocs_socket_recvfrom( iOSocket inst, char* buf, int size, char* client, int*
   SOCKADDR_IN remoteAddr;
   int     remoteAddrLen;
   remoteAddrLen=sizeof(SOCKADDR_IN);
-  rc = recvfrom( o->sh, buf, size, 0, (SOCKADDR*)&remoteAddr, &remoteAddrLen );
+
+  if( buf == NULL ) {
+    char l_buf[256];
+    size = 256;
+    rc = recvfrom( o->sh, l_buf, size, MSG_PEEK, (SOCKADDR*)&remoteAddr, &remoteAddrLen );
+  }
+  else
+    rc = recvfrom( o->sh, buf, size, 0, (SOCKADDR*)&remoteAddr, &remoteAddrLen );
+
   if(rc==SOCKET_ERROR)
   {
     o->rc = WSAGetLastError();
@@ -733,6 +782,24 @@ Boolean rocs_socket_setKeepalive( iOSocket inst, Boolean alive ) {
 }
 
 
+Boolean rocs_socket_setBroadcast( iOSocket inst, Boolean broadcast ) {
+#ifdef __ROCS_SOCKET__
+  iOSocketData o = Data(inst);
+  int rc   = 0;
+  int size = sizeof( broadcast );
+  rc = setsockopt( o->sh, SOL_SOCKET, SO_BROADCAST, (void*)&broadcast, size );
+
+  if( rc != 0 ) {
+    o->rc = WSAGetLastError();
+    TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "rocs_socket_setBroadcast() failed [%d]", WSAGetLastError() );
+    return False;
+  }
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "rocs_socket_setBroadcast() OK." );
+#endif
+  return True;
+}
+
+
 Boolean rocs_socket_setNodelay( iOSocket inst, Boolean flag ) {
 #ifdef __ROCS_SOCKET__
   iOSocketData o = Data(inst);
@@ -757,6 +824,8 @@ Boolean rocs_socket_CreateCTX( iOSocket inst ) {
   /* The method describes which SSL protocol we will be using. */
   SSL_METHOD *method;
 
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "SSL_library_init()..." );
+  SSL_library_init();
   /* Load algorithms and error strings. */
   OpenSSL_add_all_algorithms();
   SSL_load_error_strings();
@@ -802,6 +871,19 @@ Boolean rocs_socket_LoadCerts( iOSocket inst, const char *cFile, const char *kFi
 #endif
 }
 
+const char* rocs_socket_getsockname(iOSocket inst) {
+  iOSocketData data = Data(inst);
+  /*
+  struct sockaddr_in sa;
+  int sa_len;
+  sa_len = sizeof(sa);
+  if (getsockname(data->sh, (struct sockaddr*)&sa, &sa_len) != -1) {
+    return inet_ntoa(sa.sin_addr);
+  }
+  */
+  return "";
+}
+
 static char __hostname[256];
 const char* rocs_socket_gethostaddr( void ) {
   struct hostent *he;
@@ -810,7 +892,7 @@ const char* rocs_socket_gethostaddr( void ) {
 
   gethostname( __hostname, sizeof( __hostname ) );
   he = gethostbyname (__hostname);
-  while(he->h_addr_list[i] != NULL ) {
+  while( he!=NULL && he->h_addr_list[i] != NULL ) {
     const char* s = inet_ntoa (*(struct in_addr *)he->h_addr_list[i]);
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "address %d = %s", i, s );
     i++;

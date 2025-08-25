@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -41,50 +44,44 @@
 
 void statusTimer( iILcDriverInt inst, Boolean reverse ) {
   iOLcDriverData data = Data(inst);
+  Boolean oppwait = True;
+  data->opponly   = False;
 
   if( data->timer == -1 ) {
     /* handle manual operated signal */
-    if( !data->curBlock->wait(data->curBlock, data->loc, reverse ) ) {
+    Boolean wait = data->curBlock->wait(data->curBlock, data->loc, reverse, &oppwait );
+    if( !wait || !oppwait ) {
       data->timer = 0;
+      if( wait && !oppwait )
+        data->opponly = True;
     }
   }
 
   if( data->timer == 0 || !data->run || data->reqstop ) {
 
     if( data->reqstop ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,"stop requested");
       data->reqstop = False;
       data->run = False;
       data->warningnodestfound = False;
     }
 
     data->state = LC_IDLE;
-    data->loc->setMode(data->loc, wLoc.mode_idle);
+    data->loc->setMode(data->loc, wLoc.mode_idle, "");
     TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
                    "Setting state for \"%s\" from LC_TIMER to LC_IDLE.",
                    data->loc->getId( data->loc ) );
 
     if( data->next1Block != NULL )
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "next1Block for [%s] is [%s]",
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "next1Block for [%s] is [%s]",
                      data->loc->getId( data->loc ), data->next1Block->base.id(data->next1Block) );
     if( data->next2Block != NULL )
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "next2Block for [%s] is [%s]",
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "next2Block for [%s] is [%s]",
                      data->loc->getId( data->loc ), data->next2Block->base.id(data->next2Block) );
     if( data->next3Block != NULL )
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "next3Block for [%s] is [%s]",
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "next3Block for [%s] is [%s]",
                      data->loc->getId( data->loc ), data->next3Block->base.id(data->next3Block) );
 
-    /* Correct the direction for helping the P50 interface. */
-    /*
-    if( !data->loc->getDir( data->loc ) ) {
-      iONode cmd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
-      wLoc.setdir( cmd, True );
-      wLoc.setV( cmd, 0 );
-      data->loc->cmd( data->loc, cmd );
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
-                   "Setting direction for \"%s\" back to default.",
-                   data->loc->getId( data->loc ) );
-    }
-    */
   }
   else {
     if( data->timer > 0 )

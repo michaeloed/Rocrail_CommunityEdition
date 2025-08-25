@@ -1,6 +1,9 @@
 #!/bin/sh
 #
-# makewin-full.sh -- Copyright 2009 Rocrail.net.  See www.rocrail.net for license details
+#    Copyright (C) 2002-2012 Rob Versluis, Rocrail.net
+#
+#    Without an official permission commercial use is not permitted.
+#    Forking this project is not permitted.  
 #
 
 echo ""
@@ -8,36 +11,16 @@ echo "*** Rocrail makewin-full.sh starting (see www.rocrail.net)..."
 echo ""
 
 # Check params
-# rocrail-setup-[version].[patch]-rev[revno]-[type]-[dist].exe  (md5)
-
-VERSION=$1
-PATCH=$2
-TYPE=$3
-DIST=$4
+# rocrail-setup-rev[revno].exe  (md5)
 
 echo "Checking Parameters..."
 
-if [ !  $1 ] || [ ! $2 ] || [ ! $3 ] || [ ! $4 ]; then
-  echo "Error: Missing parameters:"
-  echo ""
-  echo "    Usage: makewin-full.sh <version> <patch> <type> <dist>"
-  echo ""
-  echo "    Example: \"makewin-full.sh 1.2 999 snapshot unicode\" will build "
-  echo "    \"rocrail-setup-1.2.999-revXXX-snapshot-unicode.exe\" where \"XXX\" is "
-  echo "    the Bazaar revision number or \"user\" if Bazaar is not installed."
-  echo ""
-  exit $?
-else
-  echo "    Parameters okay"
-  echo ""
-fi
-
 # Get the Bazaar revision number if available
 
-echo "Getting Bazaar revision number..."
-if which bzr > /dev/null
+echo "Getting revision number..."
+if which git > /dev/null
 then
-	BAZAARREV=`bzr revno`
+	BAZAARREV=`git rev-list --count HEAD`
 	echo "    Revision number is $BAZAARREV"
 	echo ""
 else
@@ -56,7 +39,7 @@ echo ""
 echo "Making All"
 
 make all PLATFORM=WIN32 TOOLPREFIX=i586-mingw32msvc- LIBSUFFIX=-i586-mingw32msvc MINGWINSTALL=/usr/i586-mingw32msvc
-
+#make all PLATFORM=WIN64 TOOLPREFIX=x86_64-w64-mingw32- LIBSUFFIX=-x86_64-w64-mingw32 MINGWINSTALL=/usr/x86_64-w64-mingw32
 echo "    Done"
 echo ""
 
@@ -66,7 +49,9 @@ echo "Stripping Windows Binaries"
 
 cd winbin
 i586-mingw32msvc-strip *.dll
+#x86_64-w64-mingw32-strip *.dll
 i586-mingw32msvc-strip *.exe
+#x86_64-w64-mingw32-strip *.exe
 
 echo "    Done"
 echo ""
@@ -87,7 +72,7 @@ then
 
   sudo gunzip /usr/share/doc/mingw32-runtime/mingwm10.dll.gz
   cp /usr/share/doc/mingw32-runtime/mingwm10.dll .
-  sudo gzip /usr/share/doc/mingw32-runtime/mingwm10.dll
+  #sudo gzip /usr/share/doc/mingw32-runtime/mingwm10.dll
 else
   echo "Error: mingwm10.dll not found!"
   echo ""
@@ -115,18 +100,6 @@ echo "Creating Inno Setup installer file..."
 cd ../rocrail/package
 pwd
 sed s/\<BZR\>/$BAZAARREV/ < rocrail-template.iss > rocrail-temp2.iss
-mv rocrail-temp2.iss rocrail-temp.iss
-
-sed s/\<VER\>/$VERSION/ < rocrail-temp.iss > rocrail-temp2.iss
-mv rocrail-temp2.iss rocrail-temp.iss
-
-sed s/\<PATCH\>/$PATCH/ < rocrail-temp.iss > rocrail-temp2.iss
-mv rocrail-temp2.iss rocrail-temp.iss
-
-sed s/\<DIST\>/$DIST/ < rocrail-temp.iss > rocrail-temp2.iss
-mv rocrail-temp2.iss rocrail-temp.iss
-
-sed s/\<TYPE\>/$TYPE/ < rocrail-temp.iss > rocrail-temp2.iss
 mv rocrail-temp2.iss rocrail-temp.iss
 
 echo "    Done"

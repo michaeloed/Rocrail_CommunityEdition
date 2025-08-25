@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2011 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -28,16 +31,20 @@
 
 
 #include "rocview/public/guiapp.h"
+
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocrail/wrapper/public/BiDiB.h"
 #include "rocrail/wrapper/public/BiDiBnode.h"
 
 #include "rocutils/public/vendors.h"
 
-BidibDlg::BidibDlg( wxWindow* parent, iONode props )
+#include "rocs/public/strtok.h"
+
+BidibDlg::BidibDlg( wxWindow* parent, iONode props, const char* devices )
   :bidibdlggen( parent )
 {
   m_Props = props;
+  m_Devices = devices;
   __initVendors();
   initLabels();
   initValues();
@@ -46,8 +53,14 @@ BidibDlg::BidibDlg( wxWindow* parent, iONode props )
   m_Options->GetSizer()->Layout();
   m_Nodes->GetSizer()->Layout();
 
+  m_General->Fit();
+  m_Options->Fit();
+  m_Nodes->Fit();
+
+  m_Notebook->Layout();
   m_Notebook->Fit();
 
+  GetSizer()->Layout();
   GetSizer()->Fit(this);
   GetSizer()->SetSizeHints(this);
 
@@ -62,7 +75,9 @@ void BidibDlg::initLabels() {
 
   // General
   m_labIID->SetLabel( wxGetApp().getMsg( "iid" ) );
-  m_labDevice->SetLabel( wxGetApp().getMsg( "port" ) );
+  m_labDevice->SetLabel( wxGetApp().getMsg( "device" ) );
+  m_labHost->SetLabel( wxGetApp().getMsg( "host" ) );
+  m_labPort->SetLabel( wxGetApp().getMsg( "port" ) );
   m_BPS->SetLabel(wxGetApp().getMsg( "bps" ));
   m_SubLib->SetLabel(wxGetApp().getMsg( "sublib" ));
 
@@ -71,9 +86,7 @@ void BidibDlg::initLabels() {
   m_labSecAckInt->SetLabel(wxGetApp().getMsg( "interval" ));
 
   // Nodes
-  m_AddNode->SetLabel(wxGetApp().getMsg( "add" ));
-  m_ModifyNode->SetLabel(wxGetApp().getMsg( "modify" ));
-  m_DeleteNode->SetLabel(wxGetApp().getMsg( "delete" ));
+  m_ConfigureNodes->SetLabel(wxGetApp().getMsg( "setup" ) + wxT("..."));
 
   // Buttons
   m_StdButtonOK->SetLabel( wxGetApp().getMsg( "ok" ) );
@@ -89,15 +102,33 @@ void BidibDlg::initValues() {
   // General
   m_IID->SetValue( wxString( wDigInt.getiid( m_Props ), wxConvUTF8 ) );
   m_Device->SetValue( wxString( wDigInt.getdevice( m_Props ), wxConvUTF8 ) );
+  m_Host->SetValue( wxString( wDigInt.gethost( m_Props ), wxConvUTF8 ) );
+  m_Port->SetValue( wDigInt.getport( m_Props ) );
+
+  if( m_Devices != NULL ) {
+    iOStrTok tok = StrTokOp.inst(m_Devices, ',');
+    while( StrTokOp.hasMoreTokens(tok) ) {
+      m_Device->Append( wxString( StrTokOp.nextToken(tok), wxConvUTF8 ) );
+    }
+    StrTokOp.base.del(tok);
+  }
 
   if( wDigInt.getbps( m_Props ) == 19200 )
     m_BPS->SetSelection(0);
-  else if( wDigInt.getbps( m_Props ) == 1048576 )
+  else if( wDigInt.getbps( m_Props ) == 1000000 )
     m_BPS->SetSelection(2);
   else
     m_BPS->SetSelection(1);
 
-  m_SubLib->SetSelection(0);
+  if( StrOp.equals( wDigInt.cts, wDigInt.getflow( m_Props ) ) )
+    m_CTS->SetValue(true);
+  else
+    m_CTS->SetValue(false);
+
+  if( StrOp.equals( wDigInt.sublib_udp, wDigInt.getsublib( m_Props ) ) )
+    m_SubLib->SetSelection(1);
+  else
+    m_SubLib->SetSelection(0);
 
   // Options
   iONode bidib = wDigInt.getbidib(m_Props);
@@ -110,6 +141,7 @@ void BidibDlg::initValues() {
 
   // Nodes
   initNodes();
+  subLib();
 }
 
 
@@ -124,17 +156,12 @@ void BidibDlg::initNodes() {
   iONode node = wBiDiB.getbidibnode(bidib);
   while( node != NULL ) {
     char uid[256];
-    StrOp.fmtb( uid, "%d, %s, %d, %s",
-        wBiDiBnode.getuid(node), wBiDiBnode.getclass(node), wBiDiBnode.getoffset(node), m_Vendor[wBiDiBnode.getvendor(node)] );
+    StrOp.fmtb( uid, "%08X, %s, %s",
+        wBiDiBnode.getuid(node), wBiDiBnode.getpath(node), wBiDiBnode.getclass(node) );
 
     m_NodeList->Append( wxString(uid,wxConvUTF8), node );
     node = wBiDiB.nextbidibnode(bidib, node);
   }
-  m_ModifyNode->Enable(false);
-  m_DeleteNode->Enable(false);
-  m_UID->SetValue( wxString( "", wxConvUTF8 ) );
-  m_Offset->SetValue( 0 );
-
 }
 
 
@@ -145,15 +172,22 @@ void BidibDlg::evaluate() {
   // General
   wDigInt.setiid( m_Props, m_IID->GetValue().mb_str(wxConvUTF8) );
   wDigInt.setdevice( m_Props, m_Device->GetValue().mb_str(wxConvUTF8) );
+  wDigInt.sethost( m_Props, m_Host->GetValue().mb_str(wxConvUTF8) );
+  wDigInt.setport( m_Props, m_Port->GetValue() );
 
   if( m_BPS->GetSelection() == 0 )
     wDigInt.setbps( m_Props, 19200 );
   else if( m_BPS->GetSelection() == 1 )
     wDigInt.setbps( m_Props, 115200 );
   else
-    wDigInt.setbps( m_Props, 1048576 );
+    wDigInt.setbps( m_Props, 1000000 );
 
-  wDigInt.setsublib( m_Props, wDigInt.sublib_serial);
+  wDigInt.setflow(m_Props, m_CTS->IsChecked()?wDigInt.cts:wDigInt.no);
+
+  if( m_SubLib->GetSelection() == 1 )
+    wDigInt.setsublib( m_Props, wDigInt.sublib_udp);
+  else
+    wDigInt.setsublib( m_Props, wDigInt.sublib_serial);
 
   // Options
   iONode bidib = wDigInt.getbidib(m_Props);
@@ -170,69 +204,12 @@ void BidibDlg::OnNodeList( wxCommandEvent& event ) {
   if( m_NodeList->GetSelection() != wxNOT_FOUND ) {
     iONode node = (iONode)m_NodeList->GetClientData(m_NodeList->GetSelection());
     if( node != NULL ) {
-			char* val = StrOp.fmt( "%d", wBiDiBnode.getuid(node) );
-			m_UID->SetValue( wxString( val, wxConvUTF8 ) );
-			StrOp.free( val );
-      m_Offset->SetValue( wBiDiBnode.getoffset( node ) );
-      m_ModifyNode->Enable(true);
-      m_DeleteNode->Enable(true);
     }
     else
       TraceOp.trc( "bidibdlg", TRCLEVEL_INFO, __LINE__, 9999, "no selection..." );
   }
   else
     TraceOp.trc( "bidibdlg", TRCLEVEL_INFO, __LINE__, 9999, "no selection..." );
-}
-
-
-void BidibDlg::OnAddNode( wxCommandEvent& event ) {
-  if( m_Props == NULL )
-    return;
-  TraceOp.trc( "bidibdlg", TRCLEVEL_INFO, __LINE__, 9999, "add node..." );
-
-  iONode bidib = wDigInt.getbidib(m_Props);
-
-  iONode node = NodeOp.inst(wBiDiBnode.name(), m_Props, ELEMENT_NODE);
-  wBiDiBnode.setuid( node, atoi(m_UID->GetValue().mb_str(wxConvUTF8)) );
-  wBiDiBnode.setoffset( node, m_Offset->GetValue() );
-  NodeOp.addChild( bidib, node );
-  initNodes();
-}
-
-
-void BidibDlg::OnModifyNode( wxCommandEvent& event ) {
-  if( m_Props == NULL )
-    return;
-  TraceOp.trc( "bidibdlg", TRCLEVEL_INFO, __LINE__, 9999, "modify node..." );
-
-  if( m_NodeList->GetSelection() != wxNOT_FOUND ) {
-    iONode node = (iONode)m_NodeList->GetClientData(m_NodeList->GetSelection());
-    if( node != NULL ) {
-      wBiDiBnode.setuid( node, atoi(m_UID->GetValue().mb_str(wxConvUTF8)) );
-      wBiDiBnode.setoffset( node, m_Offset->GetValue() );
-      initNodes();
-    }
-    else
-      TraceOp.trc( "bidibdlg", TRCLEVEL_INFO, __LINE__, 9999, "no selection..." );
-  }
-}
-
-
-void BidibDlg::OnDeleteNode( wxCommandEvent& event ) {
-  if( m_Props == NULL )
-    return;
-  TraceOp.trc( "bidibdlg", TRCLEVEL_INFO, __LINE__, 9999, "delete node..." );
-
-  iONode bidib = wDigInt.getbidib(m_Props);
-  if( m_NodeList->GetSelection() != wxNOT_FOUND ) {
-    iONode node = (iONode)m_NodeList->GetClientData(m_NodeList->GetSelection());
-    if( node != NULL ) {
-      NodeOp.removeChild( bidib, node );
-      initNodes();
-    }
-    else
-      TraceOp.trc( "bidibdlg", TRCLEVEL_INFO, __LINE__, 9999, "no selection..." );
-  }
 }
 
 
@@ -245,3 +222,34 @@ void BidibDlg::OnOK( wxCommandEvent& event ) {
   evaluate();
   EndModal( wxID_OK );
 }
+
+void BidibDlg::onConfigureNodes( wxCommandEvent& event ) {
+  wxCommandEvent menuevent( wxEVT_COMMAND_MENU_SELECTED, ME_BiDiB );
+  wxPostEvent( wxGetApp().getFrame(), menuevent );
+}
+
+void BidibDlg::subLib() {
+  if( m_SubLib->GetSelection() == 1 ) {
+    m_Host->Enable(true);
+    m_Port->Enable(true);
+    m_Device->Enable(false);
+    m_BPS->Enable(false);
+  }
+  else {
+    m_Host->Enable(false);
+    m_Port->Enable(false);
+    m_Device->Enable(true);
+    m_BPS->Enable(true);
+  }
+}
+
+
+void BidibDlg::onSubLib( wxCommandEvent& event ) {
+  subLib();
+}
+
+
+void BidibDlg::OnHelp( wxCommandEvent& event ) {
+  wxGetApp().openLink( "bidib" );
+}
+

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -105,7 +108,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOClockData data = Data(inst);
   iONode quitNode = NodeOp.inst( "quit", NULL, ELEMENT_NODE );
   data->run = False;
@@ -171,9 +174,14 @@ static void __driverThread( void* threadinst ) {
         break;
       }
 
-      data->tick = !data->tick;
-      SerialOp.setDTR(data->serial, data->tick);
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "%s...", data->tick?"tick":"tack" );
+      if( StrOp.equals( wClock.sync, wClock.getcmd(node) ) ) {
+        data->tick = !data->tick;
+        SerialOp.setDTR(data->serial, data->tick);
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "%s...", data->tick?"tick":"tack" );
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "cmd=%s", wClock.getcmd(node) );
+      }
       node->base.del( node );
 
     }
@@ -221,7 +229,7 @@ static struct OClock* _inst( const iONode ini ,const iOTrace trc ) {
   data->run = True;
 
   data->serial = SerialOp.inst( data->device );
-  SerialOp.setFlow( data->serial, none );
+  SerialOp.setFlow( data->serial, 0 );
   SerialOp.setLine( data->serial, 9600, 8, 1, 0, wDigInt.isrtsdisabled( ini ) );
   SerialOp.open( data->serial );
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -172,6 +175,9 @@ void LNCV::event( iONode event ) {
   int cv   = wProgram.getcv (event);
   int val  = wProgram.getvalue(event);
   bool datarsp = false;
+  char* str;
+
+  TraceOp.trc( "lncv", TRCLEVEL_INFO, __LINE__, 9999, "LNCV event: modid %d addr %d cv %d val %d", mod, addr, cv, val );
 
   if( cmd == wProgram.datarsp )
     datarsp = true;
@@ -181,11 +187,13 @@ void LNCV::event( iONode event ) {
   //m_ModuleKey->SetValue( wxString( str,wxConvUTF8) );
   //StrOp.free(str);
 
-  //str = StrOp.fmt( "%d", addr );
-  //m_Address->SetValue( wxString( str,wxConvUTF8) );
-  //StrOp.free(str);
+  if ( !datarsp ) {
+    str = StrOp.fmt( "%d", addr );
+    m_Address->SetValue( wxString( str,wxConvUTF8) );
+    StrOp.free(str);
+  }
 
-  char* str = StrOp.fmt( "%d", cv );
+  str = StrOp.fmt( "%d", cv );
   m_CVfrom->SetValue( wxString( str,wxConvUTF8) );
   StrOp.free(str);
 
@@ -224,7 +232,7 @@ void LNCV::CreateControls()
   m_Parent->SetSizer(m_MainBox);
 
     m_ItemPanel = new wxPanel( m_Parent, -1, wxDefaultPosition, wxDefaultSize, wxSUNKEN_BORDER|wxTAB_TRAVERSAL );
-    m_MainBox->Add(m_ItemPanel, 1, wxGROW|wxALL|wxADJUST_MINSIZE, 2);
+    m_MainBox->Add(m_ItemPanel, 1, wxGROW|wxALL, 2);
 
     wxBoxSizer* itemBoxSizer3 = new wxBoxSizer(wxVERTICAL);
     m_ItemPanel->SetSizer(itemBoxSizer3);
@@ -237,7 +245,7 @@ void LNCV::CreateControls()
     itemStaticBoxSizer4->Add(itemBoxSizer5, 0, wxALIGN_LEFT, 5);
 
     m_labModuleKey = new wxStaticText( m_ItemPanel, wxID_ANY, _("Key"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemBoxSizer5->Add(m_labModuleKey, 0, wxGROW|wxALL|wxADJUST_MINSIZE, 5);
+    itemBoxSizer5->Add(m_labModuleKey, 0, wxGROW|wxALL, 5);
 
     m_ModuleKey = new wxTextCtrl( m_ItemPanel, wxID_ANY, _T(""), wxDefaultPosition, wxDefaultSize, 0 );
     itemBoxSizer5->Add(m_ModuleKey, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5);
@@ -249,7 +257,7 @@ void LNCV::CreateControls()
     itemStaticBoxSizer4->Add(itemBoxSizer9, 0, wxALIGN_LEFT, 5);
 
     m_labAddress = new wxStaticText( m_ItemPanel, wxID_ANY, _("Address"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemBoxSizer9->Add(m_labAddress, 0, wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 5);
+    itemBoxSizer9->Add(m_labAddress, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
     m_Address = new wxTextCtrl( m_ItemPanel, wxID_ANY, _T(""), wxDefaultPosition, wxDefaultSize, 0 );
     itemBoxSizer9->Add(m_Address, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5);
@@ -268,7 +276,7 @@ void LNCV::CreateControls()
     itemFlexGridSizer12->Add(m_CVfrom, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
     m_labValue = new wxStaticText( m_ItemPanel, wxID_ANY, _("Value"), wxDefaultPosition, wxDefaultSize, 0 );
-    itemFlexGridSizer12->Add(m_labValue, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL|wxADJUST_MINSIZE, 5);
+    itemFlexGridSizer12->Add(m_labValue, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
     m_Value = new wxTextCtrl( m_ItemPanel, wxID_ANY, _T(""), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer12->Add(m_Value, 0, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL|wxALL, 5);

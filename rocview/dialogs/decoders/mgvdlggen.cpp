@@ -1,11 +1,12 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version Dec 21 2009)
+// C++ code generated with wxFormBuilder (version Sep 12 2010)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO "NOT" EDIT THIS FILE!
 ///////////////////////////////////////////////////////////////////////////
 
 #include "mgvdlggen.h"
+
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -29,10 +30,17 @@ mgvdlggen::mgvdlggen( wxWindow* parent, wxWindowID id, const wxString& title, co
 	
 	m_labIID = new wxStaticText( m_Setup, wxID_ANY, wxT("IID"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_labIID->Wrap( -1 );
-	fgSizer3->Add( m_labIID, 0, wxALL, 5 );
+	fgSizer3->Add( m_labIID, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	m_IID = new wxTextCtrl( m_Setup, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
-	fgSizer3->Add( m_IID, 0, wxALL|wxEXPAND, 5 );
+	fgSizer3->Add( m_IID, 0, wxALL|wxEXPAND|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	m_labBus = new wxStaticText( m_Setup, wxID_ANY, wxT("Bus"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_labBus->Wrap( -1 );
+	fgSizer3->Add( m_labBus, 0, wxALL|wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	m_Bus = new wxTextCtrl( m_Setup, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
+	fgSizer3->Add( m_Bus, 0, wxALL|wxEXPAND|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	bSizer7->Add( fgSizer3, 0, wxEXPAND, 5 );
 	
@@ -101,6 +109,9 @@ mgvdlggen::mgvdlggen( wxWindow* parent, wxWindowID id, const wxString& title, co
 	m_staticline3 = new wxStaticLine( m_Setup, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_HORIZONTAL );
 	bSizer7->Add( m_staticline3, 0, wxEXPAND | wxALL, 5 );
 	
+	m_SingleGate = new wxCheckBox( m_Setup, wxID_ANY, wxT("Single gate"), wxDefaultPosition, wxDefaultSize, 0 );
+	bSizer7->Add( m_SingleGate, 0, wxRIGHT|wxLEFT, 5 );
+	
 	m_labProgramming = new wxStaticText( m_Setup, wxID_ANY, wxT("Programming:"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_labProgramming->Wrap( -1 );
 	bSizer7->Add( m_labProgramming, 0, wxALL, 5 );
@@ -136,40 +147,50 @@ mgvdlggen::mgvdlggen( wxWindow* parent, wxWindowID id, const wxString& title, co
 	bSizer11 = new wxBoxSizer( wxVERTICAL );
 	
 	wxFlexGridSizer* fgSizer6;
-	fgSizer6 = new wxFlexGridSizer( 3, 3, 0, 0 );
+	fgSizer6 = new wxFlexGridSizer( 3, 4, 0, 0 );
 	fgSizer6->AddGrowableRow( 1 );
 	fgSizer6->SetFlexibleDirection( wxVERTICAL );
 	fgSizer6->SetNonFlexibleGrowMode( wxFLEX_GROWMODE_SPECIFIED );
 	
 	m_labServoLeft = new wxStaticText( m_Servo, wxID_ANY, wxT("Left"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_labServoLeft->Wrap( -1 );
-	fgSizer6->Add( m_labServoLeft, 0, wxALL|wxALIGN_CENTER_HORIZONTAL, 5 );
+	fgSizer6->Add( m_labServoLeft, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	m_labServoRight = new wxStaticText( m_Servo, wxID_ANY, wxT("Right"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_labServoRight->Wrap( -1 );
-	fgSizer6->Add( m_labServoRight, 0, wxALL|wxALIGN_CENTER_HORIZONTAL, 5 );
+	fgSizer6->Add( m_labServoRight, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	m_labServoSpeed = new wxStaticText( m_Servo, wxID_ANY, wxT("Speed"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_labServoSpeed->Wrap( -1 );
-	fgSizer6->Add( m_labServoSpeed, 0, wxALL|wxALIGN_CENTER_HORIZONTAL, 5 );
+	fgSizer6->Add( m_labServoSpeed, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	m_labServoBounce = new wxStaticText( m_Servo, wxID_ANY, wxT("Bounce"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_labServoBounce->Wrap( -1 );
+	fgSizer6->Add( m_labServoBounce, 0, wxALL|wxALIGN_CENTER_VERTICAL|wxALIGN_CENTER_HORIZONTAL, 5 );
 	
 	m_ServoLeftAng = new wxSlider( m_Servo, wxID_ANY, 50, 1, 100, wxDefaultPosition, wxDefaultSize, wxSL_AUTOTICKS|wxSL_INVERSE|wxSL_VERTICAL );
-	fgSizer6->Add( m_ServoLeftAng, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxEXPAND, 5 );
+	fgSizer6->Add( m_ServoLeftAng, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxEXPAND|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	m_ServoRightAng = new wxSlider( m_Servo, wxID_ANY, 50, 1, 100, wxDefaultPosition, wxDefaultSize, wxSL_AUTOTICKS|wxSL_INVERSE|wxSL_VERTICAL );
-	fgSizer6->Add( m_ServoRightAng, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxEXPAND, 5 );
+	fgSizer6->Add( m_ServoRightAng, 0, wxALL|wxEXPAND|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	m_ServoSpeed = new wxSlider( m_Servo, wxID_ANY, 1, 1, 4, wxDefaultPosition, wxDefaultSize, wxSL_AUTOTICKS|wxSL_INVERSE|wxSL_VERTICAL );
-	fgSizer6->Add( m_ServoSpeed, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxEXPAND, 5 );
+	fgSizer6->Add( m_ServoSpeed, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxEXPAND|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	m_ServoBounce = new wxSlider( m_Servo, wxID_ANY, 0, 0, 3, wxDefaultPosition, wxDefaultSize, wxSL_AUTOTICKS|wxSL_INVERSE|wxSL_VERTICAL );
+	fgSizer6->Add( m_ServoBounce, 0, wxALL|wxEXPAND|wxALIGN_CENTER_VERTICAL|wxALIGN_CENTER_HORIZONTAL, 5 );
 	
 	m_SetLeftAngle = new wxButton( m_Servo, wxID_ANY, wxT("Set"), wxDefaultPosition, wxSize( 60,-1 ), 0 );
-	fgSizer6->Add( m_SetLeftAngle, 0, wxALL|wxALIGN_CENTER_HORIZONTAL, 5 );
+	fgSizer6->Add( m_SetLeftAngle, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	m_SetRightAngle = new wxButton( m_Servo, wxID_ANY, wxT("Set"), wxDefaultPosition, wxSize( 60,-1 ), 0 );
-	fgSizer6->Add( m_SetRightAngle, 0, wxALL|wxALIGN_CENTER_HORIZONTAL, 5 );
+	fgSizer6->Add( m_SetRightAngle, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5 );
 	
 	m_SetSpeed = new wxButton( m_Servo, wxID_ANY, wxT("Set"), wxDefaultPosition, wxSize( 60,-1 ), 0 );
-	fgSizer6->Add( m_SetSpeed, 0, wxALL|wxALIGN_CENTER_HORIZONTAL, 5 );
+	fgSizer6->Add( m_SetSpeed, 0, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	m_SertBounce = new wxButton( m_Servo, wxID_ANY, wxT("Set"), wxDefaultPosition, wxSize( 60,-1 ), 0 );
+	fgSizer6->Add( m_SertBounce, 0, wxALL|wxALIGN_CENTER_VERTICAL|wxALIGN_CENTER_HORIZONTAL, 5 );
 	
 	bSizer11->Add( fgSizer6, 1, wxEXPAND, 5 );
 	
@@ -191,6 +212,8 @@ mgvdlggen::mgvdlggen( wxWindow* parent, wxWindowID id, const wxString& title, co
 	m_StdButton = new wxStdDialogButtonSizer();
 	m_StdButtonOK = new wxButton( this, wxID_OK );
 	m_StdButton->AddButton( m_StdButtonOK );
+	m_StdButtonHelp = new wxButton( this, wxID_HELP );
+	m_StdButton->AddButton( m_StdButtonHelp );
 	m_StdButton->Realize();
 	bSizer6->Add( m_StdButton, 1, wxEXPAND|wxALL|wxALIGN_RIGHT, 5 );
 	
@@ -207,10 +230,13 @@ mgvdlggen::mgvdlggen( wxWindow* parent, wxWindowID id, const wxString& title, co
 	m_ServoLeftAng->Connect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoLeftAngle ), NULL, this );
 	m_ServoRightAng->Connect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoRightAngle ), NULL, this );
 	m_ServoSpeed->Connect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoSpeed ), NULL, this );
+	m_ServoBounce->Connect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoBounce ), NULL, this );
 	m_SetLeftAngle->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetLeftAngle ), NULL, this );
 	m_SetRightAngle->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetRightAngle ), NULL, this );
 	m_SetSpeed->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetSpeed ), NULL, this );
+	m_SertBounce->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetBounce ), NULL, this );
 	m_ServoRelay->Connect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( mgvdlggen::OnServoRelay ), NULL, this );
+	m_StdButtonHelp->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onHelp ), NULL, this );
 	m_StdButtonOK->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::OnOK ), NULL, this );
 }
 
@@ -223,9 +249,13 @@ mgvdlggen::~mgvdlggen()
 	m_ServoLeftAng->Disconnect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoLeftAngle ), NULL, this );
 	m_ServoRightAng->Disconnect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoRightAngle ), NULL, this );
 	m_ServoSpeed->Disconnect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoSpeed ), NULL, this );
+	m_ServoBounce->Disconnect( wxEVT_SCROLL_THUMBRELEASE, wxScrollEventHandler( mgvdlggen::OnServoBounce ), NULL, this );
 	m_SetLeftAngle->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetLeftAngle ), NULL, this );
 	m_SetRightAngle->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetRightAngle ), NULL, this );
 	m_SetSpeed->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetSpeed ), NULL, this );
+	m_SertBounce->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onSetBounce ), NULL, this );
 	m_ServoRelay->Disconnect( wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler( mgvdlggen::OnServoRelay ), NULL, this );
+	m_StdButtonHelp->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::onHelp ), NULL, this );
 	m_StdButtonOK->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( mgvdlggen::OnOK ), NULL, this );
+	
 }

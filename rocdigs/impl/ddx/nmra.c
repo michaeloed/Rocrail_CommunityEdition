@@ -1,7 +1,8 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
  Some parts are copied from the DDL project of Torsten Vogt: http://www.vogt-it.com/OpenSource/DDL
 
  This program is free software; you can redistribute it and/or
@@ -108,7 +109,7 @@ static const tTranslateData_v3 TranslateData_v3[32][2] = {
 
 static char *preamble = "111111111111111";
 static const int STACKSIZE  = 300;
-static const int BUFFERSIZE = 360;
+#define BUFFERSIZE 360
 
 int translateabel(char *bs) {     /* the result is only an index, no warranty */
    int  i,size;
@@ -1112,7 +1113,7 @@ int protocol_nmra_sm_direct_cvbyte(obj inst, int cv, int value, int verify, int 
    int ack = 0;
 
    /* no special error handling, it's job of the clients */
-   if (cv<0 || cv>1024 || value<0 || value>255) return;
+   if (cv<0 || cv>1024 || value<0 || value>255) return 0;
 
    if (!sm_initialized) sm_init();
 
@@ -1333,7 +1334,7 @@ int nmragetcvbyte(obj inst, int cv) {
    TraceOp.trc( __FILE__, TRCLEVEL_MONITOR, __LINE__, 9999, "PT: cvget for %d", cv);
 
    /* no special error handling, it's job of the clients */
-   if (cv<0 || cv>1024) return;
+   if (cv<0 || cv>1024) return -1;
 
    if (!sm_initialized) sm_init();
 

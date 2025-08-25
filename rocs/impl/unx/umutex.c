@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -94,7 +97,7 @@ Boolean rocs_mutex_wait( iOMutexData o, int t ) {
   if( t == -1 ) {
     rc = pthread_mutex_lock( (pthread_mutex_t*)data->mh );
   }
-  else if( rc = pthread_mutex_trylock( (pthread_mutex_t*)data->mh ) == EBUSY ) {
+  else if( (rc = pthread_mutex_trylock( (pthread_mutex_t*)data->mh )) == EBUSY ) {
     int try = t / 10 + 1;
     do {
       ThreadOp.sleep( 10 );

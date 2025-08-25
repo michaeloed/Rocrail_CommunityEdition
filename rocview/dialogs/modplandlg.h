@@ -1,13 +1,9 @@
-/** ------------------------------------------------------------
-  * Module:
-  * Object:
-  * ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocgui/dialogs/rocgui-dialogs.pjd,v $
-  * $Author: robvrs $
-  * $Date: 2006/02/22 14:10:57 $
-  * $Revision: 1.63 $
-  * $Name:  $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef _MODPLANDLG_H_
 #define _MODPLANDLG_H_
 
@@ -88,6 +84,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end ModPlanDlg event handler declarations
 
 ////@begin ModPlanDlg member function declarations
@@ -105,6 +104,8 @@ public:
 ////@begin ModPlanDlg member variables
     wxStaticText* m_labTitle;
     wxTextCtrl* m_Title;
+    wxStaticText* m_labSubTitle;
+    wxTextCtrl* m_SubTitle;
     wxStaticText* m_labLocoFile;
     wxTextCtrl* m_LocoFile;
     wxStaticText* m_labRoutesFile;

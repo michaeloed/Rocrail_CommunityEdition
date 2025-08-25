@@ -1,7 +1,10 @@
  /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -150,7 +153,7 @@ static Boolean __isChecksum(byte* in) {
 
   if( in[i] != bXor ) {
     TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Xor error: in[%d]=0x%02X xor=0x%02X", i, in[i], bXor );
-    TraceOp.dump( name, TRCLEVEL_EXCEPTION, in, len );
+    TraceOp.dump( name, TRCLEVEL_EXCEPTION, (char*)in, len );
     return False;
   }
 
@@ -229,11 +232,11 @@ static iOSlot __getRmxSlot(iORmxData data, iONode node) {
   cmd[3] = addr / 256;
   cmd[4] = addr % 256;
   if( __transact( data, cmd, rsp, OPC_RMXCHANEL ) ) {
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "got RMX Chanel %d for %s", rsp[5], wLoc.getid(node) );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "got RMX Channel %d for %s", rsp[5], wLoc.getid(node) );
     slot = allocMem( sizeof( struct slot) );
     slot->addr = addr;
     slot->index = rsp[5];
-    slot->protocol = cmd[4];
+    slot->protocol = rsp[6];
     slot->steps = rsp[7];
     slot->sx1 = rsp[6] < 7 ? True:False;
     slot->bus = wLoc.getbus(node);
@@ -344,9 +347,9 @@ static int __translate( iORmxData data, iONode node, byte* out, byte* opcode ) {
     byte pin  = 0x01 << ( wSwitch.getport1( node ) - 1 );
     byte mask = ~pin;
 
-    out[0] = PCKT;
-    out[1] = 6;
-    out[2] = OPC_WRITESX;
+    out[0] = PCKT;          /* message header */
+    out[1] = 7;             /* message length including header and checksum byte */
+    out[2] = OPC_WRITESX;   /* meassage type */
     out[3] = bus;
     out[4] = addr;
     out[5] = 0x01 << ( wSwitch.getport1( node ) - 1 );
@@ -374,7 +377,7 @@ static int __translate( iORmxData data, iONode node, byte* out, byte* opcode ) {
     byte mask = ~pin;
 
     out[0] = PCKT;
-    out[1] = 6;
+    out[1] = 7;
     out[2] = OPC_WRITESX;
     out[3] = bus;
     out[4] = addr;
@@ -391,9 +394,6 @@ static int __translate( iORmxData data, iONode node, byte* out, byte* opcode ) {
         "switch addr %d, port %d, cmd %s", addr, wSwitch.getport1( node ), wSwitch.getcmd( node ) );
     return 7;
   }
-
-
-
 
   /* System command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSysCmd.name() ) ) {
@@ -424,11 +424,7 @@ static int __translate( iORmxData data, iONode node, byte* out, byte* opcode ) {
   else if( StrOp.equals( NodeOp.getName( node ), wLoc.name() ) ) {
     int  speed = 0;
     byte in = 0;
-    Boolean fn = wLoc.isfn( node );
     int    dir = wLoc.isdir( node );
-    int  spcnt = wLoc.getspcnt( node );
-
-    int index = 0;
 
     iOSlot slot = __getSlot(data, node );
 
@@ -437,7 +433,7 @@ static int __translate( iORmxData data, iONode node, byte* out, byte* opcode ) {
       return 0;
     }
 
-    spcnt = slot->steps;
+    int spcnt = slot->steps;
 
     if( wLoc.getV( node ) != -1 ) {
       if( StrOp.equals( wLoc.getV_mode( node ), wLoc.V_mode_percent ) )
@@ -446,22 +442,23 @@ static int __translate( iORmxData data, iONode node, byte* out, byte* opcode ) {
         speed = (wLoc.getV( node ) * spcnt) / wLoc.getV_max( node );
     }
 
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loc=%s addr=%d speed=%d steps=%d lights=%s dir=%s",
-        wLoc.getid(node), wLoc.getaddr(node), speed, spcnt, fn?"on":"off", dir?"forwards":"reverse" );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loc=%s addr=%d speed=%d steps=%d dir=%s",
+        wLoc.getid(node), wLoc.getaddr(node), speed, spcnt, dir?"forwards":"reverse" );
 
     out[0] = PCKT;
-    out[1] = 0x07;
+    out[1] = 7;
     out[2] = OPC_LOCOV;
     out[3] = slot->index;
-    out[4] = speed + (dir?0x00:0x80);
+    out[4] = speed;
     out[5] = (dir?0x00:0x01);
+    *opcode = OPC_LOCOV;
     return 7;
 
   }
 
   /* Function command. */
   else if( StrOp.equals( NodeOp.getName( node ), wFunCmd.name() ) ) {
-    Boolean f0  = False;
+    Boolean f0  = wFunCmd.isf0 ( node );
     Boolean f1  = wFunCmd.isf1 ( node );
     Boolean f2  = wFunCmd.isf2 ( node );
     Boolean f3  = wFunCmd.isf3 ( node );
@@ -493,18 +490,17 @@ static int __translate( iORmxData data, iONode node, byte* out, byte* opcode ) {
       return 0;
     }
 
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function command for %s", wLoc.getid(node) );
-
-    f0 = slot->lights;
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function command for %s, function %d", wLoc.getid(node), wFunCmd.getfnchanged(node) );
 
     out[0] = PCKT;
-    out[1] = 0x08;
+    out[1] = 8;
     out[2] = OPC_LOCOF;
     out[3] = slot->index;
     out[4] = (f0 << 0 | f1 << 1 | f2 << 2 | f3 << 3 | f4 << 4 | f5 << 5 | f6 << 6 | f7 << 7);
     out[5] = (f8 << 0 | f9 << 1 | f10 << 2 | f11 << 3 | f12 << 4 | f13 << 5 | f14 << 6 | f15 << 7);
     out[6] = (f16 << 0 | f17 << 1 | f18 << 2 | f19 << 3 | f20 << 4 | f21 << 5 | f22 << 6 | f23 << 7);
-    return 7;
+    *opcode = OPC_LOCOF;
+    return 8;
 
   }
 
@@ -560,7 +556,7 @@ static void __evaluateFB( iORmxData data ) {
             port = n;
             state = (in & (0x01 << n)) ? 1:0;
             TraceOp.dump ( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_BYTE, (char*)&in, 1 );
-            TraceOp.trc( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_DEBUG, __LINE__, 9999, "fb %d = %d", addr*8+port+1, state );
+            TraceOp.trc( name, data->dummyio ? TRCLEVEL_INFO:TRCLEVEL_MONITOR, __LINE__, 9999, "fb %d = %d", addr*8+port+1, state );
             {
               /* inform listener: Node3 */
               iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
@@ -666,16 +662,25 @@ static Boolean __evaluateRsp( iORmxData data, byte* out, int outsize, byte* in, 
 }
 
 
-static Boolean __readPacket( iORmxData data, byte* in ) {
+static Boolean __readPacket( iORmxData data, byte* in, Boolean cmdResponse ) {
   Boolean rc = data->dummyio;
-
+  /* byte 0 is message header, byte 1 is message length including header and checksum byte */
   if( !data->dummyio ) {
-    rc = SerialOp.read( data->serial, in, 2 );
+    rc = SerialOp.read( data->serial, (char*)in, 2 );
     if( rc && in[0] == 0x7D) {
       int insize = in[1];
-      rc = SerialOp.read( data->serial, in+2, insize - 2 );
+      rc = SerialOp.read( data->serial, (char*)(in+2), insize - 2 );
       if( rc ) {
-        TraceOp.dump( name, TRCLEVEL_BYTE, in, insize );
+        TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "Message received" );
+        TraceOp.dump( name, TRCLEVEL_BYTE, (char*)in, insize );
+        rc = __isChecksum(in);
+        if( !rc ) {
+          TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Checksum error in received data" );
+        }
+        /* unsollicited message from rmx, not a response on a command send, could be a changed SX address */
+        if( rc && !cmdResponse && in[2] == OPC_READSX ) {
+          __evaluateSX(data, in);
+        }
       }
       else {
         /* error reading data */
@@ -685,6 +690,7 @@ static Boolean __readPacket( iORmxData data, byte* in ) {
     else {
       /* error reading header */
       TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "error reading header" );
+      rc = False;
     }
   }
 
@@ -699,20 +705,19 @@ static Boolean __transact( iORmxData data, byte* out, byte* in, byte opcode ) {
     int outsize = out[1];
     int insize  = 0;
     __addChecksum(out);
-
-    TraceOp.dump( name, TRCLEVEL_BYTE, out, outsize );
+    TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "Message send" );
+    TraceOp.dump( name, TRCLEVEL_BYTE, (char*)out, outsize );
     if( !data->dummyio ) {
-      if( rc = SerialOp.write( data->serial, out, outsize ) ) {
+      if( (rc = SerialOp.write( data->serial, (char*)out, outsize )) ) {
         if( in != NULL ) {
-          if( __readPacket( data, in ) ) {
-            int retries = 0;
-            rc = False;
-            while( !rc && retries < 128 ) {
+          int retries = 0;
+          rc = False;
+          while( !rc && retries <128 ) {    /* keep reading until a message with the correct opcode answer is received, but max 128 times */
+            if( __readPacket( data, in, True ) ) {
               rc = __evaluateRsp(data, out, outsize, in, insize, opcode);
               if( !rc )
                 ThreadOp.sleep(10);
               retries++;
-
             }
           }
         }
@@ -752,7 +757,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iORmxData data = Data(inst);
   data->run = False;
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "shutting down <%s>...", data->iid );
@@ -843,13 +848,13 @@ static void __rmxReader( void* threadinst ) {
     if( MutexOp.wait( data->mux ) ) {
       /* checking for unsolicited packets */
       if( SerialOp.available(data->serial) ) {
-        if( __readPacket( data, buffer ) ) {
+        if( __readPacket( data, buffer, False ) ) {
         }
       }
       MutexOp.post( data->mux );
     }
 
-    ThreadOp.sleep( 100 );
+    ThreadOp.sleep( 10 );
   };
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "RMX reader ended." );
 }
@@ -879,12 +884,14 @@ static struct ORmx* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid      = %s", data->iid );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device   = %s", data->device );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "baudrate = 57600 (fix)" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "flow     = %s", wDigInt.getflow(ini) );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
   data->serialOK = False;
   if( !data->dummyio ) {
+    const char* flow = wDigInt.getflow( ini );
     data->serial = SerialOp.inst( data->device );
-    SerialOp.setFlow( data->serial, none );
+    SerialOp.setFlow( data->serial, StrOp.equals( wDigInt.cts, flow )?cts:0 );
     SerialOp.setLine( data->serial, 57600, 8, 2, none, wDigInt.isrtsdisabled( ini ) );
     SerialOp.setTimeout( data->serial, wDigInt.gettimeout(ini), wDigInt.gettimeout(ini) );
     data->serialOK = SerialOp.open( data->serial );

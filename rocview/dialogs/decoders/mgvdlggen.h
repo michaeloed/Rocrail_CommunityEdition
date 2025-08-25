@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version Dec 21 2009)
+// C++ code generated with wxFormBuilder (version Sep 12 2010)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO "NOT" EDIT THIS FILE!
@@ -18,6 +18,7 @@
 #include <wx/sizer.h>
 #include <wx/statline.h>
 #include <wx/spinctrl.h>
+#include <wx/checkbox.h>
 #include <wx/button.h>
 #include <wx/panel.h>
 #include <wx/bitmap.h>
@@ -25,7 +26,6 @@
 #include <wx/icon.h>
 #include <wx/radiobox.h>
 #include <wx/slider.h>
-#include <wx/checkbox.h>
 #include <wx/notebook.h>
 #include <wx/dialog.h>
 
@@ -44,6 +44,8 @@ class mgvdlggen : public wxDialog
 		wxPanel* m_Setup;
 		wxStaticText* m_labIID;
 		wxTextCtrl* m_IID;
+		wxStaticText* m_labBus;
+		wxTextCtrl* m_Bus;
 		wxStaticLine* m_staticline2;
 		wxStaticText* m_staticText14;
 		wxStaticText* m_labAddress;
@@ -61,6 +63,7 @@ class mgvdlggen : public wxDialog
 		wxSpinCtrl* m_Addr4;
 		wxSpinCtrl* m_Port4;
 		wxStaticLine* m_staticline3;
+		wxCheckBox* m_SingleGate;
 		wxStaticText* m_labProgramming;
 		wxButton* m_ProgrammingOn;
 		wxButton* m_ProgrammingOff;
@@ -69,16 +72,20 @@ class mgvdlggen : public wxDialog
 		wxStaticText* m_labServoLeft;
 		wxStaticText* m_labServoRight;
 		wxStaticText* m_labServoSpeed;
+		wxStaticText* m_labServoBounce;
 		wxSlider* m_ServoLeftAng;
 		wxSlider* m_ServoRightAng;
 		wxSlider* m_ServoSpeed;
+		wxSlider* m_ServoBounce;
 		wxButton* m_SetLeftAngle;
 		wxButton* m_SetRightAngle;
 		wxButton* m_SetSpeed;
+		wxButton* m_SertBounce;
 		wxStaticLine* m_staticline4;
 		wxCheckBox* m_ServoRelay;
 		wxStdDialogButtonSizer* m_StdButton;
 		wxButton* m_StdButtonOK;
+		wxButton* m_StdButtonHelp;
 		
 		// Virtual event handlers, overide them in your derived class
 		virtual void OnProgrammingOn( wxCommandEvent& event ) { event.Skip(); }
@@ -87,16 +94,19 @@ class mgvdlggen : public wxDialog
 		virtual void OnServoLeftAngle( wxScrollEvent& event ) { event.Skip(); }
 		virtual void OnServoRightAngle( wxScrollEvent& event ) { event.Skip(); }
 		virtual void OnServoSpeed( wxScrollEvent& event ) { event.Skip(); }
+		virtual void OnServoBounce( wxScrollEvent& event ) { event.Skip(); }
 		virtual void onSetLeftAngle( wxCommandEvent& event ) { event.Skip(); }
 		virtual void onSetRightAngle( wxCommandEvent& event ) { event.Skip(); }
 		virtual void onSetSpeed( wxCommandEvent& event ) { event.Skip(); }
+		virtual void onSetBounce( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnServoRelay( wxCommandEvent& event ) { event.Skip(); }
+		virtual void onHelp( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnOK( wxCommandEvent& event ) { event.Skip(); }
 		
 	
 	public:
 		
-		mgvdlggen( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxT("MGV136 Servo"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxDEFAULT_DIALOG_STYLE );
+		mgvdlggen( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxT("GCA136 Servo"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxDEFAULT_DIALOG_STYLE );
 		~mgvdlggen();
 	
 };

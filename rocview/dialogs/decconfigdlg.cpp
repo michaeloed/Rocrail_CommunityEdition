@@ -1,4 +1,11 @@
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #include "decconfigdlg.h"
+#include "rocview/public/guiapp.h"
 
 #include "rocs/public/trace.h"
 
@@ -51,3 +58,9 @@ void DecConfigDlg::onOK( wxCommandEvent& event ) {
   TraceOp.trc( "deccfg", TRCLEVEL_INFO, __LINE__, 9999, "onOK" );
   EndModal( wxID_OK );
 }
+
+void DecConfigDlg::onHelp( wxCommandEvent& event ) {
+  wxGetApp().openLink( "pt" );
+}
+
+

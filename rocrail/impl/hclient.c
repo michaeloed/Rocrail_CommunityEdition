@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -23,7 +26,7 @@
 #include "rocrail/public/app.h"
 #include "rocrail/impl/hclient_impl.h"
 #include "rocrail/wrapper/public/Global.h"
-#include "rocrail/wrapper/public/RocRail.h"
+#include "rocrail/wrapper/public/FreeRail.h"
 #include "rocrail/wrapper/public/Trace.h"
 
 #include "rocs/public/mem.h"
@@ -138,7 +141,7 @@ static void __header( iOSocket s, int refresh ) {
   SocketOp.fmt( s, "HTTP/1.0 200 OK\r\n" );
   SocketOp.fmt( s, "Content-type: text/html\r\n\r\n" );
   SocketOp.fmt( s, "<html><head><title>Rocrail HTTP Service </title>\n" );
-  SocketOp.fmt( s, "<link href=\"rocrail.gif\" rel=\"shortcut icon\">\n" );
+  SocketOp.fmt( s, "<link href=\"rocrail.gif\" rel=\"short circuit icon\">\n" );
   if( refresh > 0 )
     SocketOp.fmt( s, "<META CONTENT=\"%d\" HTTP-EQUIV=\"refresh\">\n", refresh );
   SocketOp.fmt( s, "</head><body>\n" );
@@ -203,8 +206,8 @@ static void __scan4Trc( iOHClient inst ) {
   iOHClientData   data = Data(inst);
   iODir            dir = NULL;
   const char* fileName = NULL;
-  char* tracepath = FileOp.getPath( wTrace.getrfile( wRocRail.gettrace( AppOp.getIni() ) ) );
-  const char* tracefile = FileOp.ripPath( wTrace.getrfile( wRocRail.gettrace( AppOp.getIni() ) ) );
+  char* tracepath = FileOp.getPath( wTrace.getrfile( wFreeRail.gettrace( AppOp.getIni() ) ) );
+  const char* tracefile = FileOp.ripPath( wTrace.getrfile( wFreeRail.gettrace( AppOp.getIni() ) ) );
   Boolean      absolute = False;
 
   if( tracepath == NULL )
@@ -689,7 +692,7 @@ static void __getLoc( iOHClient inst, const char* str ) {
   iOHClientData data = Data(inst);
   char* nid = __getID( str );
   {
-    iOLoc loc = ModelOp.getLoc( AppOp.getModel(), nid );
+    iOLoc loc = ModelOp.getLoc( AppOp.getModel(), nid, NULL, False );
     if( loc != NULL ) {
       iIHtmlInt html = (iIHtmlInt)loc;
       char* form = html->getForm( loc );
@@ -710,7 +713,7 @@ static void __getLoc( iOHClient inst, const char* str ) {
 
 static void __postLoc( iOHClient inst, const char* postid, const char* postdata ) {
   iOHClientData data = Data(inst);
-  iOLoc loc = ModelOp.getLoc( AppOp.getModel(), postid );
+  iOLoc loc = ModelOp.getLoc( AppOp.getModel(), postid, NULL, False );
   if( loc != NULL ) {
     iIHtmlInt html = (iIHtmlInt)loc;
     char* reply = html->postForm( loc, postdata );
@@ -735,7 +738,7 @@ static Boolean _work( struct OHClient* inst ) {
     char *p = postdata;
     postcall pc = NULL;
     char* postid = NULL;
-    const char* tracefile = FileOp.ripPath( wTrace.getrfile( wRocRail.gettrace( AppOp.getIni() ) ) );
+    const char* tracefile = FileOp.ripPath( wTrace.getrfile( wFreeRail.gettrace( AppOp.getIni() ) ) );
 
     SocketOp.setRcvTimeout( data->socket, 1000 );
     /* Read first HTTP header line: */
@@ -788,7 +791,7 @@ static Boolean _work( struct OHClient* inst ) {
     else if( StrOp.find( str, "GET" ) && StrOp.find( str, " /shutdown?ok=true" ) ) {
       __getBlank( inst );
       SocketOp.disConnect( data->socket );
-      AppOp.shutdown();
+      AppOp.shutdown(0, "WEB Client command");
       return True;
     }
     else if( StrOp.find( str, "GET" ) && StrOp.find( str, " /shutdown?ok=false" ) ) {

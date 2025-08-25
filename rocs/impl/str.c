@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -21,6 +24,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <time.h>
+#include <ctype.h>
 
 #include "rocs/public/str.h"
 #include "rocs/public/mem.h"
@@ -160,19 +164,20 @@ static char* _fmt( const char* fmt, ... ) {
   char s[4096] = {'\0'};
 
   va_start(args, fmt);
-  vsprintf(s, fmt, args);
+  vsnprintf(s, 4095, fmt, args);
   va_end(args);
-
+  s[4095] = '\0';
   return _dup( s );
 }
+
 static char* _fmtID( RocsMemID id, const char* fmt, ... ) {
   va_list args;
   char s[4096] = {'\0'};
 
   va_start(args, fmt);
-  vsprintf(s, fmt, args);
+  vsnprintf(s, 4095, fmt, args);
   va_end(args);
-
+  s[4095] = '\0';
   return _dupID( s, id );
 }
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -17,6 +20,12 @@
  along with this program; if not, write to the Free Software
  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
+
+#define MIN_IB_VERSION_FOR_EXTENDED_FUNCTIONS          0x2000L /* 2.000 */
+#define MIN_OPENDCC_VERSION_FOR_EXTENDED_FUNCTIONS     0x1708L /* 23.08 */
+#define MIN_TAMS_VERSION_FOR_EXTENDED_FUNCTIONS    0x01040666L /* 1.4.6f */
+#define MAX_FB 128
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -95,55 +104,46 @@ static int __count(void) {
 /*
  ***** Private functions.
  */
-static p50state __cts( iOP50xData o ) {
-  /* CTS */
-  int wait4cts = 0;
+static void __recoverCom(iOP50xData data) {
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "trying to recover communication...");
+  if( data->serial != NULL )
+    SerialOp.base.del( data->serial );
+  data->serial = SerialOp.inst( data->device );
+  SerialOp.setFlow( data->serial, data->flow );
+  SerialOp.setLine( data->serial, data->bps, data->bits, data->stopBits, data->parity, wDigInt.isrtsdisabled( data->ini ) );
+  SerialOp.setTimeout( data->serial, data->timeout, data->timeout );
+  data->serialOK = SerialOp.open( data->serial );
 
-  if( o->dummyio )
-    return P50_OK;
-
-  while( wait4cts < o->ctsretry ) {
-    int rc = SerialOp.isCTS( o->serial );
-    if( rc == -1 ) {
-      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "device error; switch to dummy mode" );
-      o->dummyio = True;
-      return P50_CTSERR;
-    }
-    if( rc > 0 ) {
-      return P50_OK;
-    }
-    ThreadOp.sleep( 10 );
-    wait4cts++;
-  }
-  TraceOp.trc(name, TRCLEVEL_WARNING, __LINE__, 9999, "CTS not ready");
-  return P50_CTSERR;
 }
 
 static Boolean __flushP50x( iOP50xData o ) {
+  Boolean ok = False;
   /* Read all pending information on serial port. Interface Hickups if data is pending from previous init! */
-  if( !o->dummyio ) {
+  if( !o->dummyio && MutexOp.trywait( o->mux, o->timeout ) ) {
     byte buffer[256];
     int bAvail = SerialOp.available(o->serial);
     if( bAvail > 0 && bAvail < 256 ) {
       TraceOp.trc(name, TRCLEVEL_WARNING, __LINE__, 9999, "Flushing %d bytes...", bAvail);
-      SerialOp.read( o->serial, buffer, bAvail );
-      TraceOp.dump( NULL, TRCLEVEL_WARNING, buffer, bAvail );
+      SerialOp.read( o->serial, (char*)buffer, bAvail );
+      TraceOp.dump( NULL, TRCLEVEL_WARNING, (char*)buffer, bAvail );
     }
     else if(bAvail >= 256) {
       TraceOp.trc(name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Can not flush %d bytes, check your hardware!", bAvail);
-      return False;
+      ok = False;
     }
     else {
       TraceOp.trc(name, TRCLEVEL_DEBUG, __LINE__, 9999, "flushed");
+      ok = True;
     }
+    MutexOp.post( o->mux );
   }
-  return True;
+  return ok;
 }
 
 
 
-static Boolean __transact( iOP50xData o, char* out, int outsize, char* in, int insize, int inendbyte, int muxwait ) {
-  if( MutexOp.trywait( o->mux, muxwait ) ) {
+static Boolean __transact( iOP50xData o, char* out, int outsize, char* in, int insize, int inendbyte ) {
+  if( MutexOp.trywait( o->mux, o->timeout ) ) {
     Boolean rc = False;
     p50state state = P50_OK;
 
@@ -154,17 +154,6 @@ static Boolean __transact( iOP50xData o, char* out, int outsize, char* in, int i
       MutexOp.post( o->mux );
       return False;
     }
-
-    if( !__flushP50x(o) ) {
-      MutexOp.post( o->mux );
-      return False;
-    }
-
-    if( o->tok)
-      printf( "\n*****token!!! B\n\n" );
-    o->tok = True;
-
-    state = __cts(o);
 
     if( state == P50_OK ) {
 
@@ -219,15 +208,19 @@ static Boolean __transact( iOP50xData o, char* out, int outsize, char* in, int i
           }
         }
       }
-      else
+      else {
+        /* error: try to recover? */
         state = P50_SNDERR;
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "communication error");
+        ThreadOp.sleep(1000);
+        __recoverCom(o);
+      }
     }
     if( state != P50_OK ) {
       const char* strState = state == P50_RCVERR?"RCVERR":"SNDERR";
       TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
         "ERROR in transact!!! rc=%d state=%s\n", SerialOp.getRc( o->serial ), strState );
     }
-    o->tok = False;
     MutexOp.post( o->mux );
 
     if( state != o->state ) {
@@ -257,6 +250,8 @@ static Boolean __transact( iOP50xData o, char* out, int outsize, char* in, int i
         wResponse.setstate( nodeC, wResponse.rcverr );
         errLevel = TRCLEVEL_EXCEPTION;
         break;
+      case P50_ERROR:
+        break;
       }
 
       if( o->listenerFun != NULL && o->listenerObj != NULL )
@@ -281,7 +276,7 @@ static Boolean __transact( iOP50xData o, char* out, int outsize, char* in, int i
  * @param insize Responce size.
  * @return Request size.
  */
-static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insize, int* inendbyte ) {
+static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insize, int* inendbyte, iONode* rsp ) {
   *insize = 0;
   /* BinCmd command. */
   if( StrOp.equals( NodeOp.getName( node ), wBinCmd.name() ) ) {
@@ -330,6 +325,17 @@ static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insi
     p50[3] |= (wSwitch.isactivate( node )?0x40:0x00); /* Set active */
     *insize = 1; /* Return code from P50x. */
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "turnout %d %s", addr, cmdstr );
+
+    if( o->echoswcmds ){
+      iONode nodeC = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+      wSwitch.setbus( nodeC, wSwitch.getbus( node ) );
+      wSwitch.setaddr1( nodeC, wSwitch.getaddr1( node ) );
+      wSwitch.setport1( nodeC, wSwitch.getport1( node ) );
+      if( wSwitch.getiid(node) != NULL )
+        wSwitch.setiid( nodeC, wSwitch.getiid(node) );
+      wSwitch.setstate( nodeC, wSwitch.getcmd( node ) );
+      o->listenerFun( o->listenerObj, nodeC, TRCLEVEL_INFO );
+    }
     return 4;
   }
 
@@ -386,10 +392,15 @@ static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insi
 
     if( wLoc.getV( node ) != -1 ) {
       if( StrOp.equals( wLoc.getV_mode( node ), wLoc.V_mode_percent ) )
-        speed = (wLoc.getV( node ) * 127) / 100;
+        speed = (wLoc.getV( node ) * 126) / 100;
       else if( wLoc.getV_max( node ) > 0 )
-        speed = (wLoc.getV( node ) * 127) / wLoc.getV_max( node );
+        speed = (wLoc.getV( node ) * 126) / wLoc.getV_max( node );
     }
+    if( speed > 0 ) {
+      /* skip step 1: emergency break */
+      speed++;
+    }
+
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loc %d speed=%d lights=%s dir=%s",
         addr, speed, fn?"on":"off", dir?"forwards":"reverse" );
 
@@ -401,7 +412,7 @@ static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insi
     p50[5] = 0; /* reset */
     p50[5] |= fn?0x10:0x00;
     p50[5] |= dir?0x20:0x00;
-    p50[5] |= 0x40; /* Force */
+    p50[5] |= (o->force?0x40:0x00); /* Force */
     *insize = 1; /* Return code from P50x. */
     return 6;
   }
@@ -409,7 +420,36 @@ static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insi
   else if( StrOp.equals( NodeOp.getName( node ), wFunCmd.name() ) ) {
     int   addr = wFunCmd.getaddr( node );
     int group = wFunCmd.getgroup(node);
-    if( group > 2 ) {
+    if( group > 4 ) {
+      Boolean f1 = wFunCmd.isf17 ( node );
+      Boolean f2 = wFunCmd.isf18( node );
+      Boolean f3 = wFunCmd.isf19( node );
+      Boolean f4 = wFunCmd.isf20( node );
+      Boolean f5 = wFunCmd.isf21( node );
+      Boolean f6 = wFunCmd.isf22( node );
+      Boolean f7 = wFunCmd.isf23( node );
+      Boolean f8 = wFunCmd.isf24( node );
+      Boolean f9  = wFunCmd.isf25( node );
+      Boolean f10 = wFunCmd.isf26( node );
+      Boolean f11 = wFunCmd.isf27( node );
+      Boolean f12 = wFunCmd.isf28( node );
+      int   info  = (f1?0x01:0) + (f2?0x02:0) + (f3?0x04:0) + (f4?0x08:0) + (f5?0x10:0) + (f6?0x20:0) + (f7?0x40:0) + (f8?0x80:0);
+      int   info2 = (f9?0x01:0) + (f10?0x02:0) + (f11?0x04:0) + (f12?0x08:0);
+      p50[0] = (byte)'x';
+      p50[1] = 0x8A;
+      p50[2] = (byte)(addr&0xFF);
+      p50[3] = (addr >> 8) & 0xFF;
+      p50[4] = (unsigned char)info;
+      p50[5] = (unsigned char)info2;
+      *insize = 1; /* Return code from P50x. */
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
+              "loc %d f17=%s f18=%s f19=%s f20=%s f21=%s f22=%s f23=%s f24=%s f25=%s f26=%s f27=%s f28=%s",
+              addr, f1?"on":"off", f2?"on":"off", f3?"on":"off", f4?"on":"off",
+              f5?"on":"off", f6?"on":"off", f7?"on":"off", f8?"on":"off",
+              f9?"on":"off", f10?"on":"off", f11?"on":"off", f12?"on":"off");
+      return 6;
+    }
+    else if( group > 2 ) {
       Boolean f1 = wFunCmd.isf9 ( node );
       Boolean f2 = wFunCmd.isf10( node );
       Boolean f3 = wFunCmd.isf11( node );
@@ -457,11 +497,22 @@ static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insi
   /* System command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSysCmd.name() ) ) {
     const char* cmd = wSysCmd.getcmd( node );
-    if( StrOp.equals( cmd, wSysCmd.stop ) || StrOp.equals( cmd, wSysCmd.ebreak ) ) {
+    if( StrOp.equals( cmd, wSysCmd.enablecom ) ) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "%s: %s communication", o->iid, wSysCmd.getval(node) == 1 ? "enable":"disable" );
+      o->dummyio = wSysCmd.getval(node) == 0 ? True:False;
+    }
+    else if( StrOp.equals( cmd, wSysCmd.stop ) ) {
       p50[0] = (byte)'x';
       p50[1] = 0xa6;
       *insize = 1; /* Return code from P50x. */
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Power OFF" );
+      return 2;
+    }
+    else if( StrOp.equals( cmd, wSysCmd.ebreak ) ) {
+      p50[0] = (byte)'x';
+      p50[1] = 0xa5;
+      *insize = 1; /* Return code from P50x. */
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Emergency Break" );
       return 2;
     }
     else if( StrOp.equals( cmd, wSysCmd.go ) ) {
@@ -490,10 +541,12 @@ static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insi
   }
   /* Feedback command. */
   else if( StrOp.equals( NodeOp.getName( node ), wFeedback.name() ) ) {
-    int mod = wFeedback.getaddr( node )/16;
-    p50[0] = (unsigned char)(192+mod);
-    *insize = 2;
-    return 1;
+    int addr = wFeedback.getaddr( node );
+    Boolean state = wFeedback.isstate( node );
+
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "simulate fb addr=%d state=%s", addr, state?"true":"false" );
+    *rsp = (iONode)NodeOp.base.clone( node );
+    return 0;
   }
   /* Program command. */
   else if( StrOp.equals( NodeOp.getName( node ), wProgram.name() ) ) {
@@ -548,7 +601,6 @@ static int __translate( iOP50xData o, iONode node, unsigned char* p50, int* insi
         Antwort: 0 = Ok, accepted
                  0x80 = busy, command ignored
         */
-
         p50[0] = (byte)'x';
         p50[1] = 0xDE;
         p50[2] = addr & 0xFF;
@@ -581,19 +633,22 @@ static Boolean __getversion( iOP50x inst ) {
   iOP50xData data = Data(inst);
   char out[8] = {'x',0xA0};
   char in[256];
+  char inVersion[256];
+  char inSerno[256];
   char rl = 0;
   int idx = 0;
   int outsize = 2;
   int insize = 0;
+  int sizeVersion = 0;
+  int sizeSerno = 0;
   p50state state = P50_OK;
   Boolean ok = False;
   memset(in,0,32);
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Sending XNOP..." );
-  out[0]= 'x';
-  out[1]= 0xC4;
-
   if( !data->dummyio && MutexOp.trywait( data->mux, data->timeout ) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Sending XNOP..." );
+    out[0]= 'x';
+    out[1]= 0xC4;
 
     if( SerialOp.write( data->serial, (char*)out, 2 ) ) {
       if( !SerialOp.read( data->serial, (char*)in, 1 ) )
@@ -602,14 +657,14 @@ static Boolean __getversion( iOP50x inst ) {
     else
       state = P50_SNDERR;
 
-    if( state = P50_OK ) {
-    int bAvail = 0;
-    ThreadOp.sleep( 500 );
-    bAvail = SerialOp.available(data->serial);
-    if( bAvail > 0 && bAvail < 32 )
-      SerialOp.read( data->serial, (char*)in, bAvail );
+    if( state == P50_OK ) {
+      int bAvail = 0;
+      ThreadOp.sleep( 500 );
+      bAvail = SerialOp.available(data->serial);
+      if( bAvail > 0 && bAvail < 32 )
+        SerialOp.read( data->serial, (char*)in, bAvail );
       if( bAvail == 1 ) {
-        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "p50 mode detected!!!" );
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Wrong protocol syntax detected! Set the interface syntax to 6050 & IB. (SO2=2)" );
         MutexOp.post( data->mux );
         return False;
       }
@@ -628,7 +683,7 @@ static Boolean __getversion( iOP50x inst ) {
       /* First in byte tells how much bytes are comming. */
       if( SerialOp.read( data->serial, in, 1 ) ) {
         state = P50_OK;
-        insize = in[0];
+        sizeVersion = in[0];
       }
       else {
         state = P50_RCVERR;
@@ -636,7 +691,7 @@ static Boolean __getversion( iOP50x inst ) {
         return False;
       }
 
-      if( SerialOp.read( data->serial, in, insize ) ) {
+      if( SerialOp.read( data->serial, inVersion, sizeVersion ) ) {
         state = P50_OK;
       }
       else {
@@ -645,37 +700,17 @@ static Boolean __getversion( iOP50x inst ) {
         return False;
       }
 
-      TraceOp.dump( NULL, TRCLEVEL_BYTE, in, insize );
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-                   "Intellibox version --- %c.%c%c%c ---",
-                   ((in[1] & 0xF0) >> 4) + 0x30,
-                   (in[1] & 0x0F) + 0x30,
-                   ((in[0] & 0xF0) >> 4) + 0x30,
-                   (in[0] & 0x0F) + 0x30
-                   );
-
       /* Read the rest of the XVer: */
+      /* store all into inSerno-buffer, because last item read will be the serno */
       do {
         rl = 0;
         ok = SerialOp.read( data->serial, &rl, 1 );
         if( ok && rl > 0 ) {
-          ok = SerialOp.read( data->serial, in, rl );
-          if( ok && idx == 4 && rl == 5 ) {
-            /* Should be sn: */
-            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
-                         "Intellibox serial number --- %c%c%c%c%c%c%c%c%c%c ---",
-                         ((in[0] & 0xF0) >> 4) + 0x30,
-                         (in[0] & 0x0F) + 0x30,
-                         ((in[1] & 0xF0) >> 4) + 0x30,
-                         (in[1] & 0x0F) + 0x30,
-                         ((in[2] & 0xF0) >> 4) + 0x30,
-                         (in[2] & 0x0F) + 0x30,
-                         ((in[3] & 0xF0) >> 4) + 0x30,
-                         (in[3] & 0x0F) + 0x30,
-                         ((in[4] & 0xF0) >> 4) + 0x30,
-                         (in[4] & 0x0F) + 0x30
-                        );
-          }
+          ok = SerialOp.read( data->serial, inSerno, rl );
+          if( ok )
+            sizeSerno = rl;
+          else
+            sizeSerno = 0;
         }
         else if( rl == 0 ) {
           /* End of sequence. */
@@ -685,15 +720,154 @@ static Boolean __getversion( iOP50x inst ) {
       } while( ok && rl > 0 && idx < 10 );
 
       MutexOp.post( data->mux );
+    } /* End of reading */
 
+    /*
+     * Version Info:
+     * IB      6 answers first is 2 Bytes (BCD)
+     * OpenDCC 1 answer           1 Bytes (BYTE) (until V0.14, only version)
+     * OpenDCC 1 answer           2 Bytes (BYTE) (since V0.15, version+serno combined)
+     * OpenDCC 2 answers first is 2 Bytes (BYTE) (since V0.23.8release)
+     * Tams    2 answers first is 3 Bytes (BCD) or 4 Bytes (3*BCD + ASCII)
+     * MoPi    2 answer           3 Bytes (BYTE) (stores version: major, minor, build)
+     */
 
-    }
-    else {
-      MutexOp.post( data->mux );
-      return False;
+    TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "__getversion sizeVersion %d sizeSerno %d idx %d", sizeVersion, sizeSerno, idx );
+    TraceOp.dump( NULL, TRCLEVEL_BYTE, inVersion, sizeVersion );
+    TraceOp.dump( NULL, TRCLEVEL_BYTE, inSerno, sizeSerno );
+
+    switch (sizeVersion) {
+      case 0:
+        if (sizeSerno == 3)
+        {
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "MoPi connector --- %d.%d.%d ---",
+                                                 (unsigned int) (inSerno[0]),
+                                                 (unsigned int) (inSerno[1]),
+                                                 (unsigned int) (inSerno[2]));
+        }
+        break;
+
+      case 1:
+        if( idx == 0 ) {
+          /* OpenDCC until V0.14, only version (1 byte) */
+          data->swversion = ( inVersion[0] & 0xFF ) << 8 ;
+
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "OpenDCC version --- 0.%d.0 ---",
+                                                                  (unsigned int) (inVersion[0] & 0xFF) );
+        }
+        break;
+      case 2:
+        if( idx == 0 ) {
+          /* OpenDCC V0.15 until V0.23.8beta, (2 bytes version+serno) */
+          data->swversion = ( inVersion[0] & 0xFF ) << 8 ;
+
+          if( (inVersion[0] & 0xFF) == 86 ) {
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "MDRRC version --- 0.%d.0 ---",
+                                                                    (unsigned int) (inVersion[0] & 0xFF) );
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "MDRRC serial# --- %d ---",
+                                                                    (unsigned int) (inVersion[1] & 0xFF) );
+            data->echoswcmds = True;
+          }
+          else {
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "OpenDCC version --- 0.%d.0 ---",
+                                                                    (unsigned int) (inVersion[0] & 0xFF) );
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "OpenDCC serial# --- %d ---",
+                                                                    (unsigned int) (inVersion[1] & 0xFF) );
+          }
+        }
+        else if( idx == 1 ) {
+          /* OpenDCC since V0.23.8 (2 bytes version + 1 byte serno) */
+          data->swversion = ( ( inVersion[0] & 0xFF ) << 8 ) + ( inVersion[1] & 0xFF );
+          if( data->swversion >= MIN_OPENDCC_VERSION_FOR_EXTENDED_FUNCTIONS ) {
+            data->useextfunc = True;
+            TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "activated extended function commands" );
+          }
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+                   "OpenDCC version --- %d.%d ---%s",
+                   (inVersion[0] & 0xFF),
+                   (inVersion[1] & 0xFF),
+                   data->useextfunc?" extended functions enabled":""
+                   );
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "OpenDCC version --- %lX (MinVerExt %lX UseExt %s) ---", 
+                     data->swversion, (unsigned long) MIN_OPENDCC_VERSION_FOR_EXTENDED_FUNCTIONS, data->useextfunc?"TRUE":"FALSE" );
+
+          if( sizeSerno == 1 ) {
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "OpenDCC serial# --- %d ---",
+                                                                  (unsigned int) (inSerno[0] & 0xFF) );
+          }
+        }
+        else { /* idx should be 5, I verify/check this only for the serial# */
+          /* Intellibox */
+          data->swversion = ( ( inVersion[1] & 0xFF ) << 8 ) + ( inVersion[0] & 0xFF );
+          if( data->swversion >= MIN_IB_VERSION_FOR_EXTENDED_FUNCTIONS ) {
+            data->useextfunc = True;
+            TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "activated extended function commands" );
+          }
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+                   "Intellibox version --- %c.%c%c%c ---%s",
+                   ((inVersion[1] & 0xF0) >> 4) + 0x30,
+                   (inVersion[1] & 0x0F) + 0x30,
+                   ((inVersion[0] & 0xF0) >> 4) + 0x30,
+                   (inVersion[0] & 0x0F) + 0x30,
+                   data->useextfunc?" extended functions enabled":""
+                   );
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Intellibox version --- %lX (MinVerExt %lX UseExt %s) ---", 
+                     data->swversion, (unsigned long) MIN_IB_VERSION_FOR_EXTENDED_FUNCTIONS, data->useextfunc?"TRUE":"FALSE" );
+
+          if( idx == 5 && sizeSerno == 5 ) {
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+                             "Intellibox serial# --- %c%c%c%c%c%c%c%c%c%c ---",
+                             ((inSerno[0] & 0xF0) >> 4) + 0x30,
+                             (inSerno[0] & 0x0F) + 0x30,
+                             ((inSerno[1] & 0xF0) >> 4) + 0x30,
+                             (inSerno[1] & 0x0F) + 0x30,
+                             ((inSerno[2] & 0xF0) >> 4) + 0x30,
+                             (inSerno[2] & 0x0F) + 0x30,
+                             ((inSerno[3] & 0xF0) >> 4) + 0x30,
+                             (inSerno[3] & 0x0F) + 0x30,
+                             ((inSerno[4] & 0xF0) >> 4) + 0x30,
+                             (inSerno[4] & 0x0F) + 0x30
+                            );
+          }
+        }
+        break;
+      case 3:
+      case 4:
+        /* Tams */
+        inVersion[sizeVersion] = 0x00;
+        data->swversion = ( (inVersion[0] & 0xFF) << 24 ) + ( (inVersion[1] & 0xFF) << 16 ) + ( (inVersion[2] & 0xFF) << 8 ) ;
+        if (sizeVersion == 4) {
+          /* ASCII char ! */
+          data->swversion += (inVersion[3] & 0xFF);
+        }
+        if( data->swversion >= MIN_TAMS_VERSION_FOR_EXTENDED_FUNCTIONS ) {
+          data->useextfunc = True;
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "TamsMC %s activated extended function commands", data->iid );
+        }
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+                   "TamsMC version --- %d.%d.%.d%s ---%s",
+                   (inVersion[0] & 0xFF),
+                   (inVersion[1] & 0xFF),
+                   (inVersion[2] & 0xFF),
+                   (sizeVersion == 4) ? inVersion+3 : "",
+                   data->useextfunc?" extended functions enabled":""
+                   );
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "TamsMC version --- %08.8lX (MinVerExt %08.8lX UseExt %s) ---", 
+                     data->swversion, (unsigned long) MIN_TAMS_VERSION_FOR_EXTENDED_FUNCTIONS, data->useextfunc?"TRUE":"FALSE" );
+
+        if( idx == 1 && sizeSerno == 4 ) {
+        /* Should be sn: */
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+                           "TamsMC serial# --- %02.2X%02.2X%02.2X%02.2X ---",
+                           (inSerno[0] & 0xFF), (inSerno[1] & 0xFF), (inSerno[2] & 0xFF), (inSerno[3] & 0xFF)
+                          );
+        }
+        break;
+      default:
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "P50X getversion: sizeVersion=%d sizeSerno=%d idx=%d", sizeVersion, sizeSerno, idx );
+        break;
     }
   }
-
   return True;
 }
 
@@ -728,7 +902,7 @@ static iONode _cmd( obj inst, const iONode nodeA ) {
   MemOp.set( in, 0x00, sizeof( in ) );
 
   if( nodeA != NULL ) {
-    int size = __translate( o, nodeA, out, &insize, &inendbyte );
+    int size = __translate( o, nodeA, out, &insize, &inendbyte, &nodeB );
 
     if( StrOp.equals( NodeOp.getName( nodeA ), wSysCmd.name() ) && StrOp.equals( wSysCmd.getcmd( nodeA ), "stopio" ) ) {
       o->stopio = True;
@@ -737,7 +911,7 @@ static iONode _cmd( obj inst, const iONode nodeA ) {
       o->stopio = False;
     }
 
-    else if( __transact( o, (char*)out, size, (char*)in, insize, inendbyte, o->timeout ) ) {
+    else if( size > 0 && __transact( o, (char*)out, size, (char*)in, insize, inendbyte ) ) {
       /* inform listener */
       if( insize > 0 ) {
         if( StrOp.equals( NodeOp.getName( nodeA ), wSwitch.name() ) ) {
@@ -757,7 +931,7 @@ static iONode _cmd( obj inst, const iONode nodeA ) {
             /*wResponse.seterror( nodeB, True );*/
           }
         }
-        else {
+        else if( !StrOp.equals( NodeOp.getName( nodeA ), wProgram.name() ) ) {
           char* s = StrOp.byteToStr( in, insize );
           nodeB = NodeOp.inst( NodeOp.getName( nodeA ), NULL, ELEMENT_NODE );
           wResponse.setdata( nodeB, s );
@@ -772,17 +946,18 @@ static iONode _cmd( obj inst, const iONode nodeA ) {
   return nodeB;
 }
 
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOP50xData data = Data(inst);
   unsigned char p50[2];
 
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
   data->run = False;
   if( poweroff ) {
     p50[0] = (unsigned char)97;
-    __transact( data, (char*)p50, 1, NULL, 0, -1, 10 );
+    __transact( data, (char*)p50, 1, NULL, 0, -1 );
   }
+  ThreadOp.sleep(100);
   SerialOp.close( data->serial );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
 }
 
 
@@ -794,7 +969,7 @@ static Boolean _supportPT( obj inst ) {
 
 static void __evaluateState( iOP50xData o, unsigned char* fb1, unsigned char* fb2, int size ) {
   int i = 0;
-  for( i = 0; i < size; i++ ) {
+  for( i = 0; i < size && i < MAX_FB; i++ ) {
     if( fb1[i] != fb2[i] ) {
       int n = 0;
       int addr = 0;
@@ -829,11 +1004,13 @@ static void __evaluateState( iOP50xData o, unsigned char* fb1, unsigned char* fb
 
 static void __evaluateLocoNet( iOP50xData o, int module, byte* value ) {
   /* assuming Lissy */
+  char ident[32];
   int identifier = (value[1] << 8) + value[0];
   iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
   wFeedback.setaddr( nodeC, module );
   wFeedback.setstate( nodeC, identifier > 0 ? True:False );
-  wFeedback.setidentifier( nodeC, identifier );
+  StrOp.fmtb(ident, "%d", identifier);
+  wFeedback.setidentifier( nodeC, ident );
   if( o->iid != NULL )
     wFeedback.setiid( nodeC, o->iid );
 
@@ -890,7 +1067,7 @@ static void __evaluatePTevent( iOP50x p50, byte* in, int size ) {
     }
     else {
       val = in[1]; /* cv value or status */
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "CV value=%d", val );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "CV[%d] value=%d", o->cv_nr, val );
       cmd = wProgram.datarsp;
     }
 
@@ -918,17 +1095,18 @@ static void __PTeventReader( void* threadinst ) {
   byte in [32];
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "PTevent reader started." );
+  ThreadOp.sleep(500);
   do {
 
-    ThreadOp.sleep( 250 );
+    ThreadOp.sleep( o->psleep );
 
     out[0] = (byte)'x';
     out[1] = 0xCE;
 
     if( !o->stopio && !o->dummyio && MutexOp.trywait( o->mux, o->timeout ) ) {
-      Boolean ptEvent = False;
+      Boolean ptEvent   = False;
+      Boolean bidiEvent = False;
       out[1] = 0xC8;
-      state = __cts( o );
       if( state == P50_OK ) {
         if( SerialOp.write( o->serial, (char*)out, 2 ) ) {
           byte evt[3] = {0,0,0};
@@ -944,7 +1122,8 @@ static void __PTeventReader( void* threadinst ) {
                 if( evt[1] & 0x80 ) {
                   if( SerialOp.read( o->serial, (char*)&evt[2], 1 ) ) {
                     /* 3rd flag TODO: evaulate */
-                    ptEvent = (evt[2] & 0x01) ? True:False;
+                    ptEvent = (evt[2] & 0x21) ? True:False;
+                    bidiEvent = (evt[2] & 0x40) ? True:False;
                     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999,
                         "3rd event flags = 0x%02X", evt[2] );
                   }
@@ -953,11 +1132,16 @@ static void __PTeventReader( void* threadinst ) {
             }
           }
         }
+        else {
+          /* error: try to recover? */
+          TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "communication error");
+          ThreadOp.sleep(1000);
+          __recoverCom(o);
+        }
       }
 
       if( ptEvent ) {
         out[1] = 0xCE;
-        state = __cts( o );
         if( state == P50_OK ) {
           if( SerialOp.write( o->serial, (char*)out, 2 ) ) {
             byte evt = 0;
@@ -988,12 +1172,12 @@ static void __PTeventReader( void* threadinst ) {
 static void __handleSwitch(iOP50x p50x, int pada, int state) {
   iOP50xData data = Data(p50x);
 
-  int port;
-  int addr;
-  int value;
+  int port = 0;
+  int addr = 0;
+  Boolean value = False;
 
-  if( state == 0x80) value = 1;
-  else value = 0;
+  if( state & 0x80)
+    value = True;
 
   AddrOp.fromPADA( pada, &addr, &port );
 
@@ -1055,9 +1239,106 @@ static void __handleLoco(iOP50x p50x, byte* status) {
   wFunCmd.setf7( nodeC, (status[1] & 0x40) ? True:False );
   wFunCmd.setf8( nodeC, (status[1] & 0x80) ? True:False );
   wLoc.setthrottleid( nodeC, "p50x" );
+  wFunCmd.setgroup(nodeC, 0 );
+
+  if( data->useextfunc ) {
+    byte out[8];
+    byte in[512];
+
+    if( !data->stopio && !data->dummyio && MutexOp.trywait( data->mux, data->timeout ) ) {
+      /* XFunc2Sts / XFuncXSts */
+      out[0] = (byte)'x';
+      out[1] = 0x8D;
+      out[2] = (byte)(addr&0xFF);
+      out[3] = (addr >> 8) & 0x07;
+
+      /* ask for F9 to F16 */
+      TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "check for XFuncXSts F9-F16 of %d", addr );
+      TraceOp.dump( name, TRCLEVEL_BYTE, (char*)out, 4 );
+      if( SerialOp.write( data->serial, (char*)out, 4 ) ) {
+        Boolean read = SerialOp.read( data->serial, (char*)&in[0], 1 ) ;
+        if( read ) {
+          TraceOp.dump( name, TRCLEVEL_DEBUG, (char*)in, 1 );
+          if (in[0] == 0x00 ) {
+            if( SerialOp.read( data->serial, (char*)in+1, 1 ) ) {
+              TraceOp.dump( name, TRCLEVEL_BYTE, (char*)in, 2 );
+
+              wFunCmd.setf9(  nodeC, (in[1] & 0x01) ? True:False );
+              wFunCmd.setf10( nodeC, (in[1] & 0x02) ? True:False );
+              wFunCmd.setf11( nodeC, (in[1] & 0x04) ? True:False );
+              wFunCmd.setf12( nodeC, (in[1] & 0x08) ? True:False );
+              wFunCmd.setf13( nodeC, (in[1] & 0x10) ? True:False );
+              wFunCmd.setf14( nodeC, (in[1] & 0x20) ? True:False );
+              wFunCmd.setf15( nodeC, (in[1] & 0x40) ? True:False );
+              wFunCmd.setf16( nodeC, (in[1] & 0x80) ? True:False );
+            }
+            else {
+              TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "unable to read loco event");
+            }
+          }
+          else {
+            /* 
+               0x02 XBADPRM - Lokadresse ausserhalb des Bereichs (1 .. 10239)
+               0x0A XNODATA - Es liegen keine Lokdaten vor (Lok nicht in Refresh-Queue)
+            */
+            TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "XFuncXSts ERR %02.2X", (int) in[0] );
+          }
+        }
+        else {
+          TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "no XFuncXSts reply for addr %d", addr );
+        }
+      }
+
+      /* XFunc34Sts */
+      out[0] = (byte)'x';
+      out[1] = 0x8E;
+      out[2] = (byte)(addr&0xFF);
+      out[3] = (addr >> 8) & 0x07;
+
+      /* ask for F17 to F28 */
+      TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "check for XFunc34Sts F17-F28 of %d", addr );
+      TraceOp.dump( name, TRCLEVEL_BYTE, (char*)out, 4 );
+      if( SerialOp.write( data->serial, (char*)out, 4 ) ) {
+        Boolean read = SerialOp.read( data->serial, (char*)&in[0], 1 ) ;
+        if( read ) {
+          TraceOp.dump( name, TRCLEVEL_DEBUG, (char*)in, 1 );
+          if (in[0] == 0x00 ) {
+            if( SerialOp.read( data->serial, (char*)in+1, 2 ) ) {
+              TraceOp.dump( name, TRCLEVEL_BYTE, (char*)in, 3 );
+
+              wFunCmd.setf17( nodeC, (in[1] & 0x01) ? True:False );
+              wFunCmd.setf18( nodeC, (in[1] & 0x02) ? True:False );
+              wFunCmd.setf19( nodeC, (in[1] & 0x04) ? True:False );
+              wFunCmd.setf20( nodeC, (in[1] & 0x08) ? True:False );
+              wFunCmd.setf21( nodeC, (in[1] & 0x10) ? True:False );
+              wFunCmd.setf22( nodeC, (in[1] & 0x20) ? True:False );
+              wFunCmd.setf23( nodeC, (in[1] & 0x40) ? True:False );
+              wFunCmd.setf24( nodeC, (in[1] & 0x80) ? True:False );
+              wFunCmd.setf25( nodeC, (in[2] & 0x01) ? True:False );
+              wFunCmd.setf26( nodeC, (in[2] & 0x02) ? True:False );
+              wFunCmd.setf27( nodeC, (in[2] & 0x04) ? True:False );
+              wFunCmd.setf28( nodeC, (in[2] & 0x08) ? True:False );
+            }
+            else {
+              TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "unable to read loco event");
+            }
+          }
+          else {
+            /* 
+               0x02 XBADPRM - Lokadresse ausserhalb des Bereichs (1 .. 10239)
+               0x0A XNODATA - Es liegen keine Lokdaten vor (Lok nicht in Refresh-Queue)
+            */
+            TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "XFunc34Sts ERR %02.2X", (int) in[0] );
+          }
+        }
+        else {
+          TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "no XFunc34Sts reply for addr %d", addr );
+        }
+      }
+      MutexOp.post( data->mux );
+    }
+  }
   data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
-
-
 }
 
 static void __dummy( void* threadinst ) {
@@ -1105,20 +1386,15 @@ static void __statusReader( void* threadinst ) {
   p50state state = P50_OK;
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Status reader started." );
-  ThreadOp.sleep( 1000 );
+  ThreadOp.sleep( 100 );
   if( !o->dummyio )
     __getversion(p50);
 
   do {
 
-    ThreadOp.sleep( 250 );
+    ThreadOp.sleep( o->psleep );
 
     if( !o->stopio && !o->dummyio && MutexOp.trywait( o->mux, o->timeout ) ) {
-
-      if( !__flushP50x(o) ) {
-        MutexOp.post( o->mux );
-        continue;
-      }
 
       out[0] = (byte)'x';
       out[1] = 0xA2; /* xStatus */
@@ -1136,6 +1412,7 @@ static void __statusReader( void* threadinst ) {
             wState.settrackbus( node, !halt );
             wState.setsensorbus( node, power );
             wState.setaccessorybus( node, power );
+            wState.setenablecom( node, o->dummyio );
 
             if( o->listenerFun != NULL && o->listenerObj != NULL )
               o->listenerFun( o->listenerObj, node, TRCLEVEL_INFO );
@@ -1162,12 +1439,12 @@ static void __statusReader( void* threadinst ) {
             if( SerialOp.read( o->serial, (char*)in, (int) ans*2 ) ) {
               int i = 0;
               for ( i = 0; i < ans; i++) {
-                 __handleSwitch(p50, in[i*2], in[i*2+1]);
+                 __handleSwitch(p50, in[i*2] + ((in[i*2+1]&0x07) * 256), in[i*2+1]);
               }
             }
             else {
               TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "unable to read switch event");
-              TraceOp.dump( name, TRCLEVEL_WARNING, in, SerialOp.getReadCnt(o->serial) );
+              TraceOp.dump( name, TRCLEVEL_WARNING, (char*)in, SerialOp.getReadCnt(o->serial) );
             }
 
           }
@@ -1183,17 +1460,17 @@ static void __statusReader( void* threadinst ) {
       out[1] = 0xC9;
       /* ask for locomotive changes */
       TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "check for XEvtLok..." );
-      TraceOp.dump( name, TRCLEVEL_DEBUG, out, 2 );
+      TraceOp.dump( name, TRCLEVEL_DEBUG, (char*)out, 2 );
       ListOp.clear(evtList);
       if( SerialOp.write( o->serial, (char*)out, 2 ) ) {
         byte* evt = NULL;
         do {
           Boolean read = SerialOp.read( o->serial, (char*)&in[0], 1 ) ;
           if( read ) {
-            TraceOp.dump( name, TRCLEVEL_DEBUG, in, 1 );
+            TraceOp.dump( name, TRCLEVEL_DEBUG, (char*)in, 1 );
             if (in[0] < 0x80 ) {
               if( SerialOp.read( o->serial, (char*)in+1, 4 ) ) {
-                TraceOp.dump( name, TRCLEVEL_DEBUG, in, 5 );
+                TraceOp.dump( name, TRCLEVEL_DEBUG, (char*)in, 5 );
                 evt = allocMem(5);
                 MemOp.copy( evt, in, 5);
                 ListOp.add(evtList, (obj)evt);
@@ -1211,6 +1488,12 @@ static void __statusReader( void* threadinst ) {
             break;
           }
         } while(in[0] != 0x80);
+      }
+      else {
+        /* error: try to recover? */
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "communication error");
+        ThreadOp.sleep(1000);
+        __recoverCom(o);
       }
 
 
@@ -1238,53 +1521,50 @@ static void __feedbackReader( void* threadinst ) {
   iOThread th = (iOThread)threadinst;
   iOP50x p50 = (iOP50x)ThreadOp.getParm( th );
   iOP50xData o = Data(p50);
-  unsigned char* fb = allocMem(256);
+  byte* fb     = allocMem(MAX_FB);
+  byte* s88_in = allocMem(MAX_FB);
   byte out[256];
-  byte in [512];
   byte tmp [8];
-  byte into [512];
   p50state state = P50_OK;
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Feedback p50x reader started." );
   /* set byte arrays to a defined state: */
   MemOp.set( out, 0, 256 );
-  MemOp.set(  in, 0, 512 );
-  MemOp.set(into, 0, 512 );
+  MemOp.set( s88_in, 0, MAX_FB );
 
   out[0] = 'x';
   out[1] = 0x99;
-  __transact( o, (char*)out, 2, in, 1, -1, o->timeout );
+  __transact( o, (char*)out, 2, (char*)s88_in, 1, -1 );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Feedback p50x reader initialized." );
+
   do {
-
-    ThreadOp.sleep( 250 );
-
+    state = P50_OK;
+    ThreadOp.sleep( o->psleep );
     out[0] = (byte)'x';
-    out[1] = 0xCB;
+    out[1] = 0xCB; /*XEvtSen*/
 
     if( !o->stopio && !o->dummyio && MutexOp.trywait( o->mux, o->timeout ) ) {
-      if( o->tok)
-        printf( "\n*****token!!! A\n\n" );
-      o->tok = True;
-      state = __cts( o );
       if( state == P50_OK ) {
+        TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)out, 2 );
         if( SerialOp.write( o->serial, (char*)out, 2 ) ) {
           byte module = 0;
           state = P50_OK;
           if( SerialOp.read( o->serial, (char*)&module, 1 ) ) {
-            /* TODO: modules > 31 are loconet */
-            while( module > 0 && state == P50_OK ) {
-              TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "fbModule = %d", module );
+            /* modules > 31 are loconet */
+            while( module > 0 && module < MAX_FB && state == P50_OK ) {
+              TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "fbModule = %d", module );
+              TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)&module, 1 );
 
               if( !SerialOp.read( o->serial, (char*)tmp, 2 ) ) {
                 state = P50_RCVERR;
                 break;
               }
+              TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)tmp, 2 );
 
-              if( module < 32 ) {
+              if( o->swversion >= MIN_OPENDCC_VERSION_FOR_EXTENDED_FUNCTIONS || module < 32 ) {
                 /* s88 */
-                in[(module-1)*2] = tmp[0];
-                in[((module-1)*2)+1] = tmp[1];
+                s88_in[(module-1)*2] = tmp[0];
+                s88_in[((module-1)*2)+1] = tmp[1];
               }
               else {
                 /* loconet */
@@ -1300,8 +1580,13 @@ static void __feedbackReader( void* threadinst ) {
           else
             state = P50_RCVERR;
         }
-        else
+        else {
+          /* error: try to recover? */
           state = P50_SNDERR;
+          TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "communication error");
+          ThreadOp.sleep(1000);
+          __recoverCom(o);
+        }
 
       }
 
@@ -1312,19 +1597,114 @@ static void __feedbackReader( void* threadinst ) {
           "ERROR reading feedbacks!!! rc=%d state=%s\n", SerialOp.getRc( o->serial ), strState );
       }
 
-      o->tok = False;
       MutexOp.post( o->mux );
 
       /* only compare if communication was OK: */
       if( state == P50_OK ) {
-        if( memcmp( fb, in, o->fbmod * 2 ) != 0 ) {
+        if( memcmp( fb, s88_in, o->fbmod ) != 0 ) {
           /* inform listener */
-          __evaluateState( o, fb, in, o->fbmod * 2);
-          memcpy( fb, in, o->fbmod * 2 );
+          __evaluateState( o, fb, s88_in, o->fbmod);
+          memcpy( fb, s88_in, o->fbmod );
         }
       }
 
     }
+
+    if( o->bidi ) {
+      byte bidi_in [32];
+
+      ThreadOp.sleep( 10 );
+      out[0] = (byte)'x';
+      out[1] = 0xD2; /*XEvtBiDi*/
+
+      if( !o->stopio && !o->dummyio && MutexOp.trywait( o->mux, o->timeout ) ) {
+        if( state == P50_OK ) {
+          TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)out, 2 );
+          if( SerialOp.write( o->serial, (char*)out, 2 ) ) {
+            byte module = 0;
+            state = P50_OK;
+            if( SerialOp.read( o->serial, (char*)&bidi_in[0], 1 ) ) {
+              while( bidi_in[0] & 0x80 ) {
+                TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "fbModule = %d", module );
+                if( SerialOp.read( o->serial, (char*)&bidi_in[1], 3 ) ) {
+                  if( bidi_in[3] & 0x40 ) {
+                    if( SerialOp.read( o->serial, (char*)&bidi_in[4], 1 ) ) {
+                      /* Speed byte */
+                    }
+                    else {
+                      break;
+                    }
+                  }
+                }
+                else {
+                  break;
+                }
+
+                TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)bidi_in, 4 );
+
+                /* Report BiDi
+                 1. Byte:       bit#   7     6     5     4     3     2     1     0
+                                    +-----+-----+-----+-----+-----+-----+-----+-----+
+                                    |  LE | res | res | res | D11 | D10 |  D9 |  D8 |
+                                    +-----+-----+-----+-----+-----+-----+-----+-----+
+
+                          LE:      0:   Listenende, es folgen keine weiteren Daten.
+                                   1:   Es folgen Daten fuer diesen Listeneintrag.
+                                   res: reserviert
+                          D11-D8:  DID (DID = Detektor-ID), high nibble;
+
+                 2. Byte: D7-D0:   Detektor-ID, Low Byte
+                 3. Byte: low byte of Lok# (A7..A0)
+                 4. Byte: high byte of Lok#, high byte of Lok#, plus Dir and Speed status, coded as follows:
+                                bit#   7     6     5     4     3     2     1     0
+                                    +-----+-----+-----+-----+-----+-----+-----+-----+
+                                    | Dir | Spd | A13 | A12 | A11 | A10 | A9  | A8  |
+                                    +-----+-----+-----+-----+-----+-----+-----+-----+
+                          Dir: Lokrichtung
+                          Spd: 1: es folgt ein weiteres Byte mit der Istgeschwindigkeit
+                 5. Byte: [optional] Speed gemaess der BiDi-Kodierung
+                             0..63: speed = value / 2;
+                             64..127: speed = value - 32;
+                             128..254: speed = value * 4;
+                             255: Kennzeichnet eine ungueltige Geschwindkeit (wird u.a. intern verwendet).
+                */
+                {
+                  int bidiAddr = bidi_in[1] + ((bidi_in[0] & 0x0F) << 8) + 1;
+                  int locoAddr = bidi_in[2] + ((bidi_in[3] & 0x3F) << 8);
+                  char ident[32];
+                  Boolean dir = (bidi_in[3] & 0x80) ? True:False;
+                  iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+
+                  wFeedback.setaddr( nodeC, bidiAddr );
+                  wFeedback.setfbtype( nodeC, wFeedback.fbtype_railcom );
+
+                  if( o->iid != NULL )
+                    wFeedback.setiid( nodeC, o->iid );
+
+                  StrOp.fmtb(ident, "%d", locoAddr);
+                  wFeedback.setidentifier( nodeC, ident );
+                  wFeedback.setstate( nodeC, locoAddr > 0 ?True:False );
+                  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
+                      "BiDi[%d] reports decoder address [%d] %s",
+                      bidiAddr, locoAddr, dir?"forwards":"reverse" );
+
+                  o->listenerFun( o->listenerObj, nodeC, TRCLEVEL_INFO );
+                }
+
+                /* Next */
+                if( !SerialOp.read( o->serial, (char*)&bidi_in[0], 1 ) ) {
+                  break;
+                }
+
+              }
+            }
+          }
+        }
+
+        MutexOp.post( o->mux );
+      }
+    }
+
 
   } while( o->run );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Feedback p50x reader ended." );
@@ -1335,23 +1715,23 @@ static void __feedbackP50Reader( void* threadinst ) {
   iOThread th = (iOThread)threadinst;
   iOP50x p50x = (iOP50x)ThreadOp.getParm( th );
   iOP50xData data = Data(p50x);
-  unsigned char* fb = allocMem(256);
+  unsigned char* fb = allocMem(MAX_FB);
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Feedback p50 reader started." );
   do {
     unsigned char out[256];
-    unsigned char in [512];
+    unsigned char in [MAX_FB];
 
-    ThreadOp.sleep( 200 );
+    ThreadOp.sleep( data->psleep );
     if( data->stopio || data->fbmod == 0 )
       continue;
 
     out[0] = (unsigned char)(128 + data->fbmod);
-    if( __transact( data, (char*)out, 1, (char*)in, data->fbmod * 2, -1, data->timeout ) ) {
-      if( memcmp( fb, in, data->fbmod * 2 ) != 0 ) {
+    if( __transact( data, (char*)out, 1, (char*)in, data->fbmod, -1 ) ) {
+      if( memcmp( fb, in, data->fbmod ) != 0 ) {
         /* inform listener */
-        __evaluateState( data, fb, in, data->fbmod * 2);
-        memcpy( fb, in, data->fbmod * 2 );
+        __evaluateState( data, fb, in, data->fbmod);
+        memcpy( fb, in, data->fbmod );
       }
     }
   } while( data->run );
@@ -1398,6 +1778,8 @@ static iOP50x _inst( const iONode settings, const iOTrace trace ) {
   /* Evaluate attributes. */
   data->device   = StrOp.dup( wDigInt.getdevice( settings ) );
   data->iid      = StrOp.dup( wDigInt.getiid( settings ) );
+  data->ini      = settings;
+  data->force    = wDigInt.isoverrule(settings);
 
   data->bps      = wDigInt.getbps( settings );
   data->bits     = wDigInt.getbits( settings );
@@ -1405,11 +1787,12 @@ static iOP50x _inst( const iONode settings, const iOTrace trace ) {
   data->timeout  = wDigInt.gettimeout( settings );
   data->fbmod    = wDigInt.getfbmod( settings );
   data->swtime   = wDigInt.getswtime( settings );
-/*  data->psleep   = wDigInt.getpsleep( settings, "psleep"  , 100    );*/
+  data->psleep   = wDigInt.getpsleep( settings );
   data->dummyio  = wDigInt.isdummyio( settings );
   data->ctsretry = wDigInt.getctsretry( settings );
   data->readfb   = wDigInt.isreadfb( settings );
   data->run      = True;
+  data->bidi     = wDigInt.isreadbidi( settings );
 
   data->serialOK = False;
   data->initOK = False;
@@ -1432,6 +1815,9 @@ static iOP50x _inst( const iONode settings, const iOTrace trace ) {
   else if( StrOp.equals( wDigInt.xon, flow ) )
     data->flow = xon;
 
+  if( data->fbmod > MAX_FB )
+    data->fbmod = MAX_FB;
+
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x %d.%d.%d", vmajor, vminor, patch );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
@@ -1442,8 +1828,10 @@ static iOP50x _inst( const iONode settings, const iOTrace trace ) {
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x timeout=%d", data->timeout );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x ctsretry=%d", data->ctsretry );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x readbidi=%d", data->bidi );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x readfb=%d", data->readfb );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x fbmod=%d", data->fbmod );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x poll sleep=%d", data->psleep );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "p50x swtime=%d", data->swtime );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
@@ -1454,6 +1842,7 @@ static iOP50x _inst( const iONode settings, const iOTrace trace ) {
   data->serialOK = SerialOp.open( data->serial );
 
   if( data->serialOK ) {
+    __flushP50x(data);
 
     if( wDigInt.isptsupport( settings ) ) {
       data->eventReader = ThreadOp.inst( "evtreader", &__PTeventReader, p50x );

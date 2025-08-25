@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2011 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -20,11 +23,12 @@
 #ifndef BIDIBSERIAL_H_
 #define BIDIBSERIAL_H_
 
+Boolean serialInit( obj inst );
 Boolean serialConnect( obj inst );
 void  serialDisconnect( obj inst );
 
 int serialRead ( obj inst, unsigned char *msg );
-Boolean serialWrite( obj inst, unsigned char *msg, int len );
+Boolean serialWrite( obj inst, unsigned char *path, unsigned char code, unsigned char* data, int datalen, void* node );
 Boolean serialAvailable( obj inst );
 
 #endif /*BIDIBSERIAL_H_*/

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -30,6 +33,7 @@
  */
 
 ////@begin includes
+#include "wx/spinctrl.h"
 ////@end includes
 #include "rocs/public/node.h"
 
@@ -39,6 +43,7 @@
  */
 
 ////@begin forward declarations
+class wxSpinCtrl;
 ////@end forward declarations
 
 /*!
@@ -51,7 +56,6 @@
 #define ID_STATICTEXT_HSI_IID 10001
 #define ID_TEXTCTRL_HSI_IID 10002
 #define ID_STATICTEXT_HSI_DEVICE 10003
-#define ID_TEXTCTRL_HSI_DEVICE 10004
 #define wxID_STATIC_HSI_LEFT 10026
 #define wxID_STATIC_HSI_MID 10027
 #define wxID_STATIC_HSI_RIGHT 10028
@@ -85,11 +89,12 @@ class Hsi88CntrlDlg: public wxDialog
   void initValues();
   void evaluate();
   iONode m_Props;
+  const char* m_Devices;
 
 public:
     /// Constructors
     Hsi88CntrlDlg( );
-    Hsi88CntrlDlg( wxWindow* parent, iONode props );
+    Hsi88CntrlDlg( wxWindow* parent, iONode props, const char* devices=NULL );
 
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_HSI88CNTRLDLG_IDNAME, const wxString& caption = SYMBOL_HSI88CNTRLDLG_TITLE, const wxPoint& pos = SYMBOL_HSI88CNTRLDLG_POSITION, const wxSize& size = SYMBOL_HSI88CNTRLDLG_SIZE, long style = SYMBOL_HSI88CNTRLDLG_STYLE );
@@ -104,6 +109,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end Hsi88CntrlDlg event handler declarations
 
@@ -124,7 +132,7 @@ public:
     wxStaticText* m_labIID;
     wxTextCtrl* m_IID;
     wxStaticText* m_labDevice;
-    wxTextCtrl* m_Device;
+    wxComboBox* m_Device;
     wxRadioBox* m_Type;
     wxStaticBox* m_ChainBox;
     wxStaticText* m_labLeft;
@@ -133,6 +141,11 @@ public:
     wxTextCtrl* m_Left;
     wxTextCtrl* m_Mid;
     wxTextCtrl* m_Right;
+    wxStaticBox* m_OptionsBox;
+    wxCheckBox* m_Smooth;
+    wxSpinCtrl* m_TriggerTime;
+    wxStaticText* m_labTriggerMS;
+    wxCheckBox* m_CTS;
     wxButton* m_OK;
     wxButton* m_Cancel;
 ////@end Hsi88CntrlDlg member variables

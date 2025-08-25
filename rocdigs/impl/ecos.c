@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -163,10 +166,12 @@ ECoS Keywords:
   */
 
 #include <string.h>
+#include <ctype.h>
 
 #include "rocdigs/impl/ecos_impl.h"
 
 #include "rocs/public/mem.h"
+#include "rocs/public/strtok.h"
 
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocrail/wrapper/public/SysCmd.h"
@@ -179,6 +184,9 @@ ECoS Keywords:
 #include "rocrail/wrapper/public/Program.h"
 #include "rocrail/wrapper/public/Output.h"
 #include "rocrail/wrapper/public/Item.h"
+#include "rocrail/wrapper/public/State.h"
+#include "rocrail/wrapper/public/FbMods.h"
+#include "rocrail/wrapper/public/FbInfo.h"
 
 #include "rocdigs/impl/ecos/ecos-parser.h"
 
@@ -190,6 +198,7 @@ static const int OID_SWMANAGER       = 11;
 static const int OID_SNIFFER         = 25;
 static const int OID_S88MANAGER      = 26;
 static const int OID_S88_ALL_MODULES = 100;
+static const int OID_ECoSDetectors   = 200;
 
 static int instCnt = 0;
 
@@ -375,7 +384,7 @@ static void __sends88Eventgroup( iOECoS inst, int news88, int olds88, int s88mod
       int address = s88module * 16 + port + 1;
       Boolean state = news88 & mask ? True:False;
 
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "new event %d %s", address, state?"on":"off" );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "s88 sensor event addr=%d state=%s", address, state?"on":"off" );
 
       /* inform listener: Node */
       iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
@@ -399,8 +408,12 @@ static void __sends88Eventgroup( iOECoS inst, int news88, int olds88, int s88mod
  * __reader function.
  *
  */
-static int __transact( iOECoS inst, const char* ecosCmd, int len ) {
+static void __transact( iOECoS inst, const char* ecosCmd, int len ) {
   iOECoSData data = Data(inst);
+
+  if( !data->enablecom ) {
+    return;
+  }
 
   if ( SocketOp.isConnected( data->socket )) {
 
@@ -539,6 +552,9 @@ static void __requestViews( iOECoS inst ) {
   StrOp.fmtb( ecosCmd, "request(%d, view)\n", OID_S88_ALL_MODULES );
   __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
 
+  StrOp.fmtb( ecosCmd, "request(%d, view)\n", OID_ECoSDetectors );
+  __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
+
   /* loco manager */
   StrOp.fmtb( ecosCmd, "request(%d, view)\n", OID_LCMANAGER );
   __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
@@ -552,6 +568,15 @@ static void __requestViews( iOECoS inst ) {
   StrOp.fmtb( ecosCmd, "request(%d, view)\n", OID_SNIFFER );
   __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
 */
+
+
+  StrOp.fmtb( ecosCmd, "get(%d, state)\n", OID_S88MANAGER );
+  __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
+  StrOp.fmtb( ecosCmd, "get(%d, state)\n", OID_S88_ALL_MODULES );
+  __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
+  StrOp.fmtb( ecosCmd, "get(%d, state)\n", OID_ECoSDetectors );
+  __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
+
 }
 
 
@@ -618,6 +643,9 @@ static void __releaseViews( iOECoS inst ) {
   StrOp.fmtb( ecosCmd, "release(%d, view)\n", OID_S88_ALL_MODULES );
   __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
 
+  StrOp.fmtb( ecosCmd, "release(%d, view)\n", OID_ECoSDetectors );
+  __transact( inst, ecosCmd, StrOp.len( ecosCmd ));
+
     /* FARKLE -- must release all locs??? */
 }
 
@@ -632,8 +660,11 @@ static void __releaseViews( iOECoS inst ) {
 static Boolean __connect( iOECoS inst ) {
   iOECoSData data = Data(inst);
 
-    /* Create a socket object: */
+  if( !data->enablecom ) {
+    return True;
+  }
 
+  /* Create a socket object: */
   if ( data->socket == NULL )
     data->socket = SocketOp.inst( data->host, data->port, False, False, False );
 
@@ -683,6 +714,45 @@ static Boolean __connect( iOECoS inst ) {
 }
 
 
+
+/* fbmods is a comman separated address list of connected feedback modules. */
+static void __updateFB( obj ecos, iONode fbInfo ) {
+  iOECoSData data = Data(ecos);
+  int cnt = NodeOp.getChildCnt( fbInfo );
+  int i = 0;
+  int n = 0;
+  char ecosCmd[ 1024 ] = {'\0'};
+
+  char* str = NodeOp.base.toString( fbInfo );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "updateFB\n%s", str );
+  StrOp.free( str );
+
+  for( i = 0; i < cnt; i++ ) {
+    iONode fbmods = NodeOp.getChild( fbInfo, i );
+    const char* mods = wFbMods.getmodules( fbmods );
+    if( mods != NULL && StrOp.len( mods ) > 0 ) {
+      iOStrTok tok = StrTokOp.inst( mods, ',' );
+      int idx = 0;
+      while( StrTokOp.hasMoreTokens( tok ) ) {
+        int addr = atoi( StrTokOp.nextToken(tok) );
+        if( addr >= 200 ) {
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "query 16 railcom states of module %d...", addr);
+          for( n = 0; n < 16; n++ ) {
+            StrOp.fmtb( ecosCmd, "get(%d, railcom[%d])\n", addr, n );
+            __transact( (iOECoS)ecos, ecosCmd, StrOp.len(ecosCmd) );
+            ThreadOp.sleep(10);
+          }
+          idx++;
+        }
+      };
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "updateFB count=%d", idx );
+    }
+  }
+
+}
+
+
+
 /**
  * __translate -- Translates an incoming command into the ECoS protocol.
  *
@@ -700,13 +770,17 @@ static int __translate( obj inst, iONode node, char* ecosCmd ) {
 
   TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "In __translate, oname = [%s]", oname );
 
+  if( StrOp.equals( oname, wFbInfo.name() ) ) {
+    __updateFB( inst, node );
+  }
+
     /*
 
       Switch command.
 
     */
 
-  if ( StrOp.equals( oname, wSwitch.name())) {
+  else if ( StrOp.equals( oname, wSwitch.name())) {
 
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ECoS switch command" );
 
@@ -729,7 +803,7 @@ static int __translate( obj inst, iONode node, char* ecosCmd ) {
     StrOp.fmtb( ecosCmd, "set(%d, switch[%s%d%c])\n",
                 OID_SWMANAGER, ( protocol[ 0 ] == 'M' ? "MOT" : "DCC" ), address, direction );
 
-    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ECoS switch command set(%d, switch[%s%d%c])",
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "switch command set(%d, switch[%s%d%c])",
                  OID_SWMANAGER, ( protocol[ 0 ] == 'M' ? "MOT" : "DCC" ), address, direction);
     /*
 
@@ -780,7 +854,7 @@ static int __translate( obj inst, iONode node, char* ecosCmd ) {
     StrOp.fmtb( ecosCmd, "set(%d, switch[%s%d%c])\n",
                 OID_SWMANAGER, (prot[0]=='M'?"MOT":"DCC"), addr, dir );
 
-    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ECoS output command set(%d, switch[%s%d%c])",
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "output command set(%d, switch[%s%d%c])",
                  OID_SWMANAGER, ( prot[ 0 ] == 'M' ? "MOT" : "DCC" ), addr, dir);
 
     /*
@@ -834,12 +908,12 @@ static int __translate( obj inst, iONode node, char* ecosCmd ) {
                     oid, 0, wLoc.isfn( node ) ? 1 : 0,
                     oid );
 
-      /* TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, ecosCmd); */
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loco %s oid=%s V=%d dir=%s lights=%s", id, oid, V, dir?"fwd":"rev", wLoc.isfn( node )?"on":"off" );
 
     } else if ( oid == NULL ) {
-      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "WARNING: NULL oid" );
+      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "no ecos oid found for [%s]", ecosid );
     } else if ( StrOp.len( oid ) <= 0 ) {
-      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "WARNING: oid len [%d]", StrOp.len( oid ));
+      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "empty ecos oid found for [%s]", ecosid);
     }
 
     /*
@@ -920,6 +994,7 @@ static int __translate( obj inst, iONode node, char* ecosCmd ) {
         }
       }
 
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loco %s oid=%s function %d set to %d", id, oid, fnchanged, fn[fnchanged] );
 
 
       StrOp.fmtb( ecosCmd + StrOp.len( ecosCmd ), "release(%s, control)\n", oid );
@@ -941,20 +1016,25 @@ static int __translate( obj inst, iONode node, char* ecosCmd ) {
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ECoS system function command" );
 
     const char* cmdstr  = wSysCmd.getcmd( node );
-    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "SysCmd %s", cmdstr );
 
     if ( StrOp.equals( cmdstr, wSysCmd.stop ) || StrOp.equals( cmdstr, wSysCmd.ebreak ) ) {
 
       StrOp.fmtb( ecosCmd, "set(%d, stop)\n", OID_ECOS );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Power OFF" );
 
     } else if ( StrOp.equals( cmdstr, wSysCmd.go )) {
 
       StrOp.fmtb( ecosCmd, "set(%d, go)\n", OID_ECOS );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Power ON" );
 
     } else if ( StrOp.equals( cmdstr, wSysCmd.loccnfg ) || StrOp.equals( cmdstr, wSysCmd.swcnfg )) {
 
       __checkObject( (iOECoS)inst, node );
 
+    }
+    else if( StrOp.equals( cmdstr, wSysCmd.enablecom ) ) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "%s: %s communication", data->iid, wSysCmd.getval(node) == 1 ? "enable":"disable" );
+      data->enablecom = wSysCmd.getval(node) == 1 ? True:False;
     }
 
     /*
@@ -967,7 +1047,24 @@ static int __translate( obj inst, iONode node, char* ecosCmd ) {
     TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "program command: UNDOCUMENTED" );
       /* Missing programming commands */
 
-  } else {
+  }
+
+  /* Sensor command. */
+  else if( StrOp.equals( oname, wFeedback.name() ) ) {
+    int addr = wFeedback.getaddr( node );
+    Boolean state = wFeedback.isstate( node );
+
+    if( wFeedback.isactivelow(node) )
+      wFeedback.setstate( node, !state);
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "simulate fb addr=%d state=%s", addr, state?"true":"false" );
+    data->listenerFun( data->listenerObj, (iONode)NodeOp.base.clone( node ), TRCLEVEL_INFO );
+
+  }
+
+
+
+  else {
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Unknown command [%s]", oname );
   }
 
@@ -988,11 +1085,19 @@ static iONode _cmd( obj inst, const iONode cmd ) {
     /* Make sure we have a valid connection */
 
   if ( !data->connected ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "no ECoS connection" );
-    if( cmd != NULL )
-      NodeOp.base.del(cmd);
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "no ECoS connection" );
+    if( cmd != NULL ) {
+      if ( StrOp.equals( NodeOp.getName(cmd), wSysCmd.name())) {
+        if( StrOp.equals( wSysCmd.getcmd(cmd), wSysCmd.enablecom ) ) {
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "%s: %s communication", data->iid, wSysCmd.getval(cmd) == 1 ? "enable":"disable" );
+          data->enablecom = wSysCmd.getval(cmd) == 1 ? True:False;
+        }
+      }
+      cmd->base.del(cmd);
+    }
     return NULL;
-  } else {
+  }
+  else {
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Connected to ECoS" );
   }
 
@@ -1014,7 +1119,7 @@ static iONode _cmd( obj inst, const iONode cmd ) {
   }
 
   if( cmd != NULL )
-    NodeOp.base.del(cmd);
+    cmd->base.del(cmd);
 
   return NULL;
 }
@@ -1024,12 +1129,24 @@ static iONode _cmd( obj inst, const iONode cmd ) {
  * _halt -- Called when Rocrail is shutting down?
  *
  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOECoSData data = Data( inst );
 
+  if( poweroff ) {
+    char ecosCmd[ 1024 ] = {'\0'};
+    StrOp.fmtb( ecosCmd, "set(%d, stop)\n", OID_ECOS );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Power OFF" );
+    __transact(( iOECoS )inst, ecosCmd, StrOp.len(ecosCmd) );
+  }
+  if( shutdown ) {
+    char ecosCmd[ 1024 ] = {'\0'};
+    StrOp.fmtb( ecosCmd, "set(%d, shutdown)\n", OID_ECOS );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Shutdown" );
+    __transact(( iOECoS )inst, ecosCmd, StrOp.len(ecosCmd) );
+  }
   __releaseViews( ( iOECoS )inst );
   data->run = False;
-
+  ThreadOp.sleep(500);
   return;
 }
 
@@ -1165,7 +1282,7 @@ static void __processLocList( iOECoS inst, iONode node ) {
         /* existing id's are overwritten */
 
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
-                     "List Saving id [%s,%s,%s] in map @ [%d]", id, oid, StrOp.dup( oid ), data->locoNameToEcosOidMap );
+                     "mapping Rocrail id=[%s] with Ecos oid=[%s]", id, oid );
 
         MutexOp.wait( data->mapmux );
         oldVal = (char*)MapOp.get( data->locoNameToEcosOidMap, id );
@@ -1338,7 +1455,7 @@ static void __processSwitchSet( iOECoS inst, iONode node ) {
 
         /* clear event red, inform listener: Node */
         iONode eventRed = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-        wFeedback.setbus( eventRed, 4 );
+        wFeedback.setfbtype( eventRed, wFeedback.fbtype_railcom );
         wFeedback.setaddr( eventRed, switchAddress * 2 );
         if ( data->iid != NULL )
           wFeedback.setiid( eventRed, data->iid );
@@ -1347,7 +1464,7 @@ static void __processSwitchSet( iOECoS inst, iONode node ) {
 
         /* clear event green, inform listener: Node */
         iONode eventGreen = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-        wFeedback.setbus( eventGreen, 4 );
+        wFeedback.setfbtype( eventGreen, wFeedback.fbtype_railcom );
         wFeedback.setaddr( eventGreen, ( switchAddress * 2 ) - 1);
         if ( data->iid != NULL )
           wFeedback.setiid( eventGreen, data->iid );
@@ -1405,7 +1522,7 @@ static void __processSwitchManagerEvents( iOECoS inst, iONode node ) {
 
             /* clear event red, inform listener: Node */
             iONode eventRed = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-            wFeedback.setbus( eventRed, 4 );
+            wFeedback.setfbtype( eventRed, wFeedback.fbtype_railcom );
             wFeedback.setaddr( eventRed, switchAddress * 2 );
             if ( data->iid != NULL )
               wFeedback.setiid( eventRed, data->iid );
@@ -1414,7 +1531,7 @@ static void __processSwitchManagerEvents( iOECoS inst, iONode node ) {
 
             /* clear event green, inform listener: Node */
             iONode eventGreen = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-            wFeedback.setbus( eventGreen, 4 );
+            wFeedback.setfbtype( eventGreen, wFeedback.fbtype_railcom );
             wFeedback.setaddr( eventGreen, ( switchAddress * 2 ) - 1);
             if ( data->iid != NULL )
               wFeedback.setiid( eventGreen, data->iid );
@@ -1493,7 +1610,7 @@ static void __processLocoEvents( iOECoS inst, iONode node ) {
         if ( ( velocityVal != -1) && ( velocityVal <= 127)) {
           iONode nodeC = NULL;
 
-          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "velocity [%s,%s,%d]", ecosLocoNameStr, rrLocoNameStr, velocityVal);
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "velocity [%s,%s,%d]", ecosLocoNameStr, rrLocoNameStr, velocityVal);
 
           nodeC = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE);
           if( data->iid != NULL)
@@ -1515,7 +1632,7 @@ static void __processLocoEvents( iOECoS inst, iONode node ) {
         if ( ( directionVal != -1) && ( directionVal <= 1)) {
           iONode nodeC = NULL;
 
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "direction [%s,%s,%d]", ecosLocoNameStr, rrLocoNameStr, directionVal);
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "direction [%s,%s,%d]", ecosLocoNameStr, rrLocoNameStr, directionVal);
 
           nodeC = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE);
           if( data->iid != NULL)
@@ -1537,7 +1654,7 @@ static void __processLocoEvents( iOECoS inst, iONode node ) {
 
         if ( ( functionNumber != -1) && ( functionNumber <= 28) && ( functionVal != -1) && ( functionVal <= 1)) {
 
-          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "function [%s,%s,%d]", ecosLocoNameStr, rrLocoNameStr, functionVal);
+          TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "function [%s,%s,%d]", ecosLocoNameStr, rrLocoNameStr, functionVal);
 
           if ( functionNumber == 0) {
             iONode nodeC = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE);
@@ -1633,7 +1750,7 @@ static void __processSwitchEvents( iOECoS inst, iONode node ) {
 
               /* event red, inform listener: Node */
               iONode eventRed = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-              wFeedback.setbus( eventRed, 4 );
+              wFeedback.setfbtype( eventRed, wFeedback.fbtype_railcom );
               wFeedback.setaddr( eventRed, switchAddress * 2 );
               if ( data->iid != NULL )
                 wFeedback.setiid( eventRed, data->iid );
@@ -1642,7 +1759,7 @@ static void __processSwitchEvents( iOECoS inst, iONode node ) {
 
               /* event green, inform listener: Node */
               iONode eventGreen = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-              wFeedback.setbus( eventGreen, 4 );
+              wFeedback.setfbtype( eventGreen, wFeedback.fbtype_railcom );
               wFeedback.setaddr( eventGreen, ( switchAddress * 2 ) - 1);
               if ( data->iid != NULL )
                 wFeedback.setiid( eventGreen, data->iid );
@@ -1655,7 +1772,7 @@ static void __processSwitchEvents( iOECoS inst, iONode node ) {
 
               /* clear event red, inform listener: Node */
               iONode eventRed = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-              wFeedback.setbus( eventRed, 4 );
+              wFeedback.setfbtype( eventRed, wFeedback.fbtype_railcom );
               wFeedback.setaddr( eventRed, switchAddress * 2 );
               if ( data->iid != NULL )
                 wFeedback.setiid( eventRed, data->iid );
@@ -1664,7 +1781,7 @@ static void __processSwitchEvents( iOECoS inst, iONode node ) {
 
               /* clear event green, inform listener: Node */
               iONode eventGreen = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
-              wFeedback.setbus( eventGreen, 4 );
+              wFeedback.setfbtype( eventGreen, wFeedback.fbtype_railcom );
               wFeedback.setaddr( eventGreen, ( switchAddress * 2 ) - 1);
               if ( data->iid != NULL )
                 wFeedback.setiid( eventGreen, data->iid );
@@ -1688,6 +1805,14 @@ static void __processSwitchEvents( iOECoS inst, iONode node ) {
  * 101 state[0x0000]
  * <END 0 (OK)>
  *
+ * <EVENT 200>
+* 200 state[0x3]
+* <END 0 (OK)>
+*
+* <EVENT 200>
+* 200 railcom[00, 0324, 1]
+* <END 0 (OK)>
+ *
  */
 static void __processS88Events( iOECoS inst, iONode node ) {
   iOECoSData data = Data( inst );
@@ -1700,9 +1825,67 @@ static void __processS88Events( iOECoS inst, iONode node ) {
 
     iONode child = NodeOp.getChild( node, idx );
 
-    const char* statestring = NodeOp.getStr( child, "state", NULL );
+    const char* statestring   = NodeOp.getStr( child, "state", NULL );
+    const char* railcomstring = NodeOp.getStr( child, "railcom", NULL );
 
       /* Make sure we have a valid event string */
+
+    if ( railcomstring != NULL ) {
+      /* 00, 0324, 1 */
+      int chanel = 0;
+      int loco   = 0;
+      int dir    = 0;
+      char ident[32];
+      /* getting the module number */
+      const char* sIOD = NodeOp.getName(child);
+      int module = atoi(sIOD);
+
+      if( module >= 200 ) {
+        int addr = 0;
+        module = module - 200;
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "railcom module [%d]", module );
+
+        iOStrTok tok = StrTokOp.inst(railcomstring, ',' );
+        if( StrTokOp.hasMoreTokens( tok ) ) {
+          const char* schanel = StrTokOp.nextToken( tok );
+          chanel = (int)strtol( schanel, (char**)NULL, 10 );
+        }
+        if( StrTokOp.hasMoreTokens( tok ) ) {
+          const char* sloco = StrTokOp.nextToken( tok );
+          loco = (int)strtol( sloco, (char**)NULL, 10 );
+        }
+        if( StrTokOp.hasMoreTokens( tok ) ) {
+          const char* sdir = StrTokOp.nextToken( tok );
+          dir = (int)strtol( sdir, (char**)NULL, 10 );
+        }
+        StrTokOp.base.del(tok);
+
+        addr = module * 16 + chanel + 1;
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "railcom sensor event addr=%d, loco=%d, dir=%s", addr, loco, dir?"fwd":"rev" );
+
+        iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+
+        wFeedback.setaddr( nodeC, addr );
+        wFeedback.setfbtype( nodeC, wFeedback.fbtype_railcom );
+
+        if( data->iid != NULL )
+          wFeedback.setiid( nodeC, data->iid );
+
+        wFeedback.setdirection( nodeC, dir == 1 ? True:False );
+
+        wFeedback.setstate( nodeC, loco > 0 ? True:False );
+        StrOp.fmtb(ident, "%d", loco);
+        wFeedback.setidentifier( nodeC, ident);
+
+        data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+      }
+      else {
+        module = 0;
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Invalid railcom module ID: [%s]", sIOD );
+      }
+
+      continue;
+    }
 
     if ( statestring == NULL ) {
       TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Empty event string!" );
@@ -1747,6 +1930,47 @@ static void __processS88Events( iOECoS inst, iONode node ) {
 }
 
 
+static void __reportState(iOECoS inst) {
+  iOECoSData data = Data(inst);
+
+  if( data->listenerFun != NULL && data->listenerObj != NULL ) {
+    iONode node = NodeOp.inst( wState.name(), NULL, ELEMENT_NODE );
+
+    if( data->iid != NULL )
+      wState.setiid( node, data->iid );
+    wState.setpower( node, data->power );
+    wState.setenablecom( node, data->enablecom );
+
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+}
+
+
+
+/* ToDo: System events:
+  <EVENT 1>1 status[GO]<END 0 (OK)>
+  <EVENT 1>1 status[STOP]<END 0 (OK)>
+*/
+static void __processSystemEvents( iOECoS inst, iONode node ) {
+  iOECoSData data = Data(inst);
+  int cnt = NodeOp.getChildCnt( node);
+  if( cnt > 0 ) {
+    iONode child = NodeOp.getChild(node, 0);
+    const char* status = NodeOp.getStr(child, "status", "?");
+    if( StrOp.equals("?", status ) ) {
+      char* xml = NodeOp.base.toString(node);
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Unhandled: %s", xml );
+      StrOp.free(xml);
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "system status is [%s]", status );
+      data->power = StrOp.equals("GO", status);
+      __reportState(inst);
+    }
+  }
+}
+
+
 /**
  * __processReply -- Handles incoming messages from the ECoS
  *
@@ -1760,9 +1984,15 @@ static void __processReply( iOECoS inst, iONode node ) {
   const char* rname = NodeOp.getStr( node, "cmd", NULL );
   int oid           = NodeOp.getInt( node, "oid", 0 );
 
+  if( (TraceOp.getLevel(NULL) & TRCLEVEL_BYTE) == TRCLEVEL_BYTE ) {
+    char* s = NodeOp.base.toString(node);
+    TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "%s", s);
+    StrOp.free(s);
+  }
+
   if ( rtype == REPLY_TYPE_REPLY ) {
 
-      /* These are the loc and switch events */
+      /* These are the loco, switch and sensor events */
 
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999,
                   "MemOp.mem_getAllocCount() = [%d]", MemOp.getAllocCount());
@@ -1784,7 +2014,14 @@ static void __processReply( iOECoS inst, iONode node ) {
     } else if ( StrOp.equals( "set", rname ) && oid == OID_SWMANAGER ) {
       __processSwitchSet( inst, node );
 
-    } else {
+    }
+    else if ( oid == OID_ECOS) {
+      __processSystemEvents( inst, node );
+    }
+    else if ( oid >= 100 && oid <= 300 ) {
+      __processS88Events( inst, node );
+    }
+    else {
       TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "other reply, rname = [%s]", rname );
       TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "other reply, oid = [%d]", oid );
     }
@@ -1793,7 +2030,10 @@ static void __processReply( iOECoS inst, iONode node ) {
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "event, rname = [%s]", rname );
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "event, oid = [%d]", oid );
 
-    if ( oid == 11) {
+    if ( oid == OID_ECOS) {
+      __processSystemEvents( inst, node );
+    }
+    else if ( oid == 11) {
       __processSwitchManagerEvents( inst, node );
 
     } else if ( oid >= 20000 ) {
@@ -1829,7 +2069,7 @@ static void __reader( void * threadinst ) {
 
   while ( data->run ) {
 
-    if ( data->connected ) {
+    if ( data->connected && data->enablecom ) {
       char c;
       if( !SocketOp.isConnected( data->socket ) || SocketOp.isBroken( data->socket ) ) {
         data->connected = False;
@@ -1886,7 +2126,8 @@ static struct OECoS* _inst( const iONode ini, const iOTrace trace ) {
   data->iid = StrOp.dup( wDigInt.getiid( ini ));  /* Set interface id */
 
   data->host      = wDigInt.gethost( ini );       /* host address */
-  data->port      = wDigInt.getport( ini );       /* port, usually 15471 */
+  data->port      = wDigInt.getport( ini ) > 0 ? wDigInt.getport( ini ):15471;       /* port, usually 15471 */
+  data->enablecom = True;
 
     /* Mark this object as running */
 

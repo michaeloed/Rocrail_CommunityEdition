@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -31,6 +34,7 @@
 ////@begin includes
 #include "wx/notebook.h"
 #include "wx/spinctrl.h"
+#include "wx/listctrl.h"
 ////@end includes
 
 #include "rocs/public/node.h"
@@ -42,6 +46,7 @@
 ////@begin forward declarations
 class wxNotebook;
 class wxSpinCtrl;
+class wxListCtrl;
 ////@end forward declarations
 
 /*!
@@ -71,6 +76,11 @@ class wxSpinCtrl;
 #define ID_BUTTON_LINK_ADD 10010
 #define ID_BUTTON_LINK_REMOVE 10011
 #define ID_CHECKBOX 10013
+#define ID_PANEL_LINK_CONDS 10230
+#define ID_LINK_COND_LIST2 10445
+#define ID_BUTTON_LINK_ADD_COND 11110
+#define ID_BUTTON_LINK_MOD_COND 11111
+#define ID_BUTTON_LINK_DEL_COND 11112
 #define SYMBOL_BLOCKGROUPINGDIALOG_STYLE wxCAPTION|wxRESIZE_BORDER|wxSYSTEM_MENU|wxCLOSE_BOX
 #define SYMBOL_BLOCKGROUPINGDIALOG_TITLE _("Block Grouping")
 #define SYMBOL_BLOCKGROUPINGDIALOG_IDNAME ID_BLOCKGROUPING_DLG
@@ -100,6 +110,7 @@ class BlockGroupingDialog: public wxDialog
   void initValues();
   bool evaluate();
   int m_TabAlign;
+  int m_CondSel;
 
 public:
     /// Constructors
@@ -150,6 +161,18 @@ public:
     /// wxEVT_COMMAND_CHECKBOX_CLICKED event handler for ID_CHECKBOX
     void OnCheckboxClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_LIST_ITEM_SELECTED event handler for ID_LINK_COND_LIST2
+    void OnLinkCondList2Selected( wxListEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_LINK_ADD_COND
+    void OnButtonLinkAddCondClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_LINK_MOD_COND
+    void OnButtonLinkModCondClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for ID_BUTTON_LINK_DEL_COND
+    void OnButtonLinkDelCondClick( wxCommandEvent& event );
+
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
 
@@ -158,6 +181,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_APPLY
     void OnApplyClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end BlockGroupingDialog event handler declarations
 
@@ -203,6 +229,15 @@ public:
     wxCheckBox* m_Critical;
     wxCheckBox* m_AllowFollowUp;
     wxSpinCtrl* m_MaxFollowUp;
+    wxPanel* m_ConditionsPanel;
+    wxListCtrl* m_CondList2;
+    wxStaticText* m_labCondFrom;
+    wxComboBox* m_CondFrom;
+    wxStaticText* m_labCondFree;
+    wxTextCtrl* m_CondFree;
+    wxButton* m_CondAdd;
+    wxButton* m_CondModify;
+    wxButton* m_CondDelete;
     wxButton* m_Cancel;
     wxButton* m_OK;
     wxButton* m_Apply;

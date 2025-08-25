@@ -1,7 +1,10 @@
 # ------------------------------------------------------------
 # Rocrail - Model Railroad Software
 #
-# Copyright (C) 2002-2010 - Rob Versluis <r.j.versluis@rocrail.net>
+# Copyright (C) 2002-2015 Rob Versluis, Rocrail.net
+#
+# Without an official permission commercial use is not permitted.
+# Forking this project is not permitted.  
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -39,6 +42,7 @@ GENSUFFIX=
 ANSI=-ansi
 MKDIR=mkdir -p
 CPUPDATE=u
+LNK_FLAGS=
 MAKE ?= make
 
 ifeq ($(NATIVE),WIN32)
@@ -55,10 +59,16 @@ endif
 PLATFORM=LINUX
 ARCH=
 ifeq ($(PLATFORM),WIN32)
-	LIBS=-liphlpapi -lmpr -lwsock32 -ladvapi32 -lwinmm
+	LIBS=-liphlpapi -lmpr -lws2_32 -ladvapi32 -lwinmm
 	DIRPREFIX=win
-	CC_EXTRA_FLAGS=
+	CC_EXTRA_FLAGS=-mthreads
+	LNK_FLAGS=-mthreads -static
 	BINSUFFIX=.exe
+else ifeq ($(PLATFORM),WIN64)
+	DIRPREFIX=win
+	LIBS=-liphlpapi -lmpr -lmswsock -lws2_32 -ladvapi32 -lwinmm
+	BINSUFFIX=.exe
+	CC_EXTRA_FLAGS=
 else ifeq ($(PLATFORM),OPENBSD)
 	LIBS=-pthread
 	DIRPREFIX=unx
@@ -72,6 +82,11 @@ else
 	BINSUFFIX=
 endif
 
+ifeq ($(PLATFORM),MACOSX)
+	CPUPDATE=
+endif
+
+
 MOUNTPOINT=..
 OUTDIR=..$(FS)$(DIRPREFIX)bin
 GENDIR=..$(FS)$(DIRPREFIX)gen
@@ -84,14 +99,13 @@ CPP=$(TOOLPREFIX)gcc
 LNK=$(TOOLPREFIX)gcc
 INCL_PATH=$(MOUNTPOINT)
 CC_FLAGS=-c $(CC_EXTRA_FLAGS) $(DEBUG) $(ANSI) -I$(INCL_PATH) -I$(GENDIR)
-LNK_FLAGS=
-RRLIBS=$(OUTDIR)$(FS)libwrapper.a $(OUTDIR)$(FS)librocs.a $(OUTDIR)$(FS)librocutils.a $(OUTDIR)$(FS)librocrail.a
+RRLIBS=$(OUTDIR)$(FS)libwrapper.a $(OUTDIR)$(FS)librocutils.a $(OUTDIR)$(FS)librocs.a $(OUTDIR)$(FS)librocrail.a
 
 OBJS=$(patsubst impl/%.c,$(TMPOUTDIR)/%.o,$(wildcard impl/*.c))
 WEBOBJS=$(patsubst impl/web/%.c,$(TMPOUTDIR)/%.o,$(wildcard impl/web/*.c))
 WOBJS=$(patsubst $(GENDIR)/rocrail/wrapper/impl/%.c,$(GENDIR)/rocrail/wrapper/bin/%.o,$(wildcard $(GENDIR)/rocrail/wrapper/impl/*.c))
 
-LIBOBJS=$(TMPOUTDIR)$(FS)rcon.o
+LIBOBJS=$(TMPOUTDIR)$(FS)rcon.o $(TMPOUTDIR)$(FS)script.o
 
 TARGET=$(OUTDIR)$(FS)rocrail$(BINSUFFIX)
 
@@ -129,6 +143,10 @@ clean:
 	-$(MKDIR) $(TMPOUTDIR)
 	-$(MKDIR) $(GENDIR)$(FS)rocrail
 	-$(REMOVE) $(OUTDIR)$(FS)*.o
+	-$(REMOVE) $(OUTDIR)$(FS)libwrapper.a
+	-$(REMOVE) $(OUTDIR)$(FS)librocrail.a
+	-$(REMOVE) $(GENDIR)$(FS)rocrail$(FS)bin$(FS)*
+	-$(REMOVE) $(GENDIR)$(FS)rocrail$(FS)public$(FS)*
 	-$(REMOVE) $(GENDIR)$(FS)rocrail$(FS)wrapper$(FS)public$(FS)*
 	-$(REMOVE) $(GENDIR)$(FS)rocrail$(FS)wrapper$(FS)impl$(FS)*
 	-$(REMOVE) $(GENDIR)$(FS)rocrail$(FS)wrapper$(FS)bin$(FS)*
@@ -147,8 +165,21 @@ rocrail:
 	$(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
 	cd ..$(FS)rocdigs$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
 	cd ..$(FS)roclcdr$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
-	cd ..$(FS)analyser$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
-	cd ..$(FS)rocview$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+ifeq ($(PLATFORM),LINUX)
+	cd ..$(FS)rocnetnode$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+endif
+	cd ..$(FS)rocview$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) WXCONFIG=$(WXCONFIG) 
+
+server:
+	cd ..$(FS)rocs$(CS) $(MAKE) fromtar PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+	cd ..$(FS)rocutils$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+	cd ..$(FS)rocint$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+	$(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+	cd ..$(FS)rocdigs$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+	cd ..$(FS)roclcdr$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+ifeq ($(PLATFORM),LINUX)
+	cd ..$(FS)rocnetnode$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+endif
 
 fromtar:
 	cd ..$(FS)rocs$(CS) $(MAKE) fromtar PLATFORM=$(PLATFORM)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
@@ -157,29 +188,35 @@ fromtar:
 	$(MAKE) clean PLATFORM=$(PLATFORM)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
 	cd ..$(FS)rocdigs$(CS) $(MAKE) clean PLATFORM=$(PLATFORM)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
 	cd ..$(FS)roclcdr$(CS) $(MAKE) clean PLATFORM=$(PLATFORM)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
-	cd ..$(FS)analyser$(CS) $(MAKE) clean PLATFORM=$(PLATFORM)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
-	cd ..$(FS)rocview$(CS) $(MAKE) clean PLATFORM=$(PLATFORM)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+ifeq ($(PLATFORM),LINUX)
+	cd ..$(FS)rocnetnode$(CS) $(MAKE) clean PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL)
+endif
+	cd ..$(FS)rocview$(CS) $(MAKE) clean PLATFORM=$(PLATFORM)$(CS) $(MAKE) all DEBUG=$(DEBUG) TOOLPREFIX=$(TOOLPREFIX) LIBSUFFIX=$(LIBSUFFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE) MINGWINSTALL=$(MINGWINSTALL) WXCONFIG=$(WXCONFIG)
 
 
 # for unix based systems only
 install_all:
-	-rm -Rf $(DESTDIR)
+#	-rm -Rf $(DESTDIR)
 #	-mkdir -p ~$(FS)rocrail$(FS)locxpm
 	-mkdir -p $(DESTDIR)
-	-mkdir -p $(DESTDIR)
+	-mkdir -p $(DESTDIR)$(FS)default
 	-cp -p $(OUTDIR)$(FS)rocrail$(BINSUFFIX) $(DESTDIR)
+	-cp -p $(OUTDIR)$(FS)rocnetnode$(BINSUFFIX) $(DESTDIR)
 	cd ..$(FS)rocdigs$(CS) $(MAKE) install TOOLPREFIX=$(TOOLPREFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)
 	cd ..$(FS)roclcdr$(CS) $(MAKE) install TOOLPREFIX=$(TOOLPREFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)
-	cd ..$(FS)analyser$(CS) $(MAKE) install TOOLPREFIX=$(TOOLPREFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)
 	cd ..$(FS)rocview$(CS) $(MAKE) install TOOLPREFIX=$(TOOLPREFIX) PLATFORM=$(PLATFORM) NATIVE=$(NATIVE)
 	-cp -p rocraild.png $(DESTDIR)
 	-cp -p ..$(FS)rocview$(FS)xpm$(FS)rocrail.xpm $(DESTDIR)
 	-cp -Rp ..$(FS)rocview$(FS)icons $(DESTDIR)
 	-cp -Rp ..$(FS)rocview$(FS)svg $(DESTDIR)
-	-cp -Rp$(CPUPDATE) symbols $(DESTDIR)
 	-cp -Rp$(CPUPDATE) ..$(FS)stylesheets $(DESTDIR)
 	-cp -Rp$(CPUPDATE) package$(FS)images $(DESTDIR)
-	-cp -p$(CPUPDATE) package$(FS)plan.xml $(DESTDIR)
+	-cp -Rp$(CPUPDATE) ..$(FS)decspecs $(DESTDIR)
+	-mkdir -p $(DESTDIR)$(FS)web
+	-cp -Rp$(CPUPDATE) impl$(FS)web$(FS)html$(FS)* $(DESTDIR)$(FS)web
+ifeq (,$(wildcard $(DESTDIR)$(FS)default$(FS)plan.xml))
+	-cp -p$(CPUPDATE) package$(FS)plan.xml $(DESTDIR)$(FS)default
+endif
 	-cp -p package$(FS)rocrail.sh $(DESTDIR)
 	-cp -p package$(FS)rocview.sh $(DESTDIR)
 	-chmod +x $(DESTDIR)$(FS)rocrail.sh

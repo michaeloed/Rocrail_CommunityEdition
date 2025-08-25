@@ -1,13 +1,9 @@
-/** ------------------------------------------------------------
-  * Module:
-  * Object:
-  * ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocgui/dialogs/rocgui-dialogs.pjd,v $
-  * $Author: robvrs $
-  * $Date: 2006/02/22 14:10:57 $
-  * $Revision: 1.63 $
-  * $Name:  $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef _CLOCKDIALOG_H_
 #define _CLOCKDIALOG_H_
 
@@ -59,8 +55,8 @@ public:
     ClockDialog();
     ClockDialog( wxWindow* parent, wxWindowID id = SYMBOL_CLOCKDIALOG_IDNAME, const wxString& caption = SYMBOL_CLOCKDIALOG_TITLE, const wxPoint& pos = SYMBOL_CLOCKDIALOG_POSITION, const wxSize& size = SYMBOL_CLOCKDIALOG_SIZE, long style = SYMBOL_CLOCKDIALOG_STYLE );
 
-    void setClock( int divider, int hours, int minutes );
-    void getClock( int* divider, int* hours, int* minutes );
+    void setClock( int divider, int hours, int minutes, int temp );
+    void getClock( int* divider, int* hours, int* minutes, int* temp );
     /// Creation
     bool Create( wxWindow* parent, wxWindowID id = SYMBOL_CLOCKDIALOG_IDNAME, const wxString& caption = SYMBOL_CLOCKDIALOG_TITLE, const wxPoint& pos = SYMBOL_CLOCKDIALOG_POSITION, const wxSize& size = SYMBOL_CLOCKDIALOG_SIZE, long style = SYMBOL_CLOCKDIALOG_STYLE );
 
@@ -80,6 +76,9 @@ public:
 
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_CANCEL
     void OnCancelClick( wxCommandEvent& event );
+
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
 
 ////@end ClockDialog event handler declarations
 
@@ -103,6 +102,8 @@ public:
     wxSpinCtrl* m_Hour;
     wxStaticText* m_labMinute;
     wxSpinCtrl* m_Minute;
+    wxStaticText* m_labTemp;
+    wxSpinCtrl* m_Temp;
     wxButton* m_OK;
     wxButton* m_Cancel;
 ////@end ClockDialog member variables

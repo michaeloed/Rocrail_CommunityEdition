@@ -1,18 +1,9 @@
-/** ------------------------------------------------------------
-  * A U T O   G E N E R A T E D  (First time only!)
-  * Generator: Rocs ogen (build Jun 11 2009 07:08:17)
-  * Module: RocDigs
-  * XML: $Source: /cvsroot/rojav/rocdigs/rocdigs.xml,v $
-  * XML: $Revision: 1.14 $
-  * Object: DCC232
-  * Date: Thu Jun 11 11:57:39 2009
-  * ------------------------------------------------------------
-  * $Source$
-  * $Author$
-  * $Date$
-  * $Revision$
-  * $Name$
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 #include "rocdigs/impl/dcc232_impl.h"
 
@@ -33,6 +24,7 @@
 #include "rocrail/wrapper/public/Program.h"
 #include "rocrail/wrapper/public/State.h"
 #include "rocrail/wrapper/public/DCC232.h"
+#include "rocrail/wrapper/public/BinStateCmd.h"
 
 #include "rocutils/public/addr.h"
 
@@ -41,6 +33,7 @@ static int instCnt = 0;
 
 static int __getcvbyte(iODCC232 inst, int cv);
 static Boolean __setcvbyte(iODCC232 inst, int cv, int val);
+static Boolean __checkSerialDevice( iODCC232 dcc232);
 
 /** ----- OBase ----- */
 static void __del( void* inst ) {
@@ -121,7 +114,7 @@ static int __getLocoSlot(iODCC232 dcc232, iONode node, Boolean* isNew ) {
 void __stateChanged( iODCC232 dcc232 ) {
   iODCC232Data data = Data(dcc232);
   iONode node = NodeOp.inst( wState.name(), NULL, ELEMENT_NODE );
-  wState.setiid( node, wDigInt.getiid( data->ini ) );
+  wState.setiid( node, data->iid );
   wState.setpower( node, data->power );
   wState.setprogramming( node, False );
   wState.settrackbus( node, False );
@@ -147,13 +140,19 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
     if( StrOp.equals( cmd, wSysCmd.stop ) || StrOp.equals( cmd, wSysCmd.ebreak ) ) {
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Power OFF" );
       data->power = False;
-      SerialOp.setDTR(data->serial, False);
+      __checkSerialDevice(dcc232);
+      if( data->comOK ) {
+        SerialOp.setDTR(data->serial, False);
+      }
       __stateChanged(dcc232);
     }
     else if( StrOp.equals( cmd, wSysCmd.go ) ) {
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Power ON" );
-      SerialOp.setDTR(data->serial, True);
-      SerialOp.setOutputFlow(data->serial, True);
+      __checkSerialDevice(dcc232);
+      if( data->comOK ) {
+        SerialOp.setDTR(data->serial, True);
+        SerialOp.setOutputFlow(data->serial, True);
+      }
       data->power = True;
       __stateChanged(dcc232);
     }
@@ -196,7 +195,7 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
         action = 0;
     }
 
-    packetlen = compAccessory(dccpacket, addr, port, dir, action);
+    packetlen = compAccessory((char*)dccpacket, addr, port, dir, action);
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
         "turnout %04d %d %-10.10s fada=%04d pada=%04d addr=%d port=%d gate=%d dir=%d action=%d packetlen=%d",
         addr, port, wSwitch.getcmd( node ), fada, pada, addr, port, gate, dir, action, packetlen );
@@ -205,6 +204,25 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
     MemOp.copy(cmd+1, dccpacket, packetlen );
     ThreadOp.post( data->writer, (obj)cmd );
 
+    {
+      iONode nodeC = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+
+      if( port == 0 && addr > 0 )
+        AddrOp.fromFADA( addr, &addr, &port, &gate );
+      else if( addr == 0 && port > 0 )
+        AddrOp.fromPADA( port, &addr, &port );
+
+      wSwitch.setbus( nodeC, wSwitch.getbus( node ) );
+      wSwitch.setaddr1( nodeC, wSwitch.getaddr1( node ) );
+      wSwitch.setport1( nodeC, wSwitch.getport1( node ) );
+
+      if( wSwitch.getiid(node) != NULL )
+        wSwitch.setiid( nodeC, wSwitch.getiid(node) );
+
+      wSwitch.setstate( nodeC, wSwitch.getcmd( node ) );
+
+      data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+    }
   }
   /* Output command. */
   else if( StrOp.equals( NodeOp.getName( node ), wOutput.name() ) ) {
@@ -236,7 +254,7 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "output %04d %d %d fada=%04d pada=%04d",
         addr, port, gate, fada, pada );
 
-    packetlen = compAccessory(dccpacket, addr, port, gate, action);
+    packetlen = compAccessory((char*)dccpacket, addr, port, gate, action);
     cmd = allocMem(64);
     cmd[0] = packetlen;
     MemOp.copy(cmd+1, dccpacket, packetlen );
@@ -249,7 +267,7 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
     if( pom ) {
       byte dccpacket[64];
       byte* cmd = NULL;
-      int packetlen = dccPOM(dccpacket, wProgram.getaddr(node), wProgram.islongaddr(node),
+      int packetlen = dccPOM((char*)dccpacket, wProgram.getaddr(node), wProgram.islongaddr(node),
                           wProgram.getcv(node), wProgram.getvalue(node),  wProgram.getcmd( node ) == wProgram.get );
       cmd = allocMem(64);
       cmd[0] = packetlen;
@@ -259,13 +277,19 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
     else {
       if(  wProgram.getcmd( node ) == wProgram.pton ) {
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "PT ON" );
-        data->ptflag = True;
-        SerialOp.setRTS(data->serial, True);
+        __checkSerialDevice(dcc232);
+        if( data->comOK ) {
+          SerialOp.setRTS(data->serial, True);
+          data->ptflag = True;
+        }
       }
       else if(  wProgram.getcmd( node ) == wProgram.ptoff ) {
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "PT OFF" );
-        data->ptflag = False;
-        SerialOp.setRTS(data->serial, False);
+        __checkSerialDevice(dcc232);
+        if( data->comOK ) {
+          SerialOp.setRTS(data->serial, False);
+          data->ptflag = False;
+        }
       }
       else if( wProgram.getcmd( node ) == wProgram.get && data->ptflag ) {
         rsp = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
@@ -332,7 +356,7 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
         data->slots[slot].changedfgrp = wLoc.isfn( node ) ? 1:-1;
         data->slots[slot].idle = SystemOp.getTick();
 
-        data->slots[slot].lcstream[0] = compSpeed(data->slots[slot].lcstream+1, data->slots[slot].addr,
+        data->slots[slot].lcstream[0] = compSpeed((char*)(data->slots[slot].lcstream+1), data->slots[slot].addr,
                                                   data->slots[slot].longaddr  , data->slots[slot].dir,
                                                   data->slots[slot].V, data->slots[slot].steps);
 
@@ -352,7 +376,7 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
         data->slots[slot].changedfgrp = 1;
         data->slots[slot].lights = wLoc.isfn( node );
         data->slots[slot].fn[ 0] = wLoc.isfn( node );
-        data->slots[slot].fnstream[0] = compFunction(data->slots[slot].fnstream, data->slots[slot].addr,
+        data->slots[slot].fnstream[0] = compFunction((char*)data->slots[slot].fnstream, data->slots[slot].addr,
                                                      data->slots[slot].longaddr, data->slots[slot].changedfgrp, data->slots[slot].fn);
 
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
@@ -372,6 +396,24 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
     }
   }
 
+  /* BinState command. */
+  else if( StrOp.equals( NodeOp.getName( node ), wBinStateCmd.name() ) ) {
+    int addr = wBinStateCmd.getaddr( node );
+    int nr   = wBinStateCmd.getnr( node );
+    int val  = wBinStateCmd.getdata( node );
+    Boolean longaddr = StrOp.equals( wLoc.getprot( node ), wLoc.prot_L );
+    int packetlen = 0;
+    byte dccpacket[64];
+    byte* cmd = NULL;
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "binary state decoder=%d nr=%d val=%d",  addr, nr, val );
+
+    packetlen = compBinStat((char*)dccpacket, addr, longaddr, nr, val);
+    cmd = allocMem(64);
+    cmd[0] = packetlen;
+    MemOp.copy(cmd+1, dccpacket, packetlen );
+    ThreadOp.post( data->writer, (obj)cmd );
+  }
+
   /* Function */
   else if( StrOp.equals( NodeOp.getName( node ), wFunCmd.name() ) ) {
     int addr  = wFunCmd.getaddr( node );
@@ -381,7 +423,18 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
     byte dccpacket[64];
     byte* cmd = NULL;
 
-    if( MutexOp.trywait( data->slotmux, 100 ) ) {
+    if( wFunCmd.getfnchanged(node) > 100 ) {
+      int nr = wFunCmd.getfnchanged(node) - 100;
+      int val = wFunCmd.isfnchangedstate(node)?1:0;
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loco %d binstate[%d]=%d", addr, nr, val);
+      packetlen = compBinStat((char*)dccpacket, addr, longaddr, nr, val);
+      cmd = allocMem(64);
+      cmd[0] = packetlen;
+      MemOp.copy(cmd+1, dccpacket, packetlen );
+      ThreadOp.post( data->writer, (obj)cmd );
+    }
+
+    else if( MutexOp.trywait( data->slotmux, 100 ) ) {
       Boolean isNew = False;
       int slot =  __getLocoSlot( dcc232, node, &isNew);
 
@@ -423,8 +476,10 @@ static iONode __translate( iODCC232 dcc232, iONode node, char* outa ) {
         data->slots[slot].fn[27] = wFunCmd.isf27( node );
         data->slots[slot].fn[28] = wFunCmd.isf28( node );
 
-        data->slots[slot].fnstream[0] = compFunction(data->slots[slot].fnstream, data->slots[slot].addr,
+        data->slots[slot].fnstream[0] = compFunction((char*)data->slots[slot].fnstream, data->slots[slot].addr,
                                                      data->slots[slot].longaddr, data->slots[slot].changedfgrp, data->slots[slot].fn);
+
+        data->slots[slot].idle = SystemOp.getTick();
 
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
           "function group %d changed for loco %d", group, addr );
@@ -465,13 +520,15 @@ static iONode _cmd( obj inst ,const iONode nodeA ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iODCC232Data data = Data(inst);
   data->run = False;
   data->power = False;
-  SerialOp.setDTR(data->serial, False);
+  if( data->comOK ) {
+    SerialOp.setDTR(data->serial, False);
+    SerialOp.close( data->serial );
+  }
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down [%s]...", data->iid );
-  SerialOp.close( data->serial );
   __stateChanged((iODCC232)inst);
   return;
 }
@@ -498,8 +555,9 @@ static byte* _cmdRaw( obj inst, const byte* cmd ) {
 static void _shortcut( obj inst ) {
   iODCC232Data data = Data(inst);
   data->power = False;
-  SerialOp.setDTR(data->serial, False);
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "external shortcut event [%s]...", data->iid );
+  if( data->comOK )
+    SerialOp.setDTR(data->serial, False);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "external short circuit event [%s]...", data->iid );
   __stateChanged((iODCC232)inst);
   return;
 }
@@ -530,13 +588,33 @@ static int _version( obj inst ) {
 }
 
 
+static Boolean __checkSerialDevice( iODCC232 dcc232) {
+  iODCC232Data data = Data(dcc232);
+
+  if( !data->comOK ) {
+    data->comOK = SerialOp.open( data->serial );
+    if( data->comOK ) {
+      SerialOp.setOutputFlow(data->serial, data->power);
+      SerialOp.setRTS(data->serial,True);  /* +12V for ever on RTS   */
+      SerialOp.setDTR(data->serial,data->power); /* disable booster output */
+      SerialOp.setSerialMode(data->serial,dcc);
+    }
+  }
+  return data->comOK;
+}
+
 static Boolean __transmit( iODCC232 dcc232, char* bitstream, int bitstreamsize, Boolean longIdle ) {
   iODCC232Data data = Data(dcc232);
   Boolean     rc = False;
   byte idlestream[100];
   int idlestreamsize = 0;
 
-  idlestreamsize = idlePacket(idlestream, longIdle);
+  if( !__checkSerialDevice(dcc232) ) {
+    ThreadOp.sleep(1000);
+    return False;
+  }
+
+  idlestreamsize = idlePacket((char*)idlestream, longIdle);
 
   SerialOp.setSerialMode(data->serial,dcc);
 
@@ -544,15 +622,15 @@ static Boolean __transmit( iODCC232 dcc232, char* bitstream, int bitstreamsize, 
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "transmit size=%d", bitstreamsize );
     rc = SerialOp.write( data->serial, bitstream, bitstreamsize );
     if( rc )
-      rc = SerialOp.write( data->serial, idlestream, idlestreamsize );
+      rc = SerialOp.write( data->serial, (char*)idlestream, idlestreamsize );
     if( rc )
-      rc = SerialOp.write( data->serial, bitstream, bitstreamsize );
+      rc = SerialOp.write( data->serial, (char*)bitstream, bitstreamsize );
     if( rc )
-      rc = SerialOp.write( data->serial, idlestream, idlestreamsize );
+      rc = SerialOp.write( data->serial, (char*)idlestream, idlestreamsize );
   }
   else {
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "transmit size=%d", idlestreamsize );
-    rc = SerialOp.write( data->serial, idlestream, idlestreamsize );
+    rc = SerialOp.write( data->serial, (char*)idlestream, idlestreamsize );
   }
 
 
@@ -560,7 +638,9 @@ static Boolean __transmit( iODCC232 dcc232, char* bitstream, int bitstreamsize, 
     /* error */
     TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "transmit error=%d (Power Off)", SerialOp.getRc(data->serial) );
     data->power = False;
+    data->comOK = False;
     SerialOp.setDTR(data->serial, False);
+    SerialOp.close(data->serial);
     __stateChanged(dcc232);
   }
   else {
@@ -592,13 +672,13 @@ static void __watchDog( void* threadinst ) {
 
     ThreadOp.sleep(100);
 
-    if( data->power ) {
+    if( data->power && data->comOK ) {
 
       if ( ( SerialOp.isDSR(data->serial) && !inversedsr ) ) {
-        TraceOp.trc( __FILE__, TRCLEVEL_DEBUG, __LINE__, 9999, "shortcut detected" );
+        TraceOp.trc( __FILE__, TRCLEVEL_DEBUG, __LINE__, 9999, "short circuit detected" );
 
         if( scdetected && scdelay > (data->shortcutdelay / 100) ) {
-          TraceOp.trc( __FILE__, TRCLEVEL_MONITOR, __LINE__, 9999, "shortcut detected!" );
+          TraceOp.trc( __FILE__, TRCLEVEL_MONITOR, __LINE__, 9999, "short circuit detected!" );
           scdelay = 0;
           scdetected = False;
           data->power = False;
@@ -606,7 +686,7 @@ static void __watchDog( void* threadinst ) {
           __stateChanged(dcc232);
         }
         else if(!scdetected) {
-          TraceOp.trc( __FILE__, TRCLEVEL_INFO, __LINE__, 9999, "shortcut timer started [%dms]", 1000 );
+          TraceOp.trc( __FILE__, TRCLEVEL_INFO, __LINE__, 9999, "short circuit timer started [%dms]", 1000 );
           scdelay++;
           scdetected = True;
         }
@@ -624,6 +704,7 @@ static void __watchDog( void* threadinst ) {
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "DCC232 watchdog ended." );
 
+  ThreadOp.base.del(th);
 }
 
 
@@ -633,12 +714,11 @@ static void __dccWriter( void* threadinst ) {
   iODCC232 dcc232 = (iODCC232)ThreadOp.getParm( th );
   iODCC232Data data = Data(dcc232);
   int slotidx = 0;
+  int refreshCnt = 0;
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "DCC232 writer started. (0x%08X)", dcc232 );
 
   ThreadOp.setHigh( th );
-  SerialOp.setSerialMode(data->serial,dcc);
-
 
   while(data->run) {
 
@@ -652,11 +732,12 @@ static void __dccWriter( void* threadinst ) {
           MemOp.copy( dccpacket, post, 64);
           freeMem( post);
           TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "processing posted packet, size=%d", dccpacket[0] );
-          __transmit( dcc232, dccpacket+1, dccpacket[0], False );
+          __transmit( dcc232, (char*)(dccpacket+1), dccpacket[0], False );
           post = (byte*)ThreadOp.getPost( th );
         }
       }
       else if( data->slots[slotidx].addr > 0 ) {
+        refreshCnt++;
         if( MutexOp.trywait( data->slotmux, 5 ) ) {
           int size = 0;
           byte dccpacket[64];
@@ -693,7 +774,7 @@ static void __dccWriter( void* threadinst ) {
 
 
           /* refresh speed packet */
-          __transmit( dcc232, data->slots[slotidx].lcstream+1, data->slots[slotidx].lcstream[0], False );
+          __transmit( dcc232, (char*)(data->slots[slotidx].lcstream+1), data->slots[slotidx].lcstream[0], False );
           data->slots[slotidx].refreshcnt++;
 
           if( data->slots[slotidx].fgrp > 0 || data->slots[slotidx].refreshcnt > 10 ) {
@@ -703,7 +784,7 @@ static void __dccWriter( void* threadinst ) {
               /* transmit big idle packet */
               __transmit( dcc232, NULL, 0, True );
               /* transmit last function packet */
-              __transmit( dcc232, data->slots[slotidx].fnstream+1, data->slots[slotidx].fnstream[0], False );
+              __transmit( dcc232, (char*)(data->slots[slotidx].fnstream+1), data->slots[slotidx].fnstream[0], False );
             }
           }
 
@@ -724,6 +805,11 @@ static void __dccWriter( void* threadinst ) {
       if(slotidx >= 128) {
         slotidx = 0;
         TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "recycle" );
+        if( refreshCnt == 0 ) {
+          /* nothing to do: why hurry? */
+          ThreadOp.sleep(5);
+        }
+        refreshCnt = 0;
       }
 
      /* transmit big idle packet */
@@ -737,6 +823,7 @@ static void __dccWriter( void* threadinst ) {
   };
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "DCC232 writer ended." );
+  ThreadOp.base.del(th);
 }
 
 
@@ -765,7 +852,12 @@ static int __getcvbyte(iODCC232 inst, int cv) {
    /* no special error handling, it's job of the clients */
    if (cv<0 || cv>1024) {
      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "PT: CV[%d] out of range", cv);
-     return;
+     return 0;
+   }
+
+   if( !data->comOK ) {
+     TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "PT: serial device is not ready");
+     return 0;
    }
 
    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "PT: enable booster output");
@@ -846,6 +938,11 @@ static Boolean __setcvbyte(iODCC232 inst, int cv, int val) {
 
   TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "PT: cvset for %d=%d", cv, val);
 
+  if( !data->comOK ) {
+    TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "PT: serial device is not ready");
+    return False;
+  }
+
   int sendsize = createCVsetpacket(cv, val, SendStream, True);
 
 
@@ -886,6 +983,7 @@ static struct ODCC232* _inst( const iONode ini ,const iOTrace trc ) {
   if( data->dcc232 == NULL ) {
     data->dcc232 = NodeOp.inst( wDCC232.name(), ini, ELEMENT_NODE );
     NodeOp.addChild( ini, data->dcc232 );
+    wDCC232.setport( data->dcc232, wDigInt.getdevice(ini) );
   }
 
   data->purge = wDCC232.ispurge(data->dcc232);
@@ -904,13 +1002,13 @@ static struct ODCC232* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dcc232 %d.%d.%d", vmajor, vminor, patch );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid             = [%s]"    , data->iid );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device          = [%s]"    , data->device );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "purge           = [%s]"    , data->purge?"yes":"no" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "purge idle time = [%d]s"   , data->purgetime );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "shortcut check  = [%s]"    , data->shortcut?"yes":"no" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "shortcut delay  = [%d]ms"  , data->shortcutdelay );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "invert DSR      = [%s]"    , wDCC232.isinversedsr(data->dcc232)?"yes":"no" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid                 = [%s]"    , data->iid );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device              = [%s]"    , data->device );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "purge               = [%s]"    , data->purge?"yes":"no" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "purge idle time     = [%d]s"   , data->purgetime );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "short circuit check = [%s]"    , data->shortcut?"yes":"no" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "short circuit delay = [%d]ms"  , data->shortcutdelay );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "invert DSR          = [%s]"    , wDCC232.isinversedsr(data->dcc232)?"yes":"no" );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
   data->serial = SerialOp.inst( data->device );
@@ -918,11 +1016,13 @@ static struct ODCC232* _inst( const iONode ini ,const iOTrace trc ) {
   SerialOp.setLine( data->serial, 19200, 8, 0, 0, True );
   SerialOp.setCTS( data->serial, False); /*Don't use CTS handshake*/
   SerialOp.setTimeout( data->serial, wDigInt.gettimeout( ini ), wDigInt.gettimeout( ini ) );
-  SerialOp.open( data->serial );
+  data->comOK = SerialOp.open( data->serial );
 
-  SerialOp.setOutputFlow(data->serial,False);          /* suspend output */
-  SerialOp.setRTS(data->serial,True);  /* +12V for ever on RTS   */
-  SerialOp.setDTR(data->serial,False); /* disable booster output */
+  if( data->comOK ) {
+    SerialOp.setOutputFlow(data->serial,False);          /* suspend output */
+    SerialOp.setRTS(data->serial,True);  /* +12V for ever on RTS   */
+    SerialOp.setDTR(data->serial,False); /* disable booster output */
+  }
 
   if( data->shortcut ) {
     data->watchdog = ThreadOp.inst( "watchdog", &__watchDog, __DCC232 );

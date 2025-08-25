@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -45,6 +48,7 @@ const char* rocs_system_getWSName( iOSystemData o );
 const char* rocs_system_getUserName( iOSystemData o );
 int rocs_system_getMillis( void );
 Boolean rocs_system_uBusyWait( int us );
+Boolean rocs_system_usWait( int us );
 char* rocs_system_getURL( const char* filepath );
 Boolean rocs_system_setadmin( void );
 int rocs_system_getTime( int* hours, int* minutes, int* seconds );
@@ -388,6 +392,35 @@ static const char* _getBuild(void) {
 }
 
 
+static char* _latin2cp850( const char* latinstr ) {
+  int len = StrOp.len( latinstr );
+  char* cp850str = allocIDMem( len + 1, RocsStrID );
+  int i = 0;
+  for( i = 0; i < len; i++ ) {
+    if( (unsigned char)latinstr[i] < 0x80 ) {
+      cp850str[i] = latinstr[i];
+    }
+    else {
+      switch((unsigned char)latinstr[i]) {
+      case 0xC4: cp850str[i] = 0x8E; break; /* &Auml;  */
+      case 0xCB: cp850str[i] = 0xD3; break; /* &Euml;  */
+      case 0xCF: cp850str[i] = 0xD8; break; /* &Iuml;  */
+      case 0xD6: cp850str[i] = 0x99; break; /* &Ouml;  */
+      case 0xDC: cp850str[i] = 0x9A; break; /* &Uuml;  */
+      case 0xDF: cp850str[i] = 0xE1; break; /* &szlig; */
+      case 0xE4: cp850str[i] = 0x84; break; /* &auml;  */
+      case 0xEB: cp850str[i] = 0x89; break; /* &euml;  */
+      case 0xEF: cp850str[i] = 0x8B; break; /* &iuml;  */
+      case 0xF6: cp850str[i] = 0x94; break; /* &ouml;  */
+      case 0xFC: cp850str[i] = 0x81; break; /* &uuml;  */
+      default: cp850str[i] = latinstr[i]; break;
+      }
+    }
+  }
+  return cp850str;
+}
+
+
 static char* _latin2utf( const char* latinstr ) {
   int len = StrOp.len( latinstr );
   char* utfstr = allocMem( len * 3 + 1 ); /* One Euro sign needs 3 chars in UTF-8 */
@@ -436,10 +469,10 @@ static char* _latin2utf( const char* latinstr ) {
 static char* _utf2latin( const char* utfstr ) {
   /* */
   int len = StrOp.len( utfstr );
-  char* latinstr = allocIDMem( len + 1, RocsStrID );
+  char* latinstr = allocIDMem( len + 10, RocsStrID );
   int i = 0;
   int idx = 0;
-  for( i = 0; i < len; i++ ) {
+  for( i = 0; i < len && idx < len; i++ ) {
     unsigned short val = utfstr[i];
     val &= 0xFF;
     if( val > 0x007F ) {
@@ -499,12 +532,17 @@ static char* _utf2latin( const char* utfstr ) {
 
 
 static const char* eyecatcher = "_rocs_";
+static const char* eyecatcherunlim = "_rocsunlim_";
 
 static const char* _getEyecatcher(void) {
   return eyecatcher;
 }
 
-static Boolean _isExpired(const char* s, char** expdate) {
+static const char* _getUnlimEyecatcher(void) {
+  return eyecatcherunlim;
+}
+
+static Boolean _isExpired(const char* s, char** expdate, long* expdays, int vmajor, int vminor) {
   Boolean expired = False;
   char licdate[11] = {0,0,0,0,0,0,0,0,0,0,0};
   time_t     tt = time(NULL);
@@ -512,6 +550,20 @@ static Boolean _isExpired(const char* s, char** expdate) {
   char day[3] = {0,0,0};
   char mon[3] = {0,0,0};
   char year[5] = {0,0,0,0,0};
+  char unlimkey[64] = {'\0'};
+
+  if( s == NULL || StrOp.len(s) == 0 ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "no key" );
+    return True;
+  }
+
+  StrOp.fmtb(unlimkey, "%s%d.%d", eyecatcherunlim, vmajor, vminor);
+  if( StrOp.startsWith( s, unlimkey ) ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unlimited key for version %d.%d", vmajor, vminor );
+    if( expdays != NULL )
+      *expdays = -1;
+    return False;
+  }
 
   if( !StrOp.startsWith( s, SystemOp.getEyecatcher() ) ) {
     TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "invalid key" );
@@ -544,11 +596,26 @@ static Boolean _isExpired(const char* s, char** expdate) {
       TraceOp.println( "%d == %d and %d == %d and %d < %d", atoi(year), t->tm_year+1900, atoi(mon), t->tm_mon+1, atoi(day), t->tm_mday );
     }
   }
+
+  if( expdays != NULL && !expired ) {
+    time_t remainingdays = 0;
+    time_t tl;
+    t->tm_year = atoi(year) - 1900;
+    t->tm_mon  = atoi(mon) - 1;
+    t->tm_mday = atoi(day);
+    tl = mktime(t);
+    remainingdays = (tl-tt)/86400;
+    *expdays = (int)remainingdays;
+    if( *expdays >= 0 ) {
+      TraceOp.println("The license expires in %ld days.", *expdays);
+    }
+  }
+
   return expired;
 }
 
 
-static char* _decode(byte* b, int len, const char* key) {
+static char* _decode(const byte* b, int len, const char* key) {
   int keyLength = StrOp.len(key);
   char* result = allocMem(len+1);
 

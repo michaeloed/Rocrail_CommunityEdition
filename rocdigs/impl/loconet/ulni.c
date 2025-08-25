@@ -1,7 +1,7 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2010 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -72,6 +72,40 @@ Needed instance variables:
 
 #include "rocrail/wrapper/public/DigInt.h"
 
+#include "rocdigs/impl/loconet/lnconst.h"
+
+#ifndef max
+  #define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
+#endif
+
+#ifndef min
+  #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
+#endif
+
+
+static Boolean __Connect( iOLocoNet inst ) {
+  iOLocoNetData data = Data(inst);
+  iOSerial serial = NULL;
+
+  data->subSendEcho = True;
+
+  serial = SerialOp.inst( data->device );
+  SerialOp.setFlow( serial, 0 );
+  SerialOp.setLine( serial, data->bps, 8, 1, none, wDigInt.isrtsdisabled( data->ini ) );
+  SerialOp.setTimeout( serial, wDigInt.gettimeout( data->ini ), wDigInt.gettimeout( data->ini ) );
+
+  if( SerialOp.open( serial ) ) {
+    data->serial = serial;
+    return True;
+  }
+  else {
+    SerialOp.base.del( serial );
+    data->serial = NULL;
+    return False;
+  }
+}
+
+
 static void __reader( void* threadinst ) {
   iOThread      th      = (iOThread)threadinst;
   iOLocoNet     loconet = (iOLocoNet)ThreadOp.getParm( th );
@@ -90,29 +124,42 @@ static void __reader( void* threadinst ) {
     Boolean  ok = True;
     Boolean  ignore = False;
 
-  
-    do {
-		  if( SerialOp.available(data->serial) ) {
-				ok = SerialOp.read(data->serial, &c, 1);
-				if(c < 0x80) {
-				  ThreadOp.sleep(10);
-				  bucket[garbage] = c;
-				  garbage++;
-				}
-		  }
-		  else {
-		    ThreadOp.sleep(10);
-		  }
-		} while (ok && data->run && c < 0x80 && garbage < 10);
+    if( data->serial == NULL ) {
+      if( !__Connect(loconet) ) {
+        ThreadOp.sleep(1000);
+        continue;
+      }
+    }
 
-		if( garbage > 0 ) {
-		   TraceOp.trc( "ulni", TRCLEVEL_INFO, __LINE__, 9999, "garbage=%d", garbage );
-		   TraceOp.dump ( "ulni", TRCLEVEL_BYTE, (char*)bucket, garbage );
-		}
-  
-  
-  
-  
+    do {
+      if( data->serial != NULL ) {
+        int available = SerialOp.available(data->serial);
+        if( available > 0 ) {
+          ok = SerialOp.read(data->serial, (char*)&c, 1);
+          if(c <= 0x80) {
+            ThreadOp.sleep(10);
+            bucket[garbage] = c;
+            garbage++;
+          }
+        }
+        else if( available == -1 || SerialOp.getRc(data->serial) > 0 ) {
+          /* device error */
+          iOSerial serial = data->serial;
+          data->serial = NULL;
+          SerialOp.close( serial );
+          SerialOp.base.del( serial );
+          TraceOp.trc( "ulni", TRCLEVEL_EXCEPTION, __LINE__, 9999, "device error" );
+        }
+        else {
+          ThreadOp.sleep(10);
+        }
+      }
+      else {
+        ok = False;
+      }
+		} while (ok && data->run && c <= 0x80 && garbage < 10);
+
+
 		if( !data->run || !ok ) {
 		  if( data->comm ) {
 		    data->comm = False;
@@ -129,11 +176,16 @@ static void __reader( void* threadinst ) {
 		  LocoNetOp.stateChanged(loconet);
 		}
 
+		if( garbage > 0 ) {
+       TraceOp.trc( "ulni", TRCLEVEL_INFO, __LINE__, 9999, "garbage=%d", garbage );
+       TraceOp.dump ( "ulni", TRCLEVEL_BYTE, (char*)bucket, garbage );
+    }
+
 		msg[0] = c;
     ignore = False;
 
 
-		if( c == 0xE0 ) {
+		if( c == 0xE0 || c == 0xC0 ) {
 		  /* Uhli exceptions */
       TraceOp.trc( "ulni", TRCLEVEL_WARNING, __LINE__, 9999, "undocumented message: start=0x%02X", msg[0] );
       ThreadOp.sleep(0);
@@ -154,9 +206,13 @@ static void __reader( void* threadinst ) {
           msglen = 6;
           index = 1;
           break;
+      case 0xd0:
+          msglen = 6;
+          index = 1;
+          break;
       case 0xe0:
-          SerialOp.read(data->serial, &c, 1);
-          msg[1] = c;
+          SerialOp.read(data->serial, (char*)&c, 1);
+          msg[1] = c & 0x7F;
           index = 2;
           msglen = (c & 0x7F);
           break;
@@ -168,7 +224,10 @@ static void __reader( void* threadinst ) {
 		}
 		TraceOp.trc( "ulni", TRCLEVEL_BYTE, __LINE__, 9999, "message 0x%02X length=%d", msg[0], msglen );
 
-		ok = SerialOp.read(data->serial, &msg[index], msglen - index);
+    ok = False;
+    if( msglen > 0 && msglen <= 0x7F && msglen >= index ) {
+  		ok = SerialOp.read(data->serial, (char*)&msg[index], msglen - index);
+    }
 
     if( ok && msglen > 0 && !ignore ) {
       Boolean echoCatched = False;
@@ -180,10 +239,10 @@ static void __reader( void* threadinst ) {
         echoCatched = data->subSendEcho;
       }
 
-      if( msg[0]!=0x81 && !echoCatched) {
+      if( msg[0] == OPC_GPOFF || msg[0] == OPC_GPON || (msg[0]!=0x81 && !echoCatched)) {
         byte* p = allocMem(msglen+1);
         p[0] = msglen;
-        MemOp.copy( p+1, msg, msglen);
+        MemOp.copy( p+1, msg, min(msglen,127));
         QueueOp.post( data->subReadQueue, (obj)p, normal);
         TraceOp.dump ( "ulni", TRCLEVEL_BYTE, (char*)msg, msglen );
       }
@@ -216,21 +275,28 @@ static void __writer( void* threadinst ) {
   int busyTimer = 0;
 
   TraceOp.trc( "ulni", TRCLEVEL_INFO, __LINE__, 9999, "ULNI writer started." );
-  do {
+
+  while( data->run ) {
     Boolean  ok = False;
+
+    if( data->serial == NULL ) {
+      ThreadOp.sleep(1000);
+      continue;
+    }
 
     /* TODO: copy packet for the reader to compair */
 		if( !data->busy && data->subSendEcho && !QueueOp.isEmpty(data->subWriteQueue) ) {
 		  byte* p = (byte*)QueueOp.get(data->subWriteQueue);
-		  int size = p[0];
+		  int size = p[0] & 0x7F;
 		  busyTimer = 0;
-		  MemOp.copy( ln, &p[1], size );
+		  MemOp.copy( ln, &p[1], min(size, 127) );
 		  freeMem(p);
       ok = SerialOp.write( data->serial, (char*)ln, size );
       if(ok) {
-        echoTimer = 0;
+	      TraceOp.dump ( "ulni", TRCLEVEL_BYTE, (char*)ln, size );
+         echoTimer = 0;
         data->subSendLen = size;
-		    MemOp.copy( data->subSendPacket, ln, size );
+		    MemOp.copy( data->subSendPacket, ln, min(size,127) );
 		    data->subSendEcho = False;
       }
 		}
@@ -257,7 +323,7 @@ static void __writer( void* threadinst ) {
     }
 
     ThreadOp.sleep(10);
-  } while( data->run );
+  };
 
   TraceOp.trc( "ulni", TRCLEVEL_INFO, __LINE__, 9999, "ULNI writer stopped." );
 }
@@ -265,35 +331,30 @@ static void __writer( void* threadinst ) {
 
 Boolean ulniConnect( obj inst ) {
   iOLocoNetData data = Data(inst);
-
-  data->subSendEcho = True;
-
   data->bps = wDigInt.getbps( data->ini );
+  char* threadname = NULL;
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "device  =%s", data->device );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "bps     =%d", data->bps );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "timeout =%d", wDigInt.gettimeout( data->ini ) );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
+  //__Connect(inst);
 
-  data->serial = SerialOp.inst( data->device );
-  SerialOp.setFlow( data->serial, none );
-  SerialOp.setLine( data->serial, data->bps, 8, 1, none, wDigInt.isrtsdisabled( data->ini ) );
-  SerialOp.setTimeout( data->serial, wDigInt.gettimeout( data->ini ), wDigInt.gettimeout( data->ini ) );
+  data->subReadQueue = QueueOp.inst(1000);
+  data->subWriteQueue = QueueOp.inst(1000);
+  data->run = True;
 
-  if( SerialOp.open( data->serial ) ) {
-    data->subReadQueue = QueueOp.inst(1000);
-    data->subWriteQueue = QueueOp.inst(1000);
-    data->run = True;
-    data->subReader = ThreadOp.inst( "ulnireader", &__reader, inst );
-    ThreadOp.start( data->subReader );
-    data->subWriter = ThreadOp.inst( "ulniwriter", &__writer, inst );
-    ThreadOp.start( data->subWriter );
-    return True;
-  }
-  else {
-    SerialOp.base.del( data->serial );
-    return False;
-  }
+  threadname = StrOp.fmt("ulnireader%X", inst);
+  data->subReader = ThreadOp.inst( threadname, &__reader, inst );
+  StrOp.free(threadname);
+  ThreadOp.start( data->subReader );
+
+  threadname = StrOp.fmt("ulniwriter%X", inst);
+  data->subWriter = ThreadOp.inst( threadname, &__writer, inst );
+  StrOp.free(threadname);
+  ThreadOp.start( data->subWriter );
+
+  return True;
 }
 
 void ulniDisconnect( obj inst ) {
@@ -312,8 +373,8 @@ int ulniRead ( obj inst, unsigned char *msg ) {
   iOLocoNetData data = Data(inst);
   if( !QueueOp.isEmpty(data->subReadQueue) ) {
     byte* p = (byte*)QueueOp.get(data->subReadQueue);
-    int size = p[0];
-    MemOp.copy( msg, &p[1], size );
+    int size = p[0] & 0x7F;
+    MemOp.copy( msg, &p[1], min(size, 127) );
     freeMem(p);
     return size;
   }
@@ -329,9 +390,8 @@ Boolean ulniWrite( obj inst, unsigned char *msg, int len ) {
   if( len > 0 ) {
     byte* p = allocMem(len+1);
     p[0] = len;
-    MemOp.copy( p+1, msg, len);
+    MemOp.copy( p+1, msg, min(len,127));
     QueueOp.post( data->subWriteQueue, (obj)p, normal);
-    TraceOp.dump ( "ulni", TRCLEVEL_BYTE, (char*)msg, len );
     return True;
   }
   
@@ -340,6 +400,8 @@ Boolean ulniWrite( obj inst, unsigned char *msg, int len ) {
 
 Boolean ulniAvailable( obj inst ) {
   iOLocoNetData data = Data(inst);
-  return !QueueOp.isEmpty(data->subReadQueue);
+  if( data->serial != NULL )
+    return !QueueOp.isEmpty(data->subReadQueue);
+  return False;
 }
 

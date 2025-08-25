@@ -1,7 +1,10 @@
  /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -24,10 +27,12 @@
 #include "rocdigs/impl/rocnet/rn-utils.h"
 #include "rocdigs/impl/rocnet/rnserial.h"
 #include "rocdigs/impl/rocnet/rnudp.h"
+#include "rocdigs/impl/rocnet/rntcp.h"
 
 #include "rocs/public/mem.h"
 #include "rocs/public/objbase.h"
 #include "rocs/public/string.h"
+#include "rocs/public/system.h"
 
 #include "rocrail/wrapper/public/DigInt.h"
 #include "rocrail/wrapper/public/SysCmd.h"
@@ -40,13 +45,23 @@
 #include "rocrail/wrapper/public/Program.h"
 #include "rocrail/wrapper/public/State.h"
 #include "rocrail/wrapper/public/RocNet.h"
+#include "rocrail/wrapper/public/RocNetNode.h"
 #include "rocrail/wrapper/public/BinCmd.h"
 #include "rocrail/wrapper/public/Clock.h"
+#include "rocrail/wrapper/public/Command.h"
+#include "rocrail/wrapper/public/Action.h"
+#include "rocrail/wrapper/public/Item.h"
+#include "rocrail/wrapper/public/Text.h"
+#include "rocrail/wrapper/public/Color.h"
 
 #include "rocutils/public/addr.h"
 
+#include <time.h>
+
 
 static int instCnt = 0;
+
+static void __shutdownAll(obj inst);
 
 /** ----- OBase ----- */
 static void __del( void* inst ) {
@@ -101,6 +116,25 @@ static void* __event( void* inst, const void* evt ) {
   return NULL;
 }
 
+static void __reportState(iOrocNet inst, Boolean emergency) {
+  iOrocNetData data = Data(inst);
+  if( data->listenerFun != NULL && data->listenerObj != NULL ) {
+    iONode node = NodeOp.inst( wState.name(), NULL, ELEMENT_NODE );
+
+    if( data->iid != NULL )
+      wState.setiid( node, data->iid );
+
+    wState.setpower( node, data->power );
+    wState.settrackbus( node, data->connected );
+    wState.setsensorbus( node, data->sensor );
+    wState.setemergency( node, emergency );
+    wState.setaccessorybus( node, data->connected );
+
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+}
+
+
 
 static byte __getProtocol(iONode loc) {
   byte prot = 0;
@@ -108,7 +142,7 @@ static byte __getProtocol(iONode loc) {
   if( StrOp.equals( wLoc.getprot(loc), wLoc.prot_N ) || StrOp.equals( wLoc.getprot(loc), wLoc.prot_L ) || StrOp.equals( wLoc.getprot(loc), wLoc.prot_P ) ) {
     if( wLoc.getspcnt(loc) < 28 )
       prot = RN_MOBILE_PROT_DCC14;
-    if( wLoc.getspcnt(loc) > 28 )
+    else if( wLoc.getspcnt(loc) > 28 )
       prot = RN_MOBILE_PROT_DCC128;
     else
       prot = RN_MOBILE_PROT_DCC28;
@@ -120,13 +154,48 @@ static byte __getProtocol(iONode loc) {
   return prot;
 }
 
+
+static int __getbusByNickname(iOrocNet inst, iONode node) {
+  iOrocNetData data = Data(inst);
+  if( wItem.getuidname(node) != NULL && StrOp.len(wItem.getuidname(node)) > 0 ) {
+    iONode rnnode = wRocNet.getrocnetnode( data->ini );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,"searching UID-Name [%s]", wItem.getuidname(node) );
+    while( rnnode != NULL ) {
+      if( StrOp.equals(wItem.getuidname(node) , wRocNetNode.getnickname(rnnode)) ) {
+        return wRocNetNode.getid(rnnode);
+      }
+      rnnode = wRocNet.nextrocnetnode( data->ini, rnnode );
+    }
+  }
+  return -1;
+}
+
+static iONode __getNodeByID(iOrocNet inst, int id) {
+  iOrocNetData data = Data(inst);
+  iONode rnnode = wRocNet.getrocnetnode( data->ini );
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999,"searching ID [%d]", id );
+  while( rnnode != NULL ) {
+    if( wRocNetNode.getid(rnnode) == id ) {
+      return rnnode;
+    }
+    rnnode = wRocNet.nextrocnetnode( data->ini, rnnode );
+  }
+  return NULL;
+}
+
 /** ----- OrocNet ----- */
 static iONode __translate( iOrocNet inst, iONode node ) {
   iOrocNetData data = Data(inst);
-  byte*  rn  = allocMem(32);;
+  byte*  rn  = allocMem(128);
   iONode rsp = NULL;
+  int busByNickname = __getbusByNickname(inst, node);
 
   rn[0] = 0; /* network ID 0=ALL */
+
+  if( busByNickname != -1 ) {
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,"found bus %d for UID-Name [%s]", busByNickname, wItem.getuidname(node) );
+    wItem.setbus(node, busByNickname);
+  }
 
   rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
 
@@ -135,9 +204,36 @@ static iONode __translate( iOrocNet inst, iONode node ) {
   if( StrOp.equals( NodeOp.getName( node ), wBinCmd.name() ) ) {
   }
 
+  /* Action command, */
+  else if( StrOp.equals( NodeOp.getName( node ), wAction.name() ) ) {
+    int bus   = wAction.getbus( node );
+    int i = 0;
+    const char* soundfile = wAction.getsndfile(node);
+    if( StrOp.equals(wAction.sound_play, wAction.getcmd(node)) ) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,"play sound file [%s] on node=%d", wAction.getsndfile(node), bus );
+      rn[RN_PACKET_GROUP] = RN_GROUP_SOUND;
+      rnReceipientAddresToPacket( bus, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_SOUND_PLAY;
+      rn[RN_PACKET_LEN] = StrOp.len(soundfile);
+      for( i = 0; i < StrOp.len(soundfile); i++ ) {
+        rn[RN_PACKET_DATA + i] = soundfile[i];
+      }
+      ThreadOp.post( data->writer, (obj)rn );
+      return rsp;
+    }
+  }
+
   /* Clock command. */
   else if( StrOp.equals( NodeOp.getName( node ), wClock.name() ) ) {
     const char* cmd = wClock.getcmd( node );
+    long l_time = wClock.gettime(node);
+    struct tm* lTime = localtime( &l_time );
+
+    int mins  = lTime->tm_min;
+    int hours = lTime->tm_hour;
+    int wday  = lTime->tm_wday;
+    int mday  = lTime->tm_mday;
+    int mon   = lTime->tm_mon;
 
     rn[RN_PACKET_GROUP] |= RN_GROUP_CLOCK;
 
@@ -145,18 +241,22 @@ static iONode __translate( iOrocNet inst, iONode node ) {
       TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Clock set" );
       rn[RN_PACKET_ACTION] = RN_CLOCK_SET;
       rn[RN_PACKET_LEN] = 8;
-      rn[RN_PACKET_DATA + 4] = wClock.gethour(node);
-      rn[RN_PACKET_DATA + 5] = wClock.getminute(node);
+      rn[RN_PACKET_DATA + 2] = mon;
+      rn[RN_PACKET_DATA + 3] = mday;
+      rn[RN_PACKET_DATA + 4] = hours;
+      rn[RN_PACKET_DATA + 5] = mins;
       rn[RN_PACKET_DATA + 7] = wClock.getdivider(node);
       ThreadOp.post( data->writer, (obj)rn );
       return rsp;
     }
     else if( StrOp.equals( cmd, wClock.sync ) ) {
-      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Clock sync" );
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Clock sync" );
       rn[RN_PACKET_ACTION] = RN_CLOCK_SYNC;
       rn[RN_PACKET_LEN] = 8;
-      rn[RN_PACKET_DATA + 4] = wClock.gethour(node);
-      rn[RN_PACKET_DATA + 5] = wClock.getminute(node);
+      rn[RN_PACKET_DATA + 2] = mon;
+      rn[RN_PACKET_DATA + 3] = mday;
+      rn[RN_PACKET_DATA + 4] = hours;
+      rn[RN_PACKET_DATA + 5] = mins;
       rn[RN_PACKET_DATA + 7] = wClock.getdivider(node);
       ThreadOp.post( data->writer, (obj)rn );
       return rsp;
@@ -175,6 +275,8 @@ static iONode __translate( iOrocNet inst, iONode node ) {
       rn[RN_PACKET_LEN] = 1;
       rn[RN_PACKET_DATA + 0] = RN_CS_TRACKPOWER_OFF;
       ThreadOp.post( data->writer, (obj)rn );
+      data->power = False;
+      __reportState(inst, False);
       return rsp;
     }
     else if( StrOp.equals( cmd, wSysCmd.go ) ) {
@@ -183,51 +285,103 @@ static iONode __translate( iOrocNet inst, iONode node ) {
       rn[RN_PACKET_LEN] = 1;
       rn[RN_PACKET_DATA + 0] = RN_CS_TRACKPOWER_ON;
       ThreadOp.post( data->writer, (obj)rn );
+      data->power = True;
+      __reportState(inst, False);
       return rsp;
     }
+    else if( StrOp.equals( cmd, wSysCmd.sod ) ) {
+      rn[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Start of Day" );
+      rn[RN_PACKET_ACTION] = RN_STATIONARY_STARTOFDAY;
+      rn[RN_PACKET_LEN] = 0;
+      ThreadOp.post( data->writer, (obj)rn );
+      return rsp;
+    }
+    else if( StrOp.equals( cmd, wSysCmd.shutdownnode ) ) {
+      rn[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+      rnReceipientAddresToPacket( wSysCmd.getbus(node), rn, data->seven );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Shutdown node %d", wSysCmd.getbus(node) );
+      rn[RN_PACKET_ACTION] = RN_STATIONARY_SHUTDOWN;
+      rn[RN_PACKET_LEN] = 1;
+      rn[RN_PACKET_DATA + 0] = 1;
+      ThreadOp.post( data->writer, (obj)rn );
+      return rsp;
+    }
+
   }
 
   /* Switch command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSwitch.name() ) ) {
+    int bus    = wSwitch.getbus( node );
     int addr   = wSwitch.getaddr1( node );
-    int port   = wSwitch.getport1( node );
-    int gate   = 0;
     int single = wSwitch.issinglegate( node );
     byte cmd   = 0;
-    byte mask  = single ? 0x01:0x03;
 
-    if( port == 0 )
-      AddrOp.fromFADA( addr, &addr, &port, &gate );
-    else if( addr == 0 && port > 0 )
-      AddrOp.fromPADA( port, &addr, &port );
-
-    addr = (addr-1) * 4 + port;
-
-    if( StrOp.equals( wSwitch.getcmd( node ), wSwitch.straight ) ) {
-      if( single ) cmd = 0x00;
-      else         cmd = 0x01;
+    if( single ) {
+      cmd = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout );
     }
     else {
-      if( single ) cmd = 0x01;
-      else         cmd = 0x02;
+      cmd = 1;
+      addr = StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? addr+1 : addr;
     }
 
-    rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
-    rnReceipientAddresToPacket( addr, rn, data->seven );
-    rn[RN_PACKET_ACTION] = RN_OUTPUT_SWITCH_MULTI;
-    rn[RN_PACKET_LEN] = 4;
-    rn[RN_PACKET_DATA + 0] = 0;
-    rn[RN_PACKET_DATA + 1] = mask;
-    rn[RN_PACKET_DATA + 2] = 0;
-    rn[RN_PACKET_DATA + 3] = cmd;
+    if( StrOp.equals( wSwitch.prot_DEF, wSwitch.getprot(node) ) ) {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "switch bus=%d addr=%d cmd=%d type=%d", bus, addr, cmd, wSwitch.getporttype(node) );
+      rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+      rnReceipientAddresToPacket( bus, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+      rn[RN_PACKET_LEN] = 5;
+      rn[RN_PACKET_DATA + 0] = cmd;
+      rn[RN_PACKET_DATA + 1] = wSwitch.getporttype(node);
+      rn[RN_PACKET_DATA + 2] = wSwitch.getdelay(node);
+      rn[RN_PACKET_DATA + 3] = addr;
+      rn[RN_PACKET_DATA + 4] = 0;
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "switch CS addr=%d cmd=%d type=%d", wSwitch.getaddr1( node ), cmd, wSwitch.getporttype(node) );
+      rn[RN_PACKET_GROUP] |= RN_GROUP_CS;
+      rnReceipientAddresToPacket( bus, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_CS_SWITCH;
+      rn[RN_PACKET_LEN] = 4;
+      rn[RN_PACKET_DATA + 0] = (StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ? 1:0);
+      rn[RN_PACKET_DATA + 1] = wSwitch.getporttype(node);
+      rn[RN_PACKET_DATA + 2] = 0;
+      rn[RN_PACKET_DATA + 3] = wSwitch.getaddr1( node );
+    }
+
+    if( data->watchdog != NULL ) {
+      byte*  rnwd  = allocMem(32);
+      MemOp.copy(rnwd, rn, 32);
+      ThreadOp.post( data->watchdog, (obj)rnwd );
+    }
     ThreadOp.post( data->writer, (obj)rn );
     return rsp;
   }
 
   /* Signal command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSignal.name() ) ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
-        "Signal commands are no longer supported at this level." );
+    int bus    = wSignal.getbus( node );
+    int addr   = wSignal.getaddr(node);
+    int aspect = wSignal.getaspect(node) + 1; /* Aspects numbers are zero based. */
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "signal bus=%d addr=%d aspect=%d", bus, addr, aspect );
+
+    rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+    rnReceipientAddresToPacket( bus, rn, data->seven );
+    rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+    rn[RN_PACKET_LEN] = 5;
+    rn[RN_PACKET_DATA + 0] = RN_OUTPUT_ON;
+    rn[RN_PACKET_DATA + 1] = wProgram.porttype_macro;
+    rn[RN_PACKET_DATA + 2] = 0;
+    rn[RN_PACKET_DATA + 3] = aspect;
+    rn[RN_PACKET_DATA + 4] = addr; /* (addr - 1) is used as macro port offset */
+
+    if( data->watchdog != NULL ) {
+      byte*  rnwd  = allocMem(32);
+      MemOp.copy(rnwd, rn, 32);
+      ThreadOp.post( data->watchdog, (obj)rnwd );
+    }
+    ThreadOp.post( data->writer, (obj)rn );
+    return rsp;
   }
 
   /* Sensor command. */
@@ -235,103 +389,574 @@ static iONode __translate( iOrocNet inst, iONode node ) {
     int addr = wFeedback.getaddr( node );
     Boolean state = wFeedback.isstate( node );
 
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "simulate fb addr=%d state=%s", addr, state?"true":"false" );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "simulate fb addr=%d state=%s", addr, state?"true":"false" );
     rsp = (iONode)NodeOp.base.clone( node );
+    return rsp;
   }
 
   /* Output command. */
   else if( StrOp.equals( NodeOp.getName( node ), wOutput.name() ) ) {
+    int bus  = wOutput.getbus( node );
     int addr = wOutput.getaddr( node );
-    int port = wOutput.getport( node );
-    int gate = wOutput.getgate( node );
     byte cmd   = RN_OUTPUT_ON;
-
-    if( port == 0 )
-      AddrOp.fromFADA( addr, &addr, &port, &gate );
-    else if( addr == 0 && port > 0 )
-      AddrOp.fromPADA( port, &addr, &port );
-
-    addr = (addr-1) * 4 + port;
+    Boolean useWD = True;
 
     if( StrOp.equals( wOutput.getcmd( node ), wOutput.off ) ) {
       cmd = RN_OUTPUT_OFF;
+      if( wOutput.getporttype(node) == wProgram.porttype_macro && wOutput.getparam(node) > 0 ) {
+        addr = wOutput.getparam(node);
+        cmd  = RN_OUTPUT_ON;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "output: activate macro %d for off", addr );
+      }
     }
 
-    rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
-    rnReceipientAddresToPacket( addr, rn, data->seven );
-    rn[RN_PACKET_ACTION] = RN_OUTPUT_SWITCH;
-    rn[RN_PACKET_LEN] = 1;
-    rn[RN_PACKET_DATA + 0] = cmd;
+    if( StrOp.equals( wSwitch.prot_DEF, wSwitch.getprot(node) ) ) {
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "output redChannel=%d greenChannel=%d blueChannel=%d color=%X colortype=%d",
+          wOutput.getredChannel(node), wOutput.getgreenChannel(node), wOutput.getblueChannel(node), wOutput.getcolor(node), wOutput.iscolortype(node) );
+      if( wOutput.iscolortype(node) && wOutput.getredChannel(node) > 0 && wOutput.getgreenChannel(node) > 0 && wOutput.getblueChannel(node) > 0 && wOutput.getcolor(node) != NULL ) {
+        iONode color = wOutput.getcolor(node);
+        float rgb = 0;
+        float bri = wOutput.getvalue(node);
+        useWD = False;
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "RGB output bus=%d addr=%d cmd=%d type=%d red=%d green=%d blue=%d brightness=%d",
+            bus, addr, cmd, wOutput.getporttype(node), wColor.getred(color), wColor.getgreen(color), wColor.getblue(color), wOutput.getvalue(node) );
+
+        rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+        rnReceipientAddresToPacket( bus, rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+        rn[RN_PACKET_LEN] = 5;
+        rn[RN_PACKET_DATA + 0] = cmd;
+        rn[RN_PACKET_DATA + 1] = wOutput.getporttype(node);
+        rgb = wColor.getred(color);
+        rgb = (rgb * bri) / 255.0;
+        rn[RN_PACKET_DATA + 2] = (int)rgb;
+        rn[RN_PACKET_DATA + 3] = wOutput.getredChannel(node);
+        rn[RN_PACKET_DATA + 4] = 0;
+        ThreadOp.post( data->writer, (obj)rn );
+
+        rn  = allocMem(32);
+        rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+        rnReceipientAddresToPacket( bus, rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+        rn[RN_PACKET_LEN] = 5;
+        rn[RN_PACKET_DATA + 0] = cmd;
+        rn[RN_PACKET_DATA + 1] = wOutput.getporttype(node);
+        rgb = wColor.getgreen(color);
+        rgb = (rgb * bri) / 255.0;
+        rn[RN_PACKET_DATA + 2] = (int)rgb;
+        rn[RN_PACKET_DATA + 3] = wOutput.getgreenChannel(node);
+        rn[RN_PACKET_DATA + 4] = 0;
+        ThreadOp.post( data->writer, (obj)rn );
+
+        rn  = allocMem(32);
+        rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+        rnReceipientAddresToPacket( bus, rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+        rn[RN_PACKET_LEN] = 5;
+        rn[RN_PACKET_DATA + 0] = cmd;
+        rn[RN_PACKET_DATA + 1] = wOutput.getporttype(node);
+        rgb = wColor.getblue(color);
+        rgb = (rgb * bri) / 255.0;
+        rn[RN_PACKET_DATA + 2] = (int)rgb;
+        rn[RN_PACKET_DATA + 3] = wOutput.getblueChannel(node);
+        rn[RN_PACKET_DATA + 4] = 0;
+
+        if( wOutput.getwhiteChannel(node) > 0 ) {
+          ThreadOp.post( data->writer, (obj)rn );
+
+          rn  = allocMem(32);
+          rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+          rnReceipientAddresToPacket( bus, rn, data->seven );
+          rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+          rn[RN_PACKET_LEN] = 5;
+          rn[RN_PACKET_DATA + 0] = cmd;
+          rn[RN_PACKET_DATA + 1] = wOutput.getporttype(node);
+          rgb = wColor.getwhite(color);
+          rgb = (rgb * bri) / 255.0;
+          rn[RN_PACKET_DATA + 2] = (int)rgb;
+          rn[RN_PACKET_DATA + 3] = wOutput.getwhiteChannel(node);
+          rn[RN_PACKET_DATA + 4] = 0;
+        }
+
+        if( wOutput.getwhite2Channel(node) > 0 ) {
+          ThreadOp.post( data->writer, (obj)rn );
+
+          rn  = allocMem(32);
+          rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+          rnReceipientAddresToPacket( bus, rn, data->seven );
+          rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+          rn[RN_PACKET_LEN] = 5;
+          rn[RN_PACKET_DATA + 0] = cmd;
+          rn[RN_PACKET_DATA + 1] = wOutput.getporttype(node);
+          rgb = wColor.getwhite2(color);
+          rgb = (rgb * bri) / 255.0;
+          rn[RN_PACKET_DATA + 2] = (int)rgb;
+          rn[RN_PACKET_DATA + 3] = wOutput.getwhite2Channel(node);
+          rn[RN_PACKET_DATA + 4] = 0;
+        }
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "output bus=%d addr=%d cmd=%d type=%d", bus, addr, cmd, wOutput.getporttype(node) );
+        rn[RN_PACKET_GROUP] |= RN_GROUP_OUTPUT;
+        rnReceipientAddresToPacket( bus, rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_STATIONARY_SINGLE_PORT;
+        rn[RN_PACKET_LEN] = 5;
+        rn[RN_PACKET_DATA + 0] = cmd;
+        rn[RN_PACKET_DATA + 1] = wOutput.getporttype(node);
+        rn[RN_PACKET_DATA + 2] = wOutput.getvalue(node);
+        rn[RN_PACKET_DATA + 3] = addr;
+        rn[RN_PACKET_DATA + 4] = 0;
+      }
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "output CS addr=%d cmd=%d type=%d", addr, cmd, wOutput.getporttype(node) );
+      rn[RN_PACKET_GROUP] |= RN_GROUP_CS;
+      rnReceipientAddresToPacket( bus, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_CS_OUTPUT;
+      rn[RN_PACKET_LEN] = 4;
+      rn[RN_PACKET_DATA + 0] = cmd;
+      rn[RN_PACKET_DATA + 1] = wOutput.getporttype(node);
+      rn[RN_PACKET_DATA + 2] = 0;
+      rn[RN_PACKET_DATA + 3] = addr;
+    }
+
+    if( useWD && data->watchdog != NULL ) {
+      byte*  rnwd  = allocMem(32);
+      MemOp.copy(rnwd, rn, 32);
+      ThreadOp.post( data->watchdog, (obj)rnwd );
+    }
     ThreadOp.post( data->writer, (obj)rn );
+    return rsp;
+  }
+
+  /* Loc dispatch command. */
+  else if( StrOp.equals( NodeOp.getName( node ), wLoc.name() ) && StrOp.equals(wLoc.dispatch, wLoc.getcmd(node)) ) {
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "dispatch loco %s:%d", wLoc.getid(node), wLoc.getaddr(node));
+    data->dispatchAddr = wLoc.getaddr(node);
     return rsp;
   }
 
   /* Loco command. */
   else if( StrOp.equals( NodeOp.getName( node ), wLoc.name() ) ) {
+    int   bus  = wLoc.getbus( node );
     int   addr = wLoc.getaddr( node );
-    int      V = 0;
+    int  spcnt = wLoc.getspcnt( node );
+    int      V = wLoc.getV( node );
+    int   mass = wLoc.getmass( node );
     byte    fn = wLoc.isfn( node )  ? RN_MOBILE_LIGHTS_ON:0;
     byte   dir = wLoc.isdir( node ) ? RN_MOBILE_DIR_FORWARDS:0;
     byte  prot = __getProtocol(node);
 
-    if( wLoc.getV( node ) != -1 ) {
-      if( StrOp.equals( wLoc.getV_mode( node ), wLoc.V_mode_percent ) )
-        V = (wLoc.getV( node ) * 127) / 100;
-      else if( wLoc.getV_max( node ) > 0 )
-        V = (wLoc.getV( node ) * 127) / wLoc.getV_max( node );
-    }
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loc %d V=%d lights=%s dir=%s",
-        addr, V, fn?"on":"off", dir?"forwards":"reverse" );
+    if( bus == 0 && data->lcbus > 0 )
+      bus = data->lcbus;
 
-    rn[RN_PACKET_GROUP] |= RN_GROUP_MOBILE;
-    rnReceipientAddresToPacket( addr, rn, data->seven );
-    rn[RN_PACKET_ACTION] = RN_MOBILE_VELOCITY;
-    rn[RN_PACKET_LEN] = 2;
-    rn[RN_PACKET_DATA + 0] = V;
-    rn[RN_PACKET_DATA + 1] = dir | fn | prot;
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "loc %d:%d V=%d lights=%s dir=%s spcnt=%d",
+        bus, addr, V, fn?"on":"off", dir?"forwards":"reverse", spcnt );
+
+    if( bus > 0 ) {
+      rn[RN_PACKET_GROUP] |= RN_GROUP_CS;
+      rnReceipientAddresToPacket( bus, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_CS_VELOCITY;
+      rn[RN_PACKET_LEN] = 7;
+      rn[RN_PACKET_DATA + 0] = addr / 256;
+      rn[RN_PACKET_DATA + 1] = addr % 256;
+      rn[RN_PACKET_DATA + 2] = V;
+      rn[RN_PACKET_DATA + 3] = dir;
+      rn[RN_PACKET_DATA + 4] = fn;
+      rn[RN_PACKET_DATA + 5] = prot;
+      rn[RN_PACKET_DATA + 6] = spcnt;
+    }
+    else {
+      rn[RN_PACKET_GROUP] |= RN_GROUP_MOBILE;
+      rnReceipientAddresToPacket( addr, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_MOBILE_VELOCITY;
+      rn[RN_PACKET_LEN] = 5;
+      rn[RN_PACKET_DATA + 0] = V;
+      rn[RN_PACKET_DATA + 1] = dir;
+      rn[RN_PACKET_DATA + 2] = fn;
+      rn[RN_PACKET_DATA + 3] = mass;
+      rn[RN_PACKET_DATA + 4] = spcnt;
+
+      if( data->watchdog != NULL ) {
+        byte*  rnwd  = allocMem(32);
+        MemOp.copy(rnwd, rn, 32);
+        ThreadOp.post( data->watchdog, (obj)rnwd );
+      }
+    }
     ThreadOp.post( data->writer, (obj)rn );
     return rsp;
   }
 
   /* Function command. */
   else if( StrOp.equals( NodeOp.getName( node ), wFunCmd.name() ) ) {
+    int   bus  = wFunCmd.getbus( node );
     int   addr = wFunCmd.getaddr( node );
+    int lights = (wFunCmd.isf0( node )?0x01:0x00);
     byte  prot = __getProtocol(node);
-    Boolean fn   = wFunCmd.isf0(node);
-    Boolean fn1  = wFunCmd.isf1(node);
-    Boolean fn2  = wFunCmd.isf2(node);
-    Boolean fn3  = wFunCmd.isf3(node);
-    Boolean fn4  = wFunCmd.isf4(node);
-    Boolean fn5  = wFunCmd.isf5(node);
-    Boolean fn6  = wFunCmd.isf6(node);
-    Boolean fn7  = wFunCmd.isf7(node);
-    Boolean fn8  = wFunCmd.isf8(node);
-    Boolean fn9  = wFunCmd.isf9(node);
-    Boolean fn10 = wFunCmd.isf10(node);
-    Boolean fn11 = wFunCmd.isf11(node);
-    Boolean fn12 = wFunCmd.isf12(node);
+    int i = 0;
+    int fb1 = 0;
+    int fb2 = 0;
+    int fb3 = 0;
+    for( i = 0; i < 8; i++) {
+      char key[32];
+      StrOp.fmtb(key, "f%d", i+1 );
+      if( NodeOp.getBool(node, key, False) )
+        fb1 |= (1 << i);
+    }
+    for( i = 0; i < 8; i++) {
+      char key[32];
+      StrOp.fmtb(key, "f%d", i+9 );
+      if( NodeOp.getBool(node, key, False) )
+        fb2 |= (1 << i);
+    }
+    for( i = 0; i < 8; i++) {
+      char key[32];
+      StrOp.fmtb(key, "f%d", i+17 );
+      if( NodeOp.getBool(node, key, False) )
+        fb3 |= (1 << i);
+    }
 
+    if( bus == 0 && data->lcbus > 0 )
+      bus = data->lcbus;
 
-    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
-        "lc=%d lights=%s f1=%s f2=%s f3=%s f4=%s f5=%s f6=%s f7=%s f8=%s f9=%s f10=%s f11=%s f12=%s",
-        addr, fn?"on":"off",
-        fn1?"on":"off", fn2 ?"on":"off", fn3 ?"on":"off", fn4 ?"on":"off",
-        fn5?"on":"off", fn6 ?"on":"off", fn7 ?"on":"off", fn8 ?"on":"off",
-        fn9?"on":"off", fn10?"on":"off", fn11?"on":"off", fn12?"on":"off" );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "lc=%d:%d fb1=0x%02X fb2=0x%02X fb3=0x%02X changed=%d",
+        bus, addr, fb1, fb2, fb3, wFunCmd.getfnchanged(node));
 
-    rn[RN_PACKET_GROUP] |= RN_GROUP_MOBILE;
-    rnReceipientAddresToPacket( addr, rn, data->seven );
-    rn[RN_PACKET_ACTION] = RN_MOBILE_FUNCTIONS;
-    rn[RN_PACKET_LEN] = 3;
-    rn[RN_PACKET_DATA + 0] = (fn1?0x01:0x00) | (fn2?0x02:0x00) | (fn3?0x04:0x00) | (fn4?0x08:0x00) | (fn5?0x10:0x00) | (fn6?0x20:0x00) | (fn?0x40:0x00) ;
-    rn[RN_PACKET_DATA + 1] = (fn7?0x01:0x00) | (fn8?0x02:0x00) | (fn9?0x04:0x00) | (fn10?0x08:0x00) | (fn11?0x10:0x00) | (fn12?0x20:0x00) ;
-    rn[RN_PACKET_DATA + 2] = prot;
+    if( bus > 0 ) {
+      rn[RN_PACKET_GROUP] |= RN_GROUP_CS;
+      rnReceipientAddresToPacket( bus, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_CS_FUNCTION;
+      rn[RN_PACKET_LEN] = 7;
+      rn[RN_PACKET_DATA + 0] = addr / 256;
+      rn[RN_PACKET_DATA + 1] = addr % 256;
+      rn[RN_PACKET_DATA + 2] = fb1;
+      rn[RN_PACKET_DATA + 3] = fb2;
+      rn[RN_PACKET_DATA + 4] = fb3;
+      rn[RN_PACKET_DATA + 5] = prot + (lights << 7);
+      rn[RN_PACKET_DATA + 6] = (wFunCmd.getfnchanged(node) & 0x7F) + (lights << 7);
+    }
+    else {
+      rn[RN_PACKET_GROUP] |= RN_GROUP_MOBILE;
+      rnReceipientAddresToPacket( addr, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_MOBILE_FUNCTIONS;
+      rn[RN_PACKET_LEN] = 3;
+      rn[RN_PACKET_DATA + 0] = fb1;
+      rn[RN_PACKET_DATA + 1] = fb2;
+      rn[RN_PACKET_DATA + 2] = fb3;
+      rn[RN_PACKET_DATA + 3] = wFunCmd.getfnchanged(node) & 0xFF;
+
+      if( data->watchdog != NULL ) {
+        byte*  rnwd  = allocMem(32);
+        MemOp.copy(rnwd, rn, 32);
+        ThreadOp.post( data->watchdog, (obj)rnwd );
+      }
+    }
     ThreadOp.post( data->writer, (obj)rn );
     return rsp;
   }
 
+  /* Program command. */
+  else if( StrOp.equals( NodeOp.getName( node ), wProgram.name() ) ) {
+    Boolean direct = wProgram.getmode(node) == wProgram.mode_direct;
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "program type %d...", wProgram.getlntype(node) );
+    if( wProgram.getlntype(node) == wProgram.lntype_sv && wProgram.getcmd( node ) == wProgram.lncvget &&
+        wProgram.getcv(node) == 0 && wProgram.getmodid(node) == 0 && wProgram.getaddr(node) == 0 )
+    {
+      /* This construct is used to to query all LocoIOs, but is here recycled for query all CAN-GC2s. */
+      rn[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+      rnReceipientAddresToPacket( 0, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_STATIONARY_IDENTIFY;
+      rn[RN_PACKET_LEN] = 0;
+      ThreadOp.post( data->writer, (obj)rn );
+    }
+    else if(wProgram.getlntype(node) == wProgram.lntype_rocnet ) {
+      if( wProgram.getcmd( node ) == wProgram.nnreq ) {
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        int newrnid = wProgram.getvalue(node);
+        int location = wProgram.getval1(node);
+        int subip = wProgram.getval2(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_WRNID;
+        rn[RN_PACKET_LEN] = 5 + StrOp.len(wProgram.getstrval1(node));
+        rn[RN_PACKET_DATA + 0] = newrnid / 256;
+        rn[RN_PACKET_DATA + 1] = newrnid % 256;
+        rn[RN_PACKET_DATA + 2] = subip / 256;
+        rn[RN_PACKET_DATA + 3] = subip % 256;
+        rn[RN_PACKET_DATA + 4] = location;
+        StrOp.copy((char*)&rn[RN_PACKET_DATA + 5], wProgram.getstrval1(node));
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.nvget ) {
+        int porttype = wProgram.getporttype(node);
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        if( porttype == wProgram.porttype_servo ) {
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "program read channel porttype=%d", porttype );
+          rn[RN_PACKET_ACTION] = RN_PROGRAMMING_RCHANNEL;
+          rn[RN_PACKET_LEN] = 2;
+          rn[RN_PACKET_DATA + 0] = wProgram.getval1(node);
+          rn[RN_PACKET_DATA + 1] = wProgram.getval2(node);
+        }
+        else {
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "program read port porttype=%d", porttype );
+          rn[RN_PACKET_ACTION] = RN_PROGRAMMING_RPORT;
+          rn[RN_PACKET_LEN] = 2;
+          rn[RN_PACKET_DATA + 0] = wProgram.getval1(node);
+          rn[RN_PACKET_DATA + 1] = wProgram.getval2(node);
+        }
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.evget ) {
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_RPORTEVENT;
+        rn[RN_PACKET_LEN] = 2;
+        rn[RN_PACKET_DATA + 0] = wProgram.getval1(node);
+        rn[RN_PACKET_DATA + 1] = wProgram.getval2(node);
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.setchannel ) {
+        int porttype = wProgram.getporttype(node);
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_SETCHANNEL;
+        rn[RN_PACKET_LEN] = 4;
+        rn[RN_PACKET_DATA + 0] = wProgram.getval1(node);
+        rn[RN_PACKET_DATA + 1] = wProgram.getval2(node)/256;
+        rn[RN_PACKET_DATA + 2] = wProgram.getval2(node)%256;
+        rn[RN_PACKET_DATA + 3] = wProgram.getval3(node);
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.nvset ) {
+        char key[32] = {'\0'};
+        int i = 0;
+        int porttype = wProgram.getporttype(node);
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        if( porttype == wProgram.porttype_servo ) {
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "program write channel porttype=%d", porttype );
+          rn[RN_PACKET_ACTION] = RN_PROGRAMMING_WCHANNEL;
+          rn[RN_PACKET_LEN] = 8*8;
+          for( i = 0; i < 8; i++ ) {
+            /* channel#   offposH  offposL  onposH   onposL   offsteps onsteps  options */
+            StrOp.fmtb(key, "val%d", i*6 + 1);
+            rn[RN_PACKET_DATA + 0 + i*8] = NodeOp.getInt(node, key, 0);
+            StrOp.fmtb(key, "val%d", i*6 + 2);
+            rn[RN_PACKET_DATA + 1 + i*8] = NodeOp.getInt(node, key, 0)/256;
+            rn[RN_PACKET_DATA + 2 + i*8] = NodeOp.getInt(node, key, 0)%256;
+            StrOp.fmtb(key, "val%d", i*6 + 3);
+            rn[RN_PACKET_DATA + 3 + i*8] = NodeOp.getInt(node, key, 0)/256;
+            rn[RN_PACKET_DATA + 4 + i*8] = NodeOp.getInt(node, key, 0)%256;
+            StrOp.fmtb(key, "val%d", i*6 + 4);
+            rn[RN_PACKET_DATA + 5 + i*8] = NodeOp.getInt(node, key, 0);
+            StrOp.fmtb(key, "val%d", i*6 + 5);
+            rn[RN_PACKET_DATA + 6 + i*8] = NodeOp.getInt(node, key, 0);
+            StrOp.fmtb(key, "val%d", i*6 + 6);
+            rn[RN_PACKET_DATA + 7 + i*8] = NodeOp.getInt(node, key, 0);
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "channel=%d offpos=%d onpos=%d",
+                rn[RN_PACKET_DATA + 0 + i*8], rn[RN_PACKET_DATA + 1 + i*8]*256 + rn[RN_PACKET_DATA + 2 + i*8], rn[RN_PACKET_DATA + 3 + i*8]*256 + rn[RN_PACKET_DATA + 4 + i*8] );
+          }
+        }
+        else {
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "program write port porttype=%d", porttype );
+          rn[RN_PACKET_ACTION] = RN_PROGRAMMING_WPORT;
+          rn[RN_PACKET_LEN] = 8*4;
+          for( i = 0; i < 8; i++ ) {
+            StrOp.fmtb(key, "val%d", i*4 + 1);
+            rn[RN_PACKET_DATA + 0 + i*4] = NodeOp.getInt(node, key, 0);
+            StrOp.fmtb(key, "val%d", i*4 + 2);
+            rn[RN_PACKET_DATA + 1 + i*4] = NodeOp.getInt(node, key, 0);
+            StrOp.fmtb(key, "val%d", i*4 + 3);
+            rn[RN_PACKET_DATA + 2 + i*4] = NodeOp.getInt(node, key, 0);
+            StrOp.fmtb(key, "val%d", i*4 + 4);
+            rn[RN_PACKET_DATA + 3 + i*4] = NodeOp.getInt(node, key, 0);
+          }
+        }
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.unlearn ) {
+        char key[32] = {'\0'};
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        if( wProgram.getporttype( node ) == wProgram.porttype_servo )
+          rn[RN_PACKET_ACTION] = RN_PROGRAMMING_RMCHANNEL;
+        else
+          rn[RN_PACKET_ACTION] = RN_PROGRAMMING_RMPORT;
+        rn[RN_PACKET_LEN] = 8;
+        for( i = 0; i < 8; i++ ) {
+          StrOp.fmtb(key, "val%d", i + 1);
+          rn[RN_PACKET_DATA + 0 + i] = NodeOp.getInt(node, key, 0);
+        }
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.evset ) {
+        char key[32] = {'\0'};
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_WPORTEVENT;
+        rn[RN_PACKET_LEN] = 8*4;
+        for( i = 0; i < 8; i++ ) {
+          StrOp.fmtb(key, "val%d", i*4 + 1);
+          rn[RN_PACKET_DATA + 0 + i*4] = NodeOp.getInt(node, key, 0);
+          StrOp.fmtb(key, "val%d", i*4 + 2);
+          rn[RN_PACKET_DATA + 1 + i*4] = NodeOp.getInt(node, key, 0);
+          StrOp.fmtb(key, "val%d", i*4 + 3);
+          rn[RN_PACKET_DATA + 2 + i*4] = NodeOp.getInt(node, key, 0);
+          StrOp.fmtb(key, "val%d", i*4 + 4);
+          rn[RN_PACKET_DATA + 3 + i*4] = NodeOp.getInt(node, key, 0);
+        }
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.getoptions ) {
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_RDOPT;
+        rn[RN_PACKET_LEN] = 0;
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.setoptions ) {
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_WROPT;
+        rn[RN_PACKET_LEN] = 5;
+        rn[RN_PACKET_DATA + 0] = wProgram.getval1(node);
+        rn[RN_PACKET_DATA + 1] = wProgram.getval2(node);
+        rn[RN_PACKET_DATA + 2] = wProgram.getval3(node);
+        rn[RN_PACKET_DATA + 3] = wProgram.getval4(node);
+        rn[RN_PACKET_DATA + 4] = wProgram.getval5(node);
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.show ) {
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_STATIONARY_SHOW;
+        rn[RN_PACKET_LEN] = 0;
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.update ) {
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_UPDATE;
+        rn[RN_PACKET_LEN] = 3;
+        rn[RN_PACKET_DATA+0] = wProgram.getvalue(node)/256;
+        rn[RN_PACKET_DATA+1] = wProgram.getvalue(node)%256;
+        rn[RN_PACKET_DATA+2] = wProgram.getval1(node);
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.query ) {
+        rn[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+        rnReceipientAddresToPacket( 0, rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_STATIONARY_IDENTIFY;
+        rn[RN_PACKET_LEN] = 0;
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.macro_get ) {
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_RMACRO;
+        rn[RN_PACKET_LEN] = 1;
+        rn[RN_PACKET_DATA+0] = wProgram.getvalue(node);
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+      else if( wProgram.getcmd( node ) == wProgram.macro_set ) {
+        char key[32] = {'\0'};
+        int i = 0;
+        int rnid = wProgram.getmodid(node);
+        rn[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+        rnReceipientAddresToPacket( rnid, rn, data->seven );
+        rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+        rn[RN_PACKET_ACTION] = RN_PROGRAMMING_WMACRO;
+        rn[RN_PACKET_LEN] = 1 + 8*4;
+        rn[RN_PACKET_DATA + 0] = wProgram.getvalue(node);
+        for( i = 0; i < 8; i++ ) {
+          StrOp.fmtb(key, "val%d", i*4 + 1);
+          rn[RN_PACKET_DATA + 1 + i*4] = NodeOp.getInt(node, key, 0);
+          StrOp.fmtb(key, "val%d", i*4 + 2);
+          rn[RN_PACKET_DATA + 2 + i*4] = NodeOp.getInt(node, key, 0);
+          StrOp.fmtb(key, "val%d", i*4 + 3);
+          rn[RN_PACKET_DATA + 3 + i*4] = NodeOp.getInt(node, key, 0);
+          StrOp.fmtb(key, "val%d", i*4 + 4);
+          rn[RN_PACKET_DATA + 4 + i*4] = NodeOp.getInt(node, key, 0);
+        }
+        ThreadOp.post( data->writer, (obj)rn );
+      }
+    }
+    else if(wProgram.ispom(node)) {
+      int addr = wProgram.getaddr( node );
+      rn[RN_PACKET_GROUP] = RN_GROUP_CS;
+      rnReceipientAddresToPacket( 0, rn, data->seven );
+      rn[RN_PACKET_ACTION] = RN_CS_POM;
+      rn[RN_PACKET_LEN] = 6;
+      rn[RN_PACKET_DATA + 0] = addr / 256;
+      rn[RN_PACKET_DATA + 1] = addr % 256;
+      rn[RN_PACKET_DATA + 2] = wProgram.getcv(node)/256;
+      rn[RN_PACKET_DATA + 3] = wProgram.getcv(node)%256;
+      rn[RN_PACKET_DATA + 4] = wProgram.getvalue(node);
+      rn[RN_PACKET_DATA + 5] = wProgram.getcmd(node) == wProgram.set ?1:0;
+      ThreadOp.post( data->writer, (obj)rn );
+    }
+    return rsp;
+  }
+
+  /* Text command. */
+  else if( StrOp.equals( NodeOp.getName( node ), wText.name() ) ) {
+    const char* text = wText.gettext(node);
+    int bus     = wText.getbus(node);
+    int addr    = wText.getaddr(node);
+    int display = wText.getdisplay(node);
+    int len     = StrOp.len( text );
+
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "set display %d:%d:%d to \"%s\" len=%d", bus, addr, display, text, len );
+
+    if( len > 80 ) {
+      len = 80;
+    }
+
+    rn[RN_PACKET_GROUP] = RN_GROUP_DISPLAY;
+    rnReceipientAddresToPacket( bus, rn, data->seven );
+    rn[RN_PACKET_ACTION] = RN_DISPLAY_TEXT;
+    rn[RN_PACKET_LEN] = 2 + len;
+    rn[RN_PACKET_DATA + 0] = addr;
+    rn[RN_PACKET_DATA + 1] = display;
+    MemOp.copy( &rn[RN_PACKET_DATA + 2], text, len );
+    rn[RN_PACKET_DATA + 2 + len] = 0; /* the terminating zero byte */
+    ThreadOp.post( data->writer, (obj)rn );
+  }
+
   /* unhandled command */
-  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Unhandled command: [%s][%s]",
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Unhandled command: [%s][%s]",
       NodeOp.getName(node), NodeOp.getStr(node, "cmd", "?") );
   /* not used; free up */
   freeMem(rn);
@@ -340,11 +965,32 @@ static iONode __translate( iOrocNet inst, iONode node ) {
 }
 
 
+static void __shutdownAll(obj inst) {
+  iOrocNetData data = Data(inst);
+  byte* rn = allocMem(32);
+  rn[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+  rnReceipientAddresToPacket( 0, rn, data->seven );
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Shutdown all nodes" );
+  rn[RN_PACKET_ACTION] = RN_STATIONARY_SHUTDOWN;
+  rn[RN_PACKET_LEN] = 1;
+  rn[RN_PACKET_DATA + 0] = 1;
+  ThreadOp.post( data->writer, (obj)rn );
+}
+
+
 /**  */
 static iONode _cmd( obj inst ,const iONode cmd ) {
   iOrocNetData data = Data(inst);
   iONode rsp = __translate( (iOrocNet)inst, cmd );
 
+  if( cmd != NULL ) {
+    if(StrOp.equals( NodeOp.getName(cmd), wSysCmd.name() ) ) {
+      if( StrOp.equals( wSysCmd.getcmd(cmd), wSysCmd.shutdown ) && wSysCmd.getval(cmd) == 1 ) {
+        __shutdownAll(inst);
+        ThreadOp.sleep(500);
+      }
+    }
+  }
   /* Cleanup Node1 */
   cmd->base.del(cmd);
 
@@ -353,22 +999,37 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOrocNetData data = Data(inst);
+
+  data->shutdown = True;
 
   if( poweroff ) {
     byte* rn;
     rn = allocMem(32);
-    rn[0] = 0;
-    rn[RN_PACKET_GROUP] |= RN_GROUP_CS;
+    rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+    rn[RN_PACKET_GROUP] = RN_GROUP_CS;
     rn[RN_PACKET_ACTION] = RN_CS_TRACKPOWER;
     rn[RN_PACKET_LEN] = 1;
     rn[RN_PACKET_DATA + 0] = RN_CS_TRACKPOWER_OFF;
-
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Power OFF" );
     ThreadOp.post( data->writer, (obj)rn );
+    ThreadOp.sleep(250);
+
+    rn = allocMem(32);
+    rnSenderAddresToPacket( wRocNet.getid(data->rnini), rn, data->seven );
+    rn[RN_PACKET_GROUP] = RN_GROUP_HOST;
+    rn[RN_PACKET_ACTION] = RN_HOST_SHUTDOWN;
+    rn[RN_PACKET_LEN] = 0;
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Shutdown" );
+    ThreadOp.post( data->writer, (obj)rn );
     /* grab some time to process the request */
-    ThreadOp.sleep(500);
+    ThreadOp.sleep(250);
+  }
+
+  if( wRocNet.isshutdownall(data->rnini) || shutdown ) {
+    __shutdownAll(inst);
+    ThreadOp.sleep(250);
   }
 
   data->run = False;
@@ -414,8 +1075,134 @@ static Boolean _supportPT( obj inst ) {
   return True;
 }
 
+static byte* __evaluateMobile( iOrocNet rocnet, byte* rn ) {
+  iOrocNetData data       = Data(rocnet);
+  Boolean      isThis     = rocnetIsThis( rocnet, rn);
+  int          addr       = 0;
+  int          rcpt       = 0;
+  int          sndr       = 0;
+  int          action     = rnActionFromPacket(rn);
+  int          actionType = rnActionTypeFromPacket(rn);
+  byte* rnReply = NULL;
+  char key[64] = {'\0'};
+  iOMouse Mouse = NULL;
 
-static void __evaluateStationary( iOrocNet rocnet, byte* rn ) {
+  rcpt = rnReceipientAddrFromPacket(rn, data->seven);
+  sndr = rnSenderAddrFromPacket(rn, data->seven);
+
+  if( actionType != RN_ACTIONTYPE_EVENT ) {
+    return NULL;
+  }
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "evaluateMobile action=%d", action);
+
+  switch( action ) {
+  case RN_MOBILE_ROCMOUSE:
+    StrOp.fmtb(key, "%d-%d", sndr, rn[RN_PACKET_DATA+0]&0x7F );
+    Mouse = (iOMouse)MapOp.get(data->mousemap, key);
+
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        "node [%d] reports a rocmouse 0x%02X event, dispatchAddr=%d", sndr, rn[RN_PACKET_DATA+0], data->dispatchAddr );
+
+    if( Mouse != NULL && (rn[RN_PACKET_DATA+0]&0x80) ) {
+      /* Release */
+      iONode nodeSpd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      wLoc.setthrottleid( nodeSpd, key );
+      wLoc.setaddr(nodeSpd, Mouse->lcaddr);
+      wLoc.setV(nodeSpd, 0);
+      wLoc.setdir(nodeSpd, True);
+      wLoc.setfn(nodeSpd, False);
+      wLoc.setiid( nodeSpd, data->iid );
+      wLoc.setcmd(nodeSpd, wLoc.fieldcmd);
+
+      data->listenerFun( data->listenerObj, nodeSpd, TRCLEVEL_INFO );
+
+      MapOp.remove(data->mousemap, key);
+      freeMem(Mouse);
+      Mouse = NULL;
+
+      break;
+    }
+
+    if( Mouse == NULL && data->dispatchAddr > 0 ) {
+      byte* rnID = allocMem(32);
+      Mouse = allocMem( sizeof(struct mouse));
+      MapOp.put(data->mousemap, key, (obj)Mouse);
+      Mouse->nodeid = sndr;
+      Mouse->baseaddr = rn[RN_PACKET_DATA+0]&0x7F;
+      Mouse->lcaddr = data->dispatchAddr;
+      data->dispatchAddr = 0;
+
+      rnID[RN_PACKET_GROUP] = RN_GROUP_MOBILE;
+      rnReceipientAddresToPacket( sndr, rnID, data->seven );
+      rnSenderAddresToPacket( wRocNet.getid(data->rnini), rnID, data->seven );
+      rnID[RN_PACKET_ACTION] = RN_MOBILE_ROCMOUSE_BIND;
+      rnID[RN_PACKET_LEN] = 3;
+      rnID[RN_PACKET_DATA + 0] = Mouse->baseaddr;
+      rnID[RN_PACKET_DATA + 1] = Mouse->lcaddr / 256;
+      rnID[RN_PACKET_DATA + 2] = Mouse->lcaddr % 256;
+      ThreadOp.post( data->writer, (obj)rnID );
+    }
+
+    if( Mouse != NULL ) {
+      iONode nodeSpd = NodeOp.inst( wLoc.name(), NULL, ELEMENT_NODE );
+      wLoc.setthrottleid( nodeSpd, key );
+      wLoc.setaddr(nodeSpd, Mouse->lcaddr);
+      wLoc.setV_raw(nodeSpd, rn[RN_PACKET_DATA+1]);
+      if( rn[RN_PACKET_DATA+8] > 0 )
+        wLoc.setV_rawMax(nodeSpd, rn[RN_PACKET_DATA+8]);
+      else
+        wLoc.setV_rawMax(nodeSpd, 28);
+      wLoc.setdir(nodeSpd, (rn[RN_PACKET_DATA+2] & 0x01)?True:False);
+      wLoc.setfn(nodeSpd, (rn[RN_PACKET_DATA+2] & 0x02)?True:False);
+      wLoc.setiid( nodeSpd, data->iid );
+      wLoc.setcmd(nodeSpd, wLoc.fieldcmd);
+
+      data->listenerFun( data->listenerObj, nodeSpd, TRCLEVEL_INFO );
+
+      if( rn[RN_PACKET_DATA+7] > 0 ) {
+        int i = 0;
+        int changedFn = rn[RN_PACKET_DATA+7];
+        iONode nodeFn = NodeOp.inst( wFunCmd.name(), NULL, ELEMENT_NODE );
+        wLoc.setthrottleid( nodeFn, key );
+        wFunCmd.setaddr(nodeFn, Mouse->lcaddr);
+        wFunCmd.setfnchanged(nodeFn, changedFn);
+        wFunCmd.setgroup(nodeFn, (changedFn-1)/4);
+
+        wFunCmd.setf0(nodeFn, (rn[RN_PACKET_DATA+2] & 0x02)?True:False);
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "f0=%s group=%d", wFunCmd.isf0(nodeFn)?"ON":"OFF", wFunCmd.getgroup(nodeFn));
+        wLoc.setiid( nodeFn, data->iid );
+        wLoc.setcmd(nodeFn, wLoc.fieldcmd);
+
+        for( i = 0; i < 28; i++ ) {
+          Boolean fon = False;
+          char fnkey[32] = {'\0'};
+          StrOp.fmtb(fnkey, "f%d", i+1);
+          fon = rn[RN_PACKET_DATA+3+i/8] & (0x01 << (i%8));
+          NodeOp.setBool(nodeFn, fnkey, fon);
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "fnchanged=%d %s=%s", changedFn, fnkey, fon?"ON":"OFF");
+        }
+
+        data->listenerFun( data->listenerObj, nodeFn, TRCLEVEL_INFO );
+      }
+
+    }
+    break;
+
+  case RN_MOBILE_VELOCITY:
+  case RN_MOBILE_FUNCTIONS:
+    if( data->watchdog != NULL ) {
+      byte* rnwd = allocMem(8+rn[RN_PACKET_LEN]);
+      MemOp.copy( rnwd, rn, 8+rn[RN_PACKET_LEN]);
+      ThreadOp.post( data->watchdog, (obj)rnwd );
+    }
+    break;
+  }
+
+  return rnReply;
+}
+
+
+static byte* __evaluateStationary( iOrocNet rocnet, byte* rn ) {
   iOrocNetData data       = Data(rocnet);
   int          addr       = 0;
   int          rcpt       = 0;
@@ -423,15 +1210,169 @@ static void __evaluateStationary( iOrocNet rocnet, byte* rn ) {
   Boolean      isThis     = rocnetIsThis( rocnet, rn);
   int          action     = rnActionFromPacket(rn);
   int          actionType = rnActionTypeFromPacket(rn);
+  byte* rnReply = NULL;
+  char key[32] = {'\0'};
+  char mnemonic[32] = {'\0'};
+  int i;
+  int subip = 0;
+
 
   rcpt = rnReceipientAddrFromPacket(rn, data->seven);
   sndr = rnSenderAddrFromPacket(rn, data->seven);
 
   switch( action ) {
+  case RN_STATIONARY_ERROR:
+    TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
+        "node [%d] reports a [%s](%d)error, reason [%s](%d) on address [%d]", sndr,
+        rnGetRC(rn[RN_PACKET_DATA+0]), rn[RN_PACKET_DATA+0],
+        rnGetRS(rn[RN_PACKET_DATA+1]), rn[RN_PACKET_DATA+1],
+        rn[RN_PACKET_DATA+2] * 256 + rn[RN_PACKET_DATA+3] );
+    break;
+
+  case RN_STATIONARY_IDENTIFY:
+    if( data->shutdown ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ignore identify: shutting down...");
+      break;
+    }
+
+    if( actionType != RN_ACTIONTYPE_EVENT) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ignore identify command...");
+      break;
+    }
+
+    subip = rn[RN_PACKET_DATA+5]*256+rn[RN_PACKET_DATA+6];
+    rn[RN_PACKET_DATA + 7 + (rn[RN_PACKET_LEN]-7) ] = 0;
+
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
+        "Identified: rocnetid=%d class=%s vid=%d revision=%d nrio=%d subip=%d.%d nickname=[%s]", sndr,
+        rnClassString(rn[RN_PACKET_DATA+0], mnemonic), rn[RN_PACKET_DATA+1], rn[RN_PACKET_DATA+2] *256 + rn[RN_PACKET_DATA+3],
+        rn[RN_PACKET_DATA+4], rn[RN_PACKET_DATA+5], rn[RN_PACKET_DATA+6], &rn[RN_PACKET_DATA+7] );
+    if( sndr == 65535 || sndr == 0 || (sndr == 1 && wRocNet.getid(data->rnini) == 1) ) {
+      if( data->highestID == 0 ) {
+        /* default address; send a new ID */
+        data->highestID = wRocNet.getid(data->rnini);
+        iONode rrnode = wRocNet.getrocnetnode(data->ini);
+        while( rrnode != NULL ) {
+          if( wRocNetNode.getid(rrnode) > data->highestID )
+            data->highestID = wRocNetNode.getid(rrnode);
+          rrnode = wRocNet.nextrocnetnode(data->ini, rrnode);
+        }
+      }
+      data->highestID++;
+      byte* rnID = allocMem(32);
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "send %d a new ID: %d", sndr, data->highestID );
+      rnID[RN_PACKET_GROUP] = RN_GROUP_PT_STATIONARY;
+      rnReceipientAddresToPacket( sndr, rnID, data->seven );
+      rnSenderAddresToPacket( wRocNet.getid(data->rnini), rnID, data->seven );
+      rnID[RN_PACKET_ACTION] = RN_PROGRAMMING_WRNID;
+      rnID[RN_PACKET_LEN] = 5;
+      rnID[RN_PACKET_DATA + 0] = data->highestID / 256;
+      rnID[RN_PACKET_DATA + 1] = data->highestID % 256;
+      rnID[RN_PACKET_DATA + 2] = rn[RN_PACKET_DATA+5];
+      rnID[RN_PACKET_DATA + 3] = rn[RN_PACKET_DATA+6];
+      rnID[RN_PACKET_DATA + 4] = rn[RN_PACKET_NETID];
+      ThreadOp.post( data->writer, (obj)rnID );
+      break;
+    }
+
+    StrOp.fmtb( key, "%d-%d", rn[RN_PACKET_NETID], sndr);
+    if( data->run && !MapOp.haskey( data->nodemap, key ) ) {
+      iONode rnnode = NodeOp.inst( wRocNetNode.name(), data->ini, ELEMENT_NODE );
+      wRocNetNode.setid(rnnode, sndr);
+      wRocNetNode.setlocation(rnnode, rn[RN_PACKET_NETID]);
+      wRocNetNode.setsubip(rnnode, subip);
+      wRocNetNode.setclass(rnnode, rnClassString(rn[RN_PACKET_DATA+0], mnemonic));
+      wRocNetNode.setmnemonic(rnnode, mnemonic);
+      wRocNetNode.setvendor(rnnode, rn[RN_PACKET_DATA+1]);
+      wRocNetNode.setrevision(rnnode, rn[RN_PACKET_DATA+2] *256 + rn[RN_PACKET_DATA+3]);
+      wRocNetNode.setnrio(rnnode, rn[RN_PACKET_DATA+4]);
+      wRocNetNode.setnickname(rnnode, (char*)&rn[RN_PACKET_DATA+7]);
+
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "registering node %s", key );
+      MapOp.put( data->nodemap, key, (obj)rnnode);
+      NodeOp.addChild( data->ini, rnnode );
+      if( sndr >= data->highestID )
+        data->highestID = sndr + 1;
+
+      /* Inform clients */
+      {
+        iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+        wProgram.setiid( node, data->iid );
+        wProgram.setcmd(node, wProgram.identify);
+        wProgram.setvalue( node, 0 );
+        wProgram.setlntype(node, wProgram.lntype_rocnet);
+        NodeOp.addChild( node, (iONode)NodeOp.base.clone(rnnode) );
+        data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+      }
+    }
+    else if( MapOp.haskey( data->nodemap, key ) ) {
+      iONode rnnode = (iONode)MapOp.get( data->nodemap, key );
+      if( wRocNetNode.getsubip(rnnode) != subip ) {
+        TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999,
+            "node %s is already registered with another subIP: %d", key, wRocNetNode.getsubip(rnnode) );
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "node %s is already registered", key );
+      }
+    }
+
+    rnReply = allocMem(32);
+    rnReply[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+    rnReceipientAddresToPacket( sndr, rnReply, data->seven );
+    rnSenderAddresToPacket( wRocNet.getid(data->rnini), rnReply, data->seven );
+    rnReply[RN_PACKET_ACTION] = RN_STATIONARY_ACK;
+    rnReply[RN_PACKET_LEN] = 1;
+    rnReply[RN_PACKET_DATA] = RN_STATIONARY_IDENTIFY;
+    break;
+
+  case RN_STATIONARY_NOP:
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "NOP from %d to %d", sndr, rcpt );
+    break;
+
+  case RN_STATIONARY_SHUTDOWN:
+  if( sndr != 0 ) {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "node %d has been shutdown", sndr );
+
+    StrOp.fmtb( key, "%d-%d", rn[RN_PACKET_NETID], sndr);
+    if( MapOp.haskey( data->nodemap, key ) ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "remove node %s from list", key );
+      NodeOp.removeChild( data->ini, (iONode)MapOp.remove( data->nodemap, key ) );
+      /* Inform clients */
+      {
+        iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+        wProgram.setiid( node, data->iid );
+        wProgram.setmodid( node, sndr );
+        wProgram.setcmd(node, wProgram.identify);
+        wProgram.setvalue( node, 1 );
+        wProgram.setlntype(node, wProgram.lntype_rocnet);
+        data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+      }
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "node %s is not registered", key );
+    }
+    /* STOP */
+    data->power = False;
+    __reportState(rocnet, True);
+    }
+    break;
+
+  case RN_STATIONARY_SHOW: {
+    iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    wProgram.setmodid(node, sndr);
+    wProgram.setcmd( node, wProgram.show );
+    wProgram.setiid( node, data->iid );
+    wProgram.setlntype(node, wProgram.lntype_rocnet);
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+    }
+    break;
+
   default:
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unsupported action [%d]", action );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unsupported action [%d] from %d", action, sndr );
     break;
   }
+
+  return rnReply;
 }
 
 
@@ -468,6 +1409,155 @@ static void __evaluatePTStationary( iOrocNet rocnet, byte* rn ) {
   sndr = rnSenderAddrFromPacket(rn, data->seven);
 
   switch( action ) {
+  case RN_PROGRAMMING_RPORT:
+  case RN_PROGRAMMING_WPORT:
+  {
+    iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    int nrports = rn[RN_PACKET_LEN] / 4;
+    int i = 0;
+    int idx = 1;
+    char key[32] = {'\0'};
+    wProgram.setmodid(node, sndr);
+    wProgram.setcmd( node, wProgram.nvget );
+    for( i = 0; i < nrports; i++ ) {
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 0] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 1] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 2] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 3] );
+      idx++;
+    }
+    wProgram.setiid( node, data->iid );
+    wProgram.setlntype(node, wProgram.lntype_rocnet);
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+  break;
+
+  case RN_PROGRAMMING_RCHANNEL:
+  case RN_PROGRAMMING_WCHANNEL:
+  {
+    iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    int nrports = rn[RN_PACKET_LEN] / 8;
+    int i = 0;
+    int idx = 1;
+    char key[32] = {'\0'};
+    wProgram.setmodid(node, sndr);
+    wProgram.setcmd( node, wProgram.nvget );
+    wProgram.setporttype( node, wProgram.porttype_servo );
+    for( i = 0; i < nrports; i++ ) {
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*8 + 0] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*8 + 1] * 256 + rn[RN_PACKET_DATA + i*8 + 2] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*8 + 3] * 256 + rn[RN_PACKET_DATA + i*8 + 4] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*8 + 5] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*8 + 6] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*8 + 7] );
+      idx++;
+    }
+    wProgram.setiid( node, data->iid );
+    wProgram.setlntype(node, wProgram.lntype_rocnet);
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+  break;
+
+  case RN_PROGRAMMING_RPORTEVENT:
+  case RN_PROGRAMMING_WPORTEVENT:
+  {
+    iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    int nrports = rn[RN_PACKET_LEN] / 4;
+    int i = 0;
+    int idx = 1;
+    char key[32] = {'\0'};
+    wProgram.setmodid(node, sndr);
+    wProgram.setcmd( node, wProgram.evget );
+    for( i = 0; i < nrports; i++ ) {
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 0] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 1] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 2] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 3] );
+      idx++;
+    }
+    wProgram.setiid( node, data->iid );
+    wProgram.setlntype(node, wProgram.lntype_rocnet);
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+  break;
+
+  case RN_PROGRAMMING_RMACRO:
+  case RN_PROGRAMMING_WMACRO:
+  {
+    iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    int nrports = (rn[RN_PACKET_LEN]-1) / 4;
+    int i = 0;
+    int idx = 1;
+    char key[32] = {'\0'};
+    wProgram.setmodid(node, sndr);
+    wProgram.setcmd( node, wProgram.macro_get );
+    wProgram.setvalue( node, rn[RN_PACKET_DATA+0] );
+    for( i = 0; i < nrports; i++ ) {
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 1] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 2] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 3] );
+      idx++;
+      StrOp.fmtb( key, "val%d", idx );
+      NodeOp.setInt(node, key, rn[RN_PACKET_DATA + i*4 + 4] );
+      idx++;
+    }
+    wProgram.setiid( node, data->iid );
+    wProgram.setlntype(node, wProgram.lntype_rocnet);
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+  break;
+
+  case RN_PROGRAMMING_RDOPT:
+  case RN_PROGRAMMING_WROPT:
+  {
+    iONode node = NodeOp.inst( wProgram.name(), NULL, ELEMENT_NODE );
+    wProgram.setmodid(node, sndr);
+    wProgram.setcmd( node, wProgram.getoptions );
+    wProgram.setval1( node, rn[RN_PACKET_DATA+0] );
+    wProgram.setval2( node, rn[RN_PACKET_DATA+1] );
+    wProgram.setval3( node, rn[RN_PACKET_DATA+2] );
+    wProgram.setval4( node, rn[RN_PACKET_DATA+3] );
+    /* I2C scan of 0x20, 0x30 and 0x40 */
+    wProgram.setval5( node, rn[RN_PACKET_DATA+4]*256 + rn[RN_PACKET_DATA+5] );
+    wProgram.setval6( node, rn[RN_PACKET_DATA+6]*256 + rn[RN_PACKET_DATA+7] );
+    wProgram.setval7( node, rn[RN_PACKET_DATA+8]*256 + rn[RN_PACKET_DATA+9] );
+    wProgram.setval8( node, rn[RN_PACKET_DATA+10] );
+    wProgram.setiid( node, data->iid );
+    wProgram.setlntype(node, wProgram.lntype_rocnet);
+    data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+  }
+  break;
+
   default:
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unsupported action [%d]", action );
     break;
@@ -501,26 +1591,56 @@ static void __evaluateClock( iOrocNet rocnet, byte* rn ) {
 }
 
 
-static void __evaluateSensor( iOrocNet rocnet, byte* rn ) {
+static byte* __evaluateSensor( iOrocNet rocnet, byte* rn ) {
   iOrocNetData data       = Data(rocnet);
-  int          addr       = 0;
+  int          addr       = rn[RN_PACKET_DATA+3];
+  int          load       = 0;
   int          rcpt       = 0;
   int          sndr       = 0;
   Boolean      isThis     = rocnetIsThis( rocnet, rn);
   int          action     = rnActionFromPacket(rn);
   int          actionType = rnActionTypeFromPacket(rn);
+  byte* rnReply = NULL;
 
   rcpt = rnReceipientAddrFromPacket(rn, data->seven);
   sndr = rnSenderAddrFromPacket(rn, data->seven);
 
   switch( action ) {
   case RN_SENSOR_REPORT:
+  case RN_SENSORID_REPORT:
   {
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sensor report" );
+    char key[32] = {'\0'};
+    StrOp.fmtb( key, "%d-%d", rn[RN_PACKET_NETID], sndr);
     iONode evt = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
+    iONode rnnode = (iONode)MapOp.get(data->nodemap, key);
 
-    wFeedback.setaddr( evt, sndr );
+    if( rnnode != NULL )
+      wItem.setuidname(evt, wRocNetNode.getnickname(rnnode));
+    wFeedback.setbus( evt, sndr );
+    wFeedback.setaddr( evt, addr );
     wFeedback.setfbtype( evt, wFeedback.fbtype_sensor );
+
+    char ident[32] = {'\0'};
+    if( action == RN_SENSORID_REPORT ) {
+      if( rn[RN_PACKET_LEN] > 4 ) {
+        int len = rn[RN_PACKET_LEN] - 4;
+        int i = 0;
+        for( i = 0; i < len && i < 31; i++) {
+          ident[i] = rn[RN_PACKET_DATA + 4 + i];
+          ident[i+1] = '\0';
+        }
+        if( action == RN_SENSORID_REPORT )
+          wFeedback.setid( evt, ident );
+        else
+          wFeedback.setidentifier( evt, ident );
+      }
+    }
+    else {
+      load = (rn[RN_PACKET_LEN] > 4 ? rn[RN_PACKET_DATA+4]:0);
+      wFeedback.setload( evt, load );
+    }
+
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "sensor report %d:%d %s id(ent)=%s load=%d", sndr, addr, rn[RN_PACKET_DATA+2]?"on":"off", ident, load );
 
     if( data->iid != NULL )
       wFeedback.setiid( evt, data->iid );
@@ -528,12 +1648,29 @@ static void __evaluateSensor( iOrocNet rocnet, byte* rn ) {
     wFeedback.setstate( evt, rn[RN_PACKET_DATA+2]?True:False );
 
     data->listenerFun( data->listenerObj, evt, TRCLEVEL_INFO );
+
+    if( data->sack || action == RN_SENSORID_REPORT ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "acknowledge sensor event..." );
+      rnReply = allocMem(32);
+      rnReply[RN_PACKET_GROUP] = RN_GROUP_STATIONARY;
+      rnReceipientAddresToPacket( sndr, rnReply, data->seven );
+      rnSenderAddresToPacket( wRocNet.getid(data->rnini), rnReply, data->seven );
+      rnReply[RN_PACKET_ACTION] = RN_STATIONARY_ACK;
+      rnReply[RN_PACKET_LEN] = 2;
+      rnReply[RN_PACKET_DATA+0] = action;
+      rnReply[RN_PACKET_DATA+1] = addr;
+    }
     break;
   }
   default:
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unsupported action [%d]", action );
     break;
   }
+
+  data->sensor = True;
+  __reportState(rocnet, False);
+
+  return rnReply;
 }
 
 
@@ -560,7 +1697,13 @@ static void __evaluateInput( iOrocNet rocnet, byte* rn ) {
 static void __evaluateRN( iOrocNet rocnet, byte* rn ) {
   iOrocNetData data = Data(rocnet);
   int group = rn[RN_PACKET_GROUP];
+  int actionType = rnActionTypeFromPacket(rn);
+  int sndr = rnSenderAddrFromPacket(rn, data->seven);
+  int port = rn[RN_PACKET_DATA + 3];
+  int action = rnActionFromPacket(rn);
   byte* rnReply = NULL;
+
+  TraceOp.dump ( name, TRCLEVEL_BYTE, (char*)rn, 8 + rn[RN_PACKET_LEN] );
 
   switch( group ) {
     case RN_GROUP_CS:
@@ -569,6 +1712,37 @@ static void __evaluateRN( iOrocNet rocnet, byte* rn ) {
 
     case RN_GROUP_OUTPUT:
       rnReply = rocnetParseOutput( rocnet, rn );
+      if( actionType == RN_ACTIONTYPE_EVENT) {
+        char key[32] = {'\0'};
+        int state = rn[RN_PACKET_DATA + 0] & 0xFF;
+        int value = rn[RN_PACKET_DATA + 2] & 0xFF;
+        iONode rnnode = NULL;
+        iONode nodeC = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
+        StrOp.fmtb( key, "%d-%d", rn[RN_PACKET_NETID], sndr);
+        rnnode = (iONode)MapOp.get(data->nodemap, key);
+
+        if( rnnode != NULL )
+          wItem.setuidname(nodeC, wRocNetNode.getnickname(rnnode));
+
+        wSwitch.setbus( nodeC, sndr );
+        wSwitch.setaddr1( nodeC, port );
+        wSwitch.setstate( nodeC, state == 0 ?"straight":"turnout" );
+        wSwitch.setgatevalue( nodeC, state );
+        wOutput.setvalue( nodeC, value );
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "bus=%d port=%d state=%d value=%d -> %s", sndr, port, state, value, wSwitch.getstate(nodeC) );
+        wSwitch.setporttype( nodeC, rn[RN_PACKET_DATA + 1] & 0x0F );
+        if( data->iid != NULL )
+          wSwitch.setiid( nodeC, data->iid );
+
+        if( data->listenerFun != NULL && data->listenerObj != NULL )
+          data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+
+        if( data->watchdog != NULL ) {
+          byte* rnwd = allocMem(8+rn[RN_PACKET_LEN]);
+          MemOp.copy( rnwd, rn, 8+rn[RN_PACKET_LEN]);
+          ThreadOp.post( data->watchdog, (obj)rnwd );
+        }
+      }
       break;
 
     case RN_GROUP_INPUT:
@@ -576,11 +1750,11 @@ static void __evaluateRN( iOrocNet rocnet, byte* rn ) {
       break;
 
     case RN_GROUP_MOBILE:
-      rnReply = rocnetParseMobile( rocnet, rn );
+      rnReply = __evaluateMobile( rocnet, rn );
       break;
 
     case RN_GROUP_STATIONARY:
-      __evaluateStationary( rocnet, rn );
+      rnReply = __evaluateStationary( rocnet, rn );
       break;
 
     case RN_GROUP_PT_MOBILE:
@@ -596,7 +1770,16 @@ static void __evaluateRN( iOrocNet rocnet, byte* rn ) {
       break;
 
     case RN_GROUP_SENSOR:
-      __evaluateSensor( rocnet, rn );
+      rnReply = __evaluateSensor( rocnet, rn );
+      break;
+
+    case RN_GROUP_HOST:
+      if( action == RN_HOST_PONG ) {
+        iONode rrnode = __getNodeByID(rocnet, sndr);
+        if( rrnode != NULL ) {
+          wRocNetNode.setpongtick(rrnode, SystemOp.getTick());
+        }
+      }
       break;
 
     default:
@@ -615,16 +1798,16 @@ static void __reader( void* threadinst ) {
   iOThread th = (iOThread)threadinst;
   iOrocNet rocnet = (iOrocNet)ThreadOp.getParm( th );
   iOrocNetData data = Data(rocnet);
-  char rn[0x7F];
+  byte rn[0x7F];
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNet reader started." );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNet reader started" );
 
   /* Connect with the sublib. */
   while( !data->connected && data->run ) {
     data->connected = data->rnConnect((obj)rocnet);
     ThreadOp.sleep(2500);
   };
-
+  __reportState(rocnet, False);
 
   while( data->connected && data->run ) {
     int extended = False;
@@ -634,8 +1817,24 @@ static void __reader( void* threadinst ) {
     if( data->rnAvailable((obj)rocnet) ) {
       insize = data->rnRead( (obj)rocnet, rn );
 
-      if( rnCheckPacket(rn, &extended, &event) )
-        __evaluateRN( rocnet, rn );
+      if( rnCheckPacket(rn, &extended, &event) ) {
+        Boolean isThis = rocnetIsThis( rocnet, rn);
+        int rcpt = rnReceipientAddrFromPacket(rn, 0);
+        int sndr = rnSenderAddrFromPacket(rn, 0);
+        if( isThis ) {
+          char* str = StrOp.byteToStr(rn, 8 + rn[RN_PACKET_LEN]);
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ignore %s [%s] from %d(self) to %d", rnActionTypeString(rn), str, sndr, rcpt );
+          StrOp.free(str);
+        }
+        else {
+          if( TraceOp.getLevel(NULL) & TRCLEVEL_BYTE ) {
+            char* str = StrOp.byteToStr(rn, 8 + rn[RN_PACKET_LEN]);
+            TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "evaluate %s [%s] from %d to %d", rnActionTypeString(rn), str, sndr, rcpt );
+            StrOp.free(str);
+          }
+          __evaluateRN( rocnet, rn );
+        }
+      }
       else
         TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "reject invalid packet" );
     }
@@ -646,6 +1845,158 @@ static void __reader( void* threadinst ) {
   };
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNet reader stopped." );
+}
+
+
+static void __watchNodes( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOrocNet rocnet = (iOrocNet)ThreadOp.getParm( th );
+  iOrocNetData data = Data(rocnet);
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNet watch nodes started." );
+  ThreadOp.sleep(1000);
+  while( data->run ) {
+    if( data->power ) {
+      iONode rrnode = wRocNet.getrocnetnode( data->ini );
+      while( rrnode != NULL ) {
+        Boolean gotPong = True;
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ping tick on node %d is %ld, pong=%ld",
+            wRocNetNode.getid(rrnode), wRocNetNode.getpingtick(rrnode), wRocNetNode.getpongtick(rrnode) );
+        if( wRocNetNode.getpingtick(rrnode) > 0 ) {
+          if( wRocNetNode.getpongtick(rrnode) == 0 ) {
+            unsigned long pingTick = SystemOp.getTick() - wRocNetNode.getpingtick(rrnode);
+            if( pingTick > 200 ) {
+              TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "node %d did not respond within 2 seconds", wRocNetNode.getid(rrnode) );
+              /* STOP */
+              data->power = False;
+              __reportState(rocnet, True);
+              wRocNetNode.setpingtick(rrnode, 0);
+            }
+            gotPong = False;
+          }
+        }
+        if( gotPong ) {
+          byte*  rn  = allocMem(128);
+          rn[RN_PACKET_GROUP] = RN_GROUP_HOST;
+          TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "ping node %d...", wRocNetNode.getid(rrnode) );
+          rnReceipientAddresToPacket( wRocNetNode.getid(rrnode), rn, data->seven );
+          rn[RN_PACKET_ACTION] = RN_HOST_PING;
+          rn[RN_PACKET_LEN] = 0;
+          ThreadOp.post( data->writer, (obj)rn );
+          wRocNetNode.setpongtick(rrnode, 0);
+          wRocNetNode.setpingtick(rrnode, SystemOp.getTick());
+        }
+        ThreadOp.sleep(10);
+        rrnode = wRocNet.nextrocnetnode( data->ini, rrnode );
+      }
+    }
+
+    ThreadOp.sleep(1000);
+  }
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNet watch nodes ended." );
+}
+
+
+static void __watchdog( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOrocNet rocnet = (iOrocNet)ThreadOp.getParm( th );
+  iOrocNetData data = Data(rocnet);
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNet watchdog started." );
+
+  /* give the sublib time to connect */
+  ThreadOp.sleep(1000);
+  while( data->run ) {
+    int i = 0;
+    int size = ListOp.size( data->AckList );
+    byte* rn = (byte*)ThreadOp.getPost( th );
+
+    if (rn != NULL) {
+      int group = rn[RN_PACKET_GROUP];
+      int actionType = rnActionTypeFromPacket(rn);
+      int sndr = rnSenderAddrFromPacket(rn, data->seven);
+      int rcpt = rnReceipientAddrFromPacket(rn, data->seven);
+
+      if( actionType == RN_ACTIONTYPE_REQUEST && rcpt > 0 ) {
+        Boolean newReq = True;
+        for( i = 0; i < size; i++ ) {
+          iORNreq req = (iORNreq)ListOp.get( data->AckList, i );
+          if( rn[RN_PACKET_LEN] == req->req[RN_PACKET_LEN] && MemOp.cmp(req->req, rn, 8 + rn[RN_PACKET_LEN]) ) {
+            newReq = False;
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "same request is allready in the list %d", i );
+            break;
+          }
+        }
+
+        if( newReq ) {
+          iORNreq req = allocMem(sizeof(struct rnreq));
+          req->req = rn;
+          req->timer = SystemOp.getTick();
+          req->ack = False;
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "add request to the list" );
+          ListOp.add( data->AckList, (obj)req );
+        }
+
+      }
+      else if( actionType == RN_ACTIONTYPE_EVENT ) {
+        rn[RN_PACKET_ACTION] &= RN_ACTION_CODE_MASK;
+        for( i = 0; i < size; i++ ) {
+          iORNreq req = (iORNreq)ListOp.get( data->AckList, i );
+          if( sndr == rnReceipientAddrFromPacket(req->req, data->seven) && rn[RN_PACKET_LEN] == req->req[RN_PACKET_LEN] &&
+              MemOp.cmp(rn+RN_PACKET_GROUP, req->req+RN_PACKET_GROUP, 2 + rn[RN_PACKET_LEN]) )
+          {
+            req->ack = True;
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "request %d is acknowledged", i );
+          }
+        }
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unhandled request" );
+        freeMem(rn);
+      }
+    }
+
+    Boolean ack = False;
+    do {
+      ack = False;
+      size = ListOp.size( data->AckList );
+      for( i = 0; i < size; i++ ) {
+        iORNreq req = (iORNreq)ListOp.get( data->AckList, i );
+        if( req->ack ) {
+          iORNreq req = (iORNreq)ListOp.remove(data->AckList, i);
+          freeMem(req->req);
+          freeMem(req);
+          ack = True;
+          break;
+        }
+      }
+    } while(ack);
+
+    size = ListOp.size( data->AckList );
+    for( i = 0; i < size; i++ ) {
+      iORNreq req = (iORNreq)ListOp.get( data->AckList, i );
+      if( req->timer + 50 <= SystemOp.getTick() ) {
+        byte* rncopy = allocMem(8+req->req[RN_PACKET_LEN]);
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "request %d of %d timeout: resend", i, size );
+        req->timer = SystemOp.getTick();
+        req->retry++;
+        if( req->retry <= 5 ) {
+          MemOp.copy(rncopy, req->req, 8+req->req[RN_PACKET_LEN]);
+          ThreadOp.post( data->writer, (obj)rncopy );
+        }
+        else {
+          /* give up*/
+          req->ack = True;
+          TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "request %d is not acknowledged", i );
+        }
+      }
+    }
+
+
+    ThreadOp.sleep(10);
+  }
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNet watchdog stopped." );
 }
 
 
@@ -672,9 +2023,12 @@ static void __writer( void* threadinst ) {
         plen = 8 + rnRequest[RN_PACKET_LEN];
 
         if( rnCheckPacket(rnRequest, &extended, &event) ) {
-          char* str = StrOp.byteToStr(rnRequest, plen);
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "write request from queue: [%s]", str );
-          StrOp.free(str);
+          if( TraceOp.getLevel(NULL) & TRCLEVEL_BYTE ) {
+            int rcpt = rnReceipientAddrFromPacket(rnRequest, 0);
+            char* str = StrOp.byteToStr(rnRequest, 8 + rnRequest[RN_PACKET_LEN]);
+            TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "write %s [%s] to %d", rnActionTypeString(rnRequest), str, rcpt );
+            StrOp.free(str);
+          }
           ok = data->rnWrite( (obj)rocnet, rnRequest, plen );
 
         }
@@ -712,18 +2066,30 @@ static struct OrocNet* _inst( const iONode ini ,const iOTrace trc ) {
   /* Initialize data->xxx members... */
   data->ini    = ini;
   data->rnini = wDigInt.getrocnet(ini);
+  data->AckList = ListOp.inst();
+  data->nodemap  = MapOp.inst();
+  data->mousemap = MapOp.inst();
+
+  if( wDigInt.getiid(ini) != NULL )
+    data->iid = StrOp.dup(wDigInt.getiid( ini ));
 
   if( data->rnini == NULL ) {
     data->rnini = NodeOp.inst( wRocNet.name(), ini, ELEMENT_NODE );
     NodeOp.addChild( ini, data->rnini );
   }
-  data->crc = wRocNet.iscrc(data->rnini);
+  data->crc   = wRocNet.iscrc(data->rnini);
+  data->sack  = wRocNet.issack(data->rnini);
+  data->lcbus = wRocNet.getlcbus(data->rnini);
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "rocNET %d.%d.%d", vmajor, vminor, patch );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid     = %s", wDigInt.getiid( ini ) != NULL ? wDigInt.getiid( ini ):"" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sublib  = %s", wDigInt.getsublib( ini ) );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "crc     = %s", data->crc ? "on":"off" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Rocnet %d.%d.%d", vmajor, vminor, patch );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  iid          = %s", wDigInt.getiid( ini ) != NULL ? wDigInt.getiid( ini ):"" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  sublib       = %s", wDigInt.getsublib( ini ) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  crc          = %s", data->crc ? "on":"off" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  secure ack   = %s", data->sack ? "on":"off" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  watchdog     = %s", wRocNet.iswd(data->rnini) ? "on":"off" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  shutdown all = %s", wRocNet.isshutdownall(data->rnini) ? "on":"off" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  loco bus     = %d", data->lcbus );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
 
 
@@ -738,6 +2104,16 @@ static struct OrocNet* _inst( const iONode ini ,const iOTrace trc ) {
     data->seven = True;
     data->run = True;
   }
+  else if( StrOp.equals( wDigInt.sublib_tcp, wDigInt.getsublib( ini ) ) ) {
+    /* rnserial */
+    data->rnConnect    = rnTcpConnect;
+    data->rnDisconnect = rnTcpDisconnect;
+    data->rnRead       = rnTcpRead;
+    data->rnWrite      = rnTcpWrite;
+    data->rnAvailable  = rnTcpAvailable;
+    data->seven = True;
+    data->run = True;
+  }
   else if( StrOp.equals( wDigInt.sublib_udp, wDigInt.getsublib( ini ) ) ||
            StrOp.equals( wDigInt.sublib_default, wDigInt.getsublib( ini ) ) ) {
     /* rnudp */
@@ -747,12 +2123,22 @@ static struct OrocNet* _inst( const iONode ini ,const iOTrace trc ) {
     data->rnWrite      = rnUDPWrite;
     data->rnAvailable  = rnUDPAvailable;
     data->run = True;
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  multicast address [%s]", wRocNet.getaddr(data->rnini) );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "  multicast port    [%d]", wRocNet.getport(data->rnini) );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   }
   else {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sublib [%s] is not supported", wDigInt.getsublib( ini ) );
   }
 
-
+  /* Remove all nodes from previous session: */
+  {
+    iONode rnnode = wRocNet.getrocnetnode(data->ini);
+    while( rnnode != NULL ) {
+      NodeOp.removeChild(data->ini, rnnode);
+      rnnode = wRocNet.getrocnetnode(data->ini);
+    }
+  }
 
   if( data->run == True ) {
     data->reader = ThreadOp.inst( "rnreader", &__reader, __rocNet );
@@ -760,6 +2146,16 @@ static struct OrocNet* _inst( const iONode ini ,const iOTrace trc ) {
 
     data->writer = ThreadOp.inst( "rnwriter", &__writer, __rocNet );
     ThreadOp.start( data->writer );
+
+    if( wRocNet.iswatchnodes(data->rnini) ) {
+      data->watchNodes = ThreadOp.inst( "rnping", &__watchNodes, __rocNet );
+      ThreadOp.start( data->watchNodes );
+    }
+
+    if( wRocNet.iswd(data->rnini) ) {
+      data->watchdog = ThreadOp.inst( "rnwatchdog", &__watchdog, __rocNet );
+      ThreadOp.start( data->watchdog );
+    }
   }
 
   instCnt++;

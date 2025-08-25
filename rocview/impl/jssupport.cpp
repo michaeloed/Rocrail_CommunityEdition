@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -46,7 +49,6 @@
 #include "rocview/public/guiapp.h"
 
 #include "rocview/dialogs/locseldlg.h"
-#include "rocview/dialogs/loccontroldlg.h"
 
 #include "rocview/public/jssupport.h"
 
@@ -179,7 +181,7 @@ void JsSupport::OnJsEvent(wxCommandEvent& event) {
     return;
   }
 
-  TraceOp.trc( "js", TRCLEVEL_INFO, __LINE__, 9999,
+  TraceOp.trc( "js", TRCLEVEL_DEBUG, __LINE__, 9999,
     "JsEvent dev=%d, type=%d, number=%d, value=%d, msec=%d",
     device, type, number, value, wJsEvent.getmsec(js) );
 
@@ -413,7 +415,7 @@ void JsSupport::OnJsEvent(wxCommandEvent& event) {
 
           if( m_LocDialog[device] != NULL )
             m_LocDialog[device]->SelectPrev();
-          else if( m_Selected != NULL ) {
+          else if( m_Selected[device] != NULL ) {
             if( V < V_max )
               V += step;
             if( V > V_max )

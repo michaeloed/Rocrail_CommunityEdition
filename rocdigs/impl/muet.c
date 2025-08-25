@@ -1,8 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
- http://www.rocrail.net
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -213,7 +215,7 @@ static iOPoint __getPoint(iOMuetData data, iONode node) {
   cmd[3] = MONITORING_ADD;
   cmd[4] = point->addr & 0x7F;
   ThreadOp.post(data->writer, (obj)cmd);
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "add monitoring for point addr %d on bus %d", point->addr, point->bus );
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "add monitoring for point addr %d on bus %d", point->addr, point->bus );
 
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "point created for %s", key );
@@ -310,7 +312,7 @@ static void __translate( iOMuet muet, iONode node ) {
       cmd[1] = 2;
       cmd[2] = CS_SET_STATUS;
       cmd[3] = CS_OFF;
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "command: power OFF" );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "command: power OFF" );
       ThreadOp.post(data->writer, (obj)cmd);
     }
     if( StrOp.equals( cmdstr, wSysCmd.go ) ) {
@@ -320,16 +322,18 @@ static void __translate( iOMuet muet, iONode node ) {
       cmd[1] = 2;
       cmd[2] = CS_SET_STATUS;
       cmd[3] = CS_ON;
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "command: power ON" );
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "command: power ON" );
       ThreadOp.post(data->writer, (obj)cmd);
     }
   }
 
   /* Switch command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSwitch.name() ) ) {
+    const char* onoff = "off";
     byte pin = 0x01 << ( wSwitch.getport1( node ) - 1 );
     byte mask = ~pin;
-    int bus = wSwitch.getbus( node ) & 0x1F;
+    int addr = wSwitch.getaddr1( node ) & 0x7F;
+    int bus = wSwitch.getbus( node ) & 0x01;
 
     iOPoint point = __getPoint(data, node);
     if( point != NULL ) {
@@ -339,23 +343,24 @@ static void __translate( iOMuet muet, iONode node ) {
     byte *cmd = allocMem(32);
     cmd[0] = bus;
     cmd[1] = 2;
-    cmd[2] = wSwitch.getaddr1( node ) & 0x7F;
-    cmd[3] = 0x01 << ( wSwitch.getport1( node ) - 1 );
+    cmd[2] = addr;
+    cmd[3] = pin;
     cmd[2] |= WRITE_FLAG;
 
     /* reset pin to 0: */
-    cmd[3] = data->swstate[bus][cmd[2]] & mask;
+    cmd[3] = data->sx1[bus][addr] & mask;
 
-    if( StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) )
+    if( StrOp.equals( wSwitch.getcmd( node ), wSwitch.turnout ) ) {
       cmd[3] |= pin;
-    /* save new state: */
-    data->swstate[bus][cmd[2]] = cmd[3];
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "command: switch %d", wSwitch.getaddr1( node ) );
+      onoff = "on";
+    }
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "command: switch addr=%d val=0x%02X port=0x%02X %s", addr, cmd[3], pin, onoff );
     ThreadOp.post(data->writer, (obj)cmd);
   }
 
   /* Output command */
   else if( StrOp.equals( NodeOp.getName( node ), wOutput.name() ) ) {
+    const char* onoff = "off";
     int addr = wOutput.getaddr( node );
     int port = wOutput.getport( node );
     int gate = wOutput.getgate( node );
@@ -363,20 +368,20 @@ static void __translate( iOMuet muet, iONode node ) {
     byte pin = 0x01 << ( port - 1 );
     byte mask = ~pin;
 
-    int bus = wOutput.getbus(node);
+    int bus = wOutput.getbus(node) & 0x01;
     byte *cmd = allocMem(32);
     cmd[0] = bus;
     cmd[1] = 2;
     cmd[2] = addr & 0x7F;
     cmd[2] |= WRITE_FLAG;
     /* reset pin to 0: */
-    cmd[3] = data->swstate[bus][cmd[2]] & mask;
+    cmd[3] = data->sx1[bus][cmd[2]] & mask;
 
-    if( action )
+    if( action ) {
       cmd[3] |= pin;
-    /* save new state: */
-    data->swstate[bus][cmd[2]] = cmd[3];
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "command: output %d, %d", wOutput.getaddr( node ), wOutput.getport( node ) );
+      onoff = "on";
+    }
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "command: output addr=%d val=0x%02X pin=0x%02X %s", addr, cmd[3], pin, onoff );
     ThreadOp.post(data->writer, (obj)cmd);
   }
 
@@ -417,7 +422,7 @@ static void __translate( iOMuet muet, iONode node ) {
     slot->lights = wLoc.isfn(node);
     slot->lastcmd = SystemOp.getTick();
 
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "command: loco %d", addr );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "command: loco %d", addr );
     ThreadOp.post(data->writer, (obj)cmd);
   }
 
@@ -447,7 +452,7 @@ static void __translate( iOMuet muet, iONode node ) {
     slot->fn = f1;
     slot->lastcmd = SystemOp.getTick();
 
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "command: function %d", addr );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "command: function %d", addr );
     ThreadOp.post(data->writer, (obj)cmd);
   }
 
@@ -469,7 +474,7 @@ static iONode _cmd( obj inst ,const iONode nodeA ) {
 
 
 /**  */
-static void _halt( obj inst ,Boolean poweroff ) {
+static void _halt( obj inst ,Boolean poweroff, Boolean shutdown ) {
   iOMuetData data = Data(inst);
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Shutting down <%s>...", data->iid );
 
@@ -598,7 +603,7 @@ static void __writer( void* threadinst ) {
 }
 
 
-static __evaluateFB( iOMuet muet, byte in, int addr, int bus ) {
+static void __evaluateFB( iOMuet muet, byte in, int addr, int bus ) {
   iOMuetData data = Data(muet);
 
   if( in != data->fbstate[bus][addr] ) {
@@ -695,16 +700,16 @@ static void __reader( void* threadinst ) {
   while( data->run ) {
     byte in[8] = {0};
     if( SerialOp.available(data->serial) ) {
-      if( SerialOp.read(data->serial, in, 1) ) {
+      if( SerialOp.read(data->serial, (char*)in, 1) ) {
         if(in[0] == 126 ) {
-          if( SerialOp.read(data->serial, in+1, 1) ) {
+          if( SerialOp.read(data->serial, (char*)(in+1), 1) ) {
             TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)in, 2 );
             data->activebus = in[1] & 0x7F;
             TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "active bus=%d.", data->activebus );
           }
         }
         else if(in[0] >= 128 && in[0] <= (128 + 31) ) {
-          if( SerialOp.read(data->serial, in+1, 2) ) {
+          if( SerialOp.read(data->serial, (char*)(in+1), 2) ) {
             char key[32] = {'\0'};
             int bus  = (in[0]-128) & 0x7F;
             int addr = in[1] & 0x7F;
@@ -783,6 +788,8 @@ static void __reader( void* threadinst ) {
                         if( data->iid != NULL )
                           wSwitch.setiid( nodeC, data->iid );
                         wSwitch.setid( nodeC, point->id );
+                        wSwitch.setaddr1( nodeC, addr );
+                        wSwitch.setport1( nodeC, i+1 );
                         wSwitch.setstate( nodeC, newval?"straight":"turnout" );
                         TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "point update %s", point->id );
                         data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
@@ -800,8 +807,9 @@ static void __reader( void* threadinst ) {
         }
         else if(in[0] < 126 ) {
           int addr = in[0] & 0x7F;
-          if( SerialOp.read(data->serial, in+1, 1) ) {
+          if( SerialOp.read(data->serial, (char*)(in+1), 1) ) {
             char key[32] = {'\0'};
+            char ident[32];
             int val = in[1] & 0x7F;
             TraceOp.dump( NULL, TRCLEVEL_BYTE, (char*)in, 2 );
 
@@ -821,7 +829,8 @@ static void __reader( void* threadinst ) {
               wFeedback.setaddr( evt, rraddr );
               wFeedback.setbus( evt, data->activebus );
               wFeedback.setfbtype( evt, wFeedback.fbtype_lissy );
-              wFeedback.setidentifier( evt, arrived?val:0 );
+              StrOp.fmtb(ident, "%d", val);
+              wFeedback.setidentifier( evt, arrived ? ident:"0" );
               if( data->iid != NULL )
                 wFeedback.setiid( evt, data->iid );
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -226,7 +229,8 @@ void UndoDlg::OnButtonUndoUndoClick( wxCommandEvent& event )
     for( int i = 0; i < ListOp.size( unduList ); i++ ) {
       if( (obj)item == ListOp.get(unduList,i) ) {
         ListOp.remove(unduList,i);
-        wxGetApp().getFrame()->GetToolBar()->EnableTool(ME_Undo, ListOp.size( unduList ) > 0 );
+        if( wxGetApp().getFrame()->GetToolBar() != NULL )
+          wxGetApp().getFrame()->GetToolBar()->EnableTool(ME_Undo, ListOp.size( unduList ) > 0 );
         break;
       }
     }
@@ -291,7 +295,8 @@ void UndoDlg::OnButtonUndoDeleteClick( wxCommandEvent& event )
     for( int i = 0; i < ListOp.size( unduList ); i++ ) {
       if( (obj)item == ListOp.get(unduList,i) ) {
         ListOp.remove(unduList,i);
-        wxGetApp().getFrame()->GetToolBar()->EnableTool(ME_Undo, ListOp.size( unduList ) > 0 );
+        if( wxGetApp().getFrame()->GetToolBar() != NULL )
+          wxGetApp().getFrame()->GetToolBar()->EnableTool(ME_Undo, ListOp.size( unduList ) > 0 );
         break;
       }
     }

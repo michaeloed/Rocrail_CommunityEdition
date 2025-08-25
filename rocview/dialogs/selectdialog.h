@@ -1,13 +1,9 @@
-/** ------------------------------------------------------------
-  * Module:
-  * Object:
-  * ------------------------------------------------------------
-  * $Source: /cvsroot/rojav/rocgui/dialogs/rocgui-dialogs.pjd,v $
-  * $Author: robvrs $
-  * $Date: 2006/02/22 14:10:57 $
-  * $Revision: 1.63 $
-  * $Name:  $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 #ifndef _SELECTDIALOG_H_
 #define _SELECTDIALOG_H_
 
@@ -97,6 +93,9 @@ public:
     /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_OK
     void OnOkClick( wxCommandEvent& event );
 
+    /// wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+    void OnHelpClick( wxCommandEvent& event );
+
 ////@end SelectDialog event handler declarations
 
 ////@begin SelectDialog member function declarations
@@ -129,6 +128,11 @@ public:
     wxStaticText* m_labLevel;
     wxChoice* m_Level;
     wxRadioBox* m_ActionBox;
+    wxStaticText* m_labRouteIDs;
+    wxTextCtrl* m_RouteIDs;
+    wxCheckBox* m_MergeRouteIDs;
+    wxStaticText* m_labBlockID;
+    wxComboBox* m_BlockID;
     wxButton* m_Cancel;
     wxButton* m_OK;
 ////@end SelectDialog member variables

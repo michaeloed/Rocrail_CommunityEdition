@@ -1,4 +1,9 @@
 /* ------------------------------------------------------------
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+
  * libc interfaces.
  */
 #include <stdlib.h>
@@ -132,6 +137,10 @@ int main( int argc, const char* argv[] ) {
       TraceOp.println( "Parsing %s...", outfile );
       doc = DocOp.parse( xmlStr );
       freeMem( xmlStr );
+      if( doc == NULL ) {
+        TraceOp.println( "invalid file %s...", outfile );
+        return -1;
+      }
       root = DocOp.getRootNode( doc );
       __createMap(root);
 
@@ -192,7 +201,7 @@ static void __merge( const char* aid, const char* msgstr, const char* lang, iONo
   if( msg == NULL ) {
     msg = (iONode)MapOp.get( enMap, aid);
   }
-  else if( msg == NULL ) {
+  if( msg == NULL ) {
     msg = (iONode)MapOp.get( tipMap, aid);
     tip = True;
   }

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -41,22 +44,23 @@
 
 void statusPause( iILcDriverInt inst, Boolean reverse ) {
   iOLcDriverData data = Data(inst);
+  Boolean oppwait = True;
 
   if( data->pause == -1 ) {
     /* handle manual operated signal */
-    if( !data->curBlock->wait(data->curBlock, data->loc, reverse ) ) {
+    if( !data->curBlock->wait(data->curBlock, data->loc, reverse, &oppwait ) ) {
       data->pause = 0;
       data->state = LC_IDLE;
-      data->loc->setMode(data->loc, wLoc.mode_idle);
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+      data->loc->setMode(data->loc, wLoc.mode_idle, "");
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                      "Setting state for \"%s\" from LC_PAUSE to LC_IDLE for manual signal.",
                      data->loc->getId( data->loc ) );
     }
   }
   else if( data->pause == 0 ) {
     data->state = LC_IDLE;
-    data->loc->setMode(data->loc, wLoc.mode_idle);
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    data->loc->setMode(data->loc, wLoc.mode_idle, "");
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                    "Setting state for \"%s\" from LC_PAUSE to LC_IDLE.",
                    data->loc->getId( data->loc ) );
   }

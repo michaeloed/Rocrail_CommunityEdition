@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2010 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -26,6 +29,9 @@
 #include "rocs/public/strtok.h"
 
 #include "rocrail/wrapper/public/Link.h"
+#include "rocrail/wrapper/public/LinkCond.h"
+#include "rocrail/wrapper/public/Ctrl.h"
+#include "rocrail/wrapper/public/FreeRail.h"
 
 static int instCnt = 0;
 
@@ -110,10 +116,79 @@ static struct OBlockGroup* _inst( iONode ini ) {
 }
 
 
-/**  */
-static Boolean _lock( struct OBlockGroup* inst ,const char* BlockId ,const char* LocoId ) {
+static void __rewind(struct OBlockGroup* inst, const char* LocoId) {
   iOBlockGroupData data = Data(inst);
   iOModel     model  = AppOp.getModel();
+  /* rewind */
+  iOStrTok tok = StrTokOp.inst( wLink.getdst(data->props), ',' );
+  while( StrTokOp.hasMoreTokens(tok) ) {
+    const char* id = StrTokOp.nextToken( tok );
+    iIBlockBase gblock = ModelOp.getBlock( model, id );
+    if( gblock != NULL ) {
+      gblock->unLockForGroup( gblock, LocoId );
+    }
+  };
+
+}
+
+/**  */
+
+/* Check is a critical section is free */
+static Boolean _isFree( struct OBlockGroup* inst ,const char* BlockId, const char* LocoId ) {
+  iOBlockGroupData data = Data(inst);
+  iOModel model  = AppOp.getModel();
+  Boolean groupfree = True;
+
+  if( MapOp.get(data->lockmap, LocoId) != NULL ) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "loco %s already locked blockgroup %s", LocoId, wLink.getid(data->props));
+    return True;
+  }
+
+  if( MapOp.size(data->lockmap) > 0 && data->allowfollowup && data->firstBlock != NULL ) {
+    if( StrOp.equals( BlockId, data->firstBlock) && MapOp.get(data->lockmap, LocoId) == NULL && !data->followupend ) {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "blockgroup %s followup allowed for loco %s", wLink.getid(data->props), LocoId);
+      return True;
+    }
+    else {
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+          "blockgroup %s followup not allowed for loco %s: firstBlock=%s BlockId=%s followupend=%d",
+          wLink.getid(data->props), LocoId, data->firstBlock, BlockId, data->followupend );
+    }
+  }
+  else if(data->allowfollowup) {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+        "blockgroup %s followup not allowed for loco %s: firstBlock=%s BlockId=%s followupend=%d",
+        wLink.getid(data->props), LocoId, data->firstBlock, BlockId, data->followupend );
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+        "blockgroup %s followup not enabled for loco %s",
+        wLink.getid(data->props), LocoId);
+  }
+
+  if( wLink.getdst(data->props) != NULL ) {
+    iOStrTok tok = StrTokOp.inst( wLink.getdst(data->props), ',' );
+
+    while( StrTokOp.hasMoreTokens(tok) && groupfree ) {
+      const char* id = StrTokOp.nextToken( tok );
+      iIBlockBase gblock = ModelOp.getBlock( model, id );
+      if( gblock != NULL ) {
+        groupfree = gblock->isFree( gblock, LocoId );
+      }
+    };
+    StrTokOp.base.del(tok);
+  }
+
+  if( !groupfree )
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "blockgroup %s is not free for loco %s", wLink.getid(data->props), LocoId);
+  return groupfree;
+}
+
+
+static Boolean _lock( struct OBlockGroup* inst ,const char* BlockId ,const char* LocoId ) {
+  iOBlockGroupData data = Data(inst);
+  iOModel model  = AppOp.getModel();
+  Boolean selectShortest = wCtrl.isselectshortestblock( wFreeRail.getctrl( AppOp.getIni() ) );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco %s request to lock blockgroup %s with block %s",
       LocoId, wLink.getid(data->props), BlockId);
@@ -137,21 +212,63 @@ static Boolean _lock( struct OBlockGroup* inst ,const char* BlockId ,const char*
     };
     StrTokOp.base.del(tok);
 
-    MapOp.put( data->lockmap, LocoId, (obj)LocoId);
-
     if( !grouplocked ) {
-      /* rewind */
-      TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
           "unable to lock blockgroup %s for loco %s", wLink.getid(data->props), LocoId);
-      BlockGroupOp.unlock(inst, LocoId);
+      __rewind(inst, LocoId);
       data->firstBlock = NULL;
       data->firstLoco  = NULL;
     }
     else {
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco %s locked blockgroup %s with block %s",
-          LocoId, wLink.getid(data->props), BlockId);
-      data->firstBlock = BlockId;
-      data->firstLoco  = LocoId;
+      /* check the conditions... */
+      Boolean condOK = True;
+      iONode cond = wLink.getlinkcond(data->props);
+      while( cond != NULL && condOK ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "checking blockgroup %s condition first=%s...",
+            wLink.getid(data->props), wLinkCond.getfirst(cond) );
+        if( StrOp.equals( wLinkCond.getfirst(cond), BlockId )) {
+          Boolean freeBlock = False;
+          int restlen = 0;
+          iOStrTok tok = StrTokOp.inst(wLinkCond.getfree(cond), ',');
+          while( StrTokOp.hasMoreTokens(tok) ) {
+            const char* id = StrTokOp.nextToken( tok );
+            iIBlockBase block = ModelOp.getBlock( model, id );
+            if( block != NULL && block->isFree(block, LocoId) ) {
+              iOLoc loc = ModelOp.getLoc( model, LocoId, NULL, False );
+              block_suits  suits = block->isSuited( block, loc, &restlen, !selectShortest );
+              if( suits != suits_not ) {
+                freeBlock = True;
+                break;
+              }
+            }
+          };
+          StrTokOp.base.del(tok);
+          if( freeBlock ) {
+            break;
+          }
+          else {
+            TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+                "loco %s cannot lock blockgroup %s with block %s because there is no block free. [%s]",
+                LocoId, wLink.getid(data->props), BlockId, wLinkCond.getfree(cond));
+            condOK = False;
+            grouplocked = False;
+            data->firstBlock = NULL;
+            data->firstLoco  = NULL;
+            __rewind(inst, LocoId);
+          }
+        }
+        cond = wLink.nextlinkcond(data->props, cond);
+      }
+      if( condOK ) {
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "loco %s locked blockgroup %s with (first) block %s",
+            LocoId, wLink.getid(data->props), BlockId);
+        data->firstBlock = BlockId;
+        data->firstLoco  = LocoId;
+      }
+    }
+
+    if( grouplocked && !MapOp.haskey(data->lockmap, LocoId) ) {
+      MapOp.put( data->lockmap, LocoId, (obj)LocoId);
     }
 
     return grouplocked;
@@ -203,6 +320,24 @@ static void _modify( struct OBlockGroup* inst ,iONode props ) {
     NodeOp.setStr( data->props, name, value );
   }
 
+
+  /* delete all childs to make 'room' for the new ones: */
+  cnt = NodeOp.getChildCnt( data->props );
+  while( cnt > 0 ) {
+    iONode child = NodeOp.getChild( data->props, 0 );
+    NodeOp.removeChild( data->props, child );
+    cnt = NodeOp.getChildCnt( data->props );
+  }
+
+  /* add the new or modified childs: */
+  cnt = NodeOp.getChildCnt( props );
+  for( i = 0; i < cnt; i++ ) {
+    iONode child = NodeOp.getChild( props, i );
+    NodeOp.addChild( data->props, (iONode)NodeOp.base.clone(child) );
+  }
+
+
+
   data->allowfollowup = wLink.isallowfollowup(props);
   data->maxfollowup = wLink.getmaxfollowup(props);
   return;
@@ -232,7 +367,7 @@ static Boolean _unlock( struct OBlockGroup* inst ,const char* LocoId ) {
   iOModel     model  = AppOp.getModel();
 
   if( MapOp.remove( data->lockmap, LocoId) == NULL ) {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
         "blockgroup %s is not locked by %s", wLink.getid(data->props), LocoId );
     return False;
   }

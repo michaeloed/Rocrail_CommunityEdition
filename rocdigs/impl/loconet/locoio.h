@@ -2,6 +2,11 @@
 #define LOCOIO_H_
 
 /*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+
  * Programming SV's with OPC_PEER_XFER */
 
 /*

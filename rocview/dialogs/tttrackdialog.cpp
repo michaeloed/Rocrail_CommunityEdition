@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -61,9 +64,8 @@ BEGIN_EVENT_TABLE( TTTrackDialog, wxDialog )
 
 ////@begin TTTrackDialog event table entries
     EVT_BUTTON( wxID_OK, TTTrackDialog::OnOkClick )
-
     EVT_BUTTON( wxID_CANCEL, TTTrackDialog::OnCancelClick )
-
+    EVT_BUTTON( wxID_HELP, TTTrackDialog::OnHelpClick )
 ////@end TTTrackDialog event table entries
 
 END_EVENT_TABLE()
@@ -249,8 +251,7 @@ void TTTrackDialog::CreateControls()
     wxBoxSizer* itemBoxSizer2 = new wxBoxSizer(wxVERTICAL);
     itemDialog1->SetSizer(itemBoxSizer2);
 
-    wxFlexGridSizer* itemFlexGridSizer3 = new wxFlexGridSizer(2, 2, 0, 0);
-    itemFlexGridSizer3->AddGrowableCol(1);
+    wxFlexGridSizer* itemFlexGridSizer3 = new wxFlexGridSizer(0, 2, 0, 0);
     itemBoxSizer2->Add(itemFlexGridSizer3, 0, wxALIGN_CENTER_HORIZONTAL|wxALL, 5);
 
     m_LabelTrackNr = new wxStaticText( itemDialog1, wxID_STATIC_TTT_NR, _("Track Nr."), wxDefaultPosition, wxDefaultSize, 0 );
@@ -262,7 +263,7 @@ void TTTrackDialog::CreateControls()
     m_labDecoder = new wxStaticText( itemDialog1, wxID_STATIC, _("Decoder Nr."), wxDefaultPosition, wxDefaultSize, 0 );
     itemFlexGridSizer3->Add(m_labDecoder, 0, wxALIGN_RIGHT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
-    m_DecTrackNr = new wxSpinCtrl( itemDialog1, wxID_ANY, _T("-1"), wxDefaultPosition, wxSize(70, -1), wxSP_ARROW_KEYS, -1, 47, -1 );
+    m_DecTrackNr = new wxSpinCtrl( itemDialog1, wxID_ANY, _T("-1"), wxDefaultPosition, wxSize(70, -1), wxSP_ARROW_KEYS, -1, 511, -1 );
     itemFlexGridSizer3->Add(m_DecTrackNr, 0, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
     m_labOppTrackNr = new wxStaticText( itemDialog1, wxID_ANY, _("Opposite track Nr."), wxDefaultPosition, wxDefaultSize, 0 );
@@ -291,6 +292,8 @@ void TTTrackDialog::CreateControls()
     m_PosFB = new wxComboBox( itemDialog1, ID_COMBOBOX_TTT_POSFB, wxEmptyString, wxDefaultPosition, wxDefaultSize, m_PosFBStrings, wxCB_READONLY );
     itemFlexGridSizer3->Add(m_PosFB, 1, wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
+    itemFlexGridSizer3->AddGrowableCol(1);
+
     m_Polarization = new wxCheckBox( itemDialog1, wxID_ANY, _("Flip bridge polarization"), wxDefaultPosition, wxDefaultSize, 0 );
     m_Polarization->SetValue(false);
     itemBoxSizer2->Add(m_Polarization, 0, wxALIGN_LEFT|wxALL, 5);
@@ -308,6 +311,9 @@ void TTTrackDialog::CreateControls()
 
     m_Cancel = new wxButton( itemDialog1, wxID_CANCEL, _("&Cancel"), wxDefaultPosition, wxDefaultSize, 0 );
     itemStdDialogButtonSizer18->AddButton(m_Cancel);
+
+    wxButton* itemButton21 = new wxButton( itemDialog1, wxID_HELP, _("&Help"), wxDefaultPosition, wxDefaultSize, 0 );
+    itemStdDialogButtonSizer18->AddButton(itemButton21);
 
     itemStdDialogButtonSizer18->Realize();
 
@@ -367,4 +373,14 @@ void TTTrackDialog::OnCancelClick( wxCommandEvent& event )
   EndModal( 0 );
 }
 
+
+
+/*!
+ * wxEVT_COMMAND_BUTTON_CLICKED event handler for wxID_HELP
+ */
+
+void TTTrackDialog::OnHelpClick( wxCommandEvent& event )
+{
+  wxGetApp().openLink( "turntable-tracks" );
+}
 

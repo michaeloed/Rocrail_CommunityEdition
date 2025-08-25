@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -36,8 +39,12 @@
 #include "rocrail/wrapper/public/Program.h"
 #include "rocrail/wrapper/public/State.h"
 
+#include "rocdigs/impl/ddx/accpool.h"
+#include "rocdigs/impl/ddx/init.h"
 #include "rocdigs/impl/ddx/s88.h"
 #include "rocdigs/impl/ddx/nmra.h"
+#include "rocdigs/impl/ddx/motorola.h"
+#include "rocdigs/impl/ddx/locpool.h"
 
 #include "rocutils/public/addr.h"
 
@@ -525,7 +532,7 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iODDXData data = Data((iODDX)inst);
   stop_voltage(inst);
   /* sleep to wait for cycle thread to do the power off */
@@ -603,7 +610,7 @@ static int _state( obj inst ) {
 /* external shortcut event */
 static void _shortcut(obj inst) {
   iODDXData data = Data( inst );
-  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "external shortcut event; power off." );
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "external short circuit event; power off." );
   stop_voltage(inst);
 }
 
@@ -629,6 +636,7 @@ static struct ODDX* _inst( const iONode ini ,const iOTrace trc ) {
 
   /* make a clone of the ini node: it could be replaced by rocrailDialog in the rocgui... */
   data->ini = (iONode)NodeOp.base.clone( ini );
+  data->iid = StrOp.dup(wDigInt.getiid( ini ));
   data->swtime = wDigInt.getswtime( ini );
 
   ddx_ini = wDigInt.getddx( data->ini );
@@ -646,9 +654,9 @@ static struct ODDX* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ddx portbase addr=0x%X", data->portbase );
 
   data->shortcutchecking = wDDX.isshortcutchecking( ddx_ini );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ddx shortcutchecking=%d", data->shortcutchecking );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ddx short circuit checking=%d", data->shortcutchecking );
   data->shortcutdelay = wDDX.getshortcutdelay( ddx_ini );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ddx shortcutdelay=%d", wDDX.getshortcutdelay( ddx_ini ) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ddx short circuit delay=%d", wDDX.getshortcutdelay( ddx_ini ) );
   data->inversedsr = wDDX.isinversedsr( ddx_ini );
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ddx inversedsr=%d", data->inversedsr );
   data->dcc = wDDX.isdcc( ddx_ini );
@@ -688,7 +696,7 @@ static struct ODDX* _inst( const iONode ini ,const iOTrace trc ) {
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Starting DDX..." );
   SystemOp.inst();
   data->serial = NULL;
-  ddx_entry( __DDX , ddx_ini );
+  ddx_entry( (obj)__DDX , ddx_ini );
 
   instCnt++;
 //  __inst = __DDX;

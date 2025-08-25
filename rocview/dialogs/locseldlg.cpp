@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -41,10 +44,15 @@
 ////@end XPM images
 
 #include "rocview/public/guiapp.h"
+#include "rocview/res/icons.hpp"
+
 #include "rocrail/wrapper/public/ModelCmd.h"
 #include "rocrail/wrapper/public/Plan.h"
 #include "rocrail/wrapper/public/Loc.h"
+#include "rocrail/wrapper/public/Car.h"
+#include "rocrail/wrapper/public/Item.h"
 #include "rocrail/wrapper/public/FunDef.h"
+#include "rocrail/wrapper/public/DataReq.h"
 
 #include "rocview/wrapper/public/Gui.h"
 #include "rocview/wrapper/public/MIC.h"
@@ -89,12 +97,13 @@ LocSelDlg::LocSelDlg( )
 {
 }
 
-LocSelDlg::LocSelDlg( wxWindow* parent, iONode props, bool mic, const char* locid )
+LocSelDlg::LocSelDlg( wxWindow* parent, iONode props, bool mic, const char* locid, bool cars )
 {
   m_Props = props;
   m_MICmode = mic;
   m_MICini = NULL;
   m_LocID = locid;
+  m_AddCars = cars;
   if( m_MICmode ) {
     m_MICini = wGui.getmic( wxGetApp().getIni() );
     if( m_MICini == NULL ) {
@@ -109,6 +118,7 @@ LocSelDlg::LocSelDlg( wxWindow* parent, iONode props, bool mic, const char* loci
 
 
   Create( parent, -1, wxGetApp().getMsg("locseldlg") );
+  m_LocImageIndex->SetMaxSize( wxSize( -1,70 ) );
   InitIndex();
   GetSizer()->Layout();
   GetSizer()->Fit(this);
@@ -146,28 +156,59 @@ void LocSelDlg::SelectPrev() {
 }
 
 
+#define MAXHEIGHT 48
+
 void LocSelDlg::InitValues() {
   TraceOp.trc( "app", TRCLEVEL_INFO, __LINE__, 9999, "InitValues %s", wLoc.getid( m_Props ) );
   // Init General
-  if( wLoc.getimage( m_Props ) != NULL ) {
+  if( wLoc.getimage( m_Props ) != NULL && StrOp.len(wLoc.getimage(m_Props)) > 0 ) {
+    bool isSupported = true;
     wxBitmapType bmptype = wxBITMAP_TYPE_XPM;
     if( StrOp.endsWithi( wLoc.getimage( m_Props ), ".gif" ) )
       bmptype = wxBITMAP_TYPE_GIF;
     else if( StrOp.endsWithi( wLoc.getimage( m_Props ), ".png" ) )
       bmptype = wxBITMAP_TYPE_PNG;
+    else {
+      TraceOp.trc( "locseldlg", TRCLEVEL_WARNING, __LINE__, 9999, "unsupported image format %s", wLoc.getimage( m_Props ) );
+      isSupported = false;
+    }
+
 
     const char* imagepath = wGui.getimagepath(wxGetApp().getIni());
     const char* imagename = FileOp.ripPath( wLoc.getimage( m_Props ) );
     static char pixpath[256];
     StrOp.fmtb( pixpath, "%s%c%s", imagepath, SystemOp.getFileSeparator(), imagename );
 
-    if( imagename != NULL && StrOp.len(imagename) > 0 && FileOp.exist(pixpath)) {
-      TraceOp.trc( "locdlg", TRCLEVEL_INFO, __LINE__, 9999, "picture [%s]", pixpath );
-      m_LocImageIndex->SetBitmapLabel( wxBitmap(wxString(pixpath,wxConvUTF8), bmptype) );
+    if( isSupported && imagename != NULL && StrOp.len(imagename) > 0 && FileOp.exist(pixpath)) {
+      TraceOp.trc( "locseldlg", TRCLEVEL_INFO, __LINE__, 9999, "picture [%s]", pixpath );
+      wxImage img(wxString(pixpath,wxConvUTF8), bmptype);
+      if( img.IsOk() && img.GetHeight() > MAXHEIGHT ) {
+        int h = img.GetHeight();
+        int w = img.GetWidth();
+        float scale = (float)h / (float)MAXHEIGHT;
+        float width = (float)w / scale;
+        wxBitmap bmp(img.Scale((int)width, MAXHEIGHT, wxIMAGE_QUALITY_HIGH));
+        m_LocImageIndex->SetBitmapLabel( bmp );
+      }
+      else if(img.IsOk()) {
+        m_LocImageIndex->SetBitmapLabel( wxBitmap(img) );
+      }
     }
     else {
-      TraceOp.trc( "locdlg", TRCLEVEL_WARNING, __LINE__, 9999, "picture [%s] not found", pixpath );
-      m_LocImageIndex->SetBitmapLabel( wxBitmap(nopict_xpm) );
+      if( wGui.isgrayicons(wxGetApp().getIni()) )
+        m_LocImageIndex->SetBitmapLabel( *_img_noimg );
+      else
+        m_LocImageIndex->SetBitmapLabel( wxBitmap(nopict_xpm) );
+      if( isSupported && StrOp.len(imagename) > 0 ) {
+        TraceOp.trc( "locdlg", TRCLEVEL_INFO, __LINE__, 9999, "picture [%s] not found; request it from server.", pixpath );
+        // request the image from server:
+        iONode node = NodeOp.inst( wDataReq.name(), NULL, ELEMENT_NODE );
+        wDataReq.setid( node, wLoc.getid(m_Props) );
+        wDataReq.setcmd( node, wDataReq.get );
+        wDataReq.settype( node, wDataReq.image );
+        wDataReq.setfilename( node, imagename );
+        wxGetApp().sendToRocrail( node );
+      }
     }
     m_LocImageIndex->SetToolTip(wxString(wLoc.getdesc( m_Props ),wxConvUTF8));
 
@@ -176,12 +217,25 @@ void LocSelDlg::InitValues() {
     //m_LocImageIndex->SetBitmapLabel( wxBitmap(wxString(wLoc.getimage( m_Props ),wxConvUTF8), bmptype) );
   }
   else {
-    m_LocImageIndex->SetBitmapLabel( wxBitmap(nopict_xpm) );
+    if( wGui.isgrayicons(wxGetApp().getIni()) )
+      m_LocImageIndex->SetBitmapLabel( *_img_noimg );
+    else
+      m_LocImageIndex->SetBitmapLabel( wxBitmap(nopict_xpm) );
     //m_LocImageIndex->SetBitmapLabel( wxBitmap(nopict_xpm) );
   }
   m_LocImageIndex->Refresh();
+  GetSizer()->Fit(this);
+  GetSizer()->Layout();
 
 }
+
+static int locComparator(obj* o1, obj* o2) {
+  if( *o1 == NULL || *o2 == NULL )
+    return 0;
+  return strcmp( wItem.getid( (iONode)*o1 ), wItem.getid( (iONode)*o2 ) );
+}
+
+
 
 void LocSelDlg::InitIndex() {
   TraceOp.trc( "app", TRCLEVEL_INFO, __LINE__, 9999, "InitIndex" );
@@ -189,18 +243,41 @@ void LocSelDlg::InitIndex() {
   iONode model = wxGetApp().getModel();
   if( model != NULL ) {
     iONode lclist = wPlan.getlclist( model );
+    iONode carlist = wPlan.getcarlist( model );
     if( lclist != NULL ) {
+      iOList list = ListOp.inst();
       int cnt = NodeOp.getChildCnt( lclist );
       for( int i = 0; i < cnt; i++ ) {
         iONode lc = NodeOp.getChild( lclist, i );
         const char* id = wLoc.getid( lc );
-        if( id != NULL ) {
-          m_List->Append( wxString(id,wxConvUTF8) );
+        if( id != NULL && wLoc.isshow(lc) ) {
+          ListOp.add( list, (obj)lc );
         }
       }
+      if( m_AddCars && carlist != NULL ) {
+        int cnt = NodeOp.getChildCnt( carlist );
+        for( int i = 0; i < cnt; i++ ) {
+          iONode car = NodeOp.getChild( carlist, i );
+          if( wCar.getaddr(car) > 0 ) {
+            if( wCar.isshow(car) )
+              ListOp.add( list, (obj)car );
+          }
+        }
+      }
+
+      // Sort the list:
+      ListOp.sort( list, locComparator );
+      cnt = ListOp.size( list );
+
+      for( int i = 0; i < ListOp.size( list ); i++ ) {
+        iONode node = (iONode)ListOp.get( list, i );
+        if( node != NULL )
+          m_List->Append( wxString(wItem.getid( node ),wxConvUTF8) );
+      }
+
       if( m_Props != NULL ) {
-        m_List->SetStringSelection( wxString(wLoc.getid( m_Props ),wxConvUTF8) );
-        m_List->SetFirstItem( wxString(wLoc.getid( m_Props ),wxConvUTF8) );
+        m_List->SetStringSelection( wxString(wItem.getid( m_Props ),wxConvUTF8) );
+        m_List->SetFirstItem( wxString(wItem.getid( m_Props ),wxConvUTF8) );
         InitValues();
       }
       else if( m_LocID != NULL && StrOp.len(m_LocID) > 0 ) {
@@ -209,6 +286,12 @@ void LocSelDlg::InitIndex() {
         m_Props = wxGetApp().getFrame()->findLoc( m_List->GetStringSelection().mb_str(wxConvUTF8) );
         InitValues();
       }
+      else if(m_List->GetCount() > 0 ) {
+        m_List->SetSelection( 0 );
+        m_Props = wxGetApp().getFrame()->findLoc( m_List->GetStringSelection().mb_str(wxConvUTF8) );
+        InitValues();
+      }
+      ListOp.base.del(list);
     }
   }
 }
@@ -249,15 +332,16 @@ void LocSelDlg::CreateControls()
     LocSelDlg* itemDialog1 = this;
 
     wxFlexGridSizer* itemFlexGridSizer2 = new wxFlexGridSizer(0, 1, 0, 0);
-    itemFlexGridSizer2->AddGrowableRow(1);
     itemDialog1->SetSizer(itemFlexGridSizer2);
 
-    m_LocImageIndex = new wxBitmapButton( itemDialog1, ID_BITMAPBUTTON_SEL_LOC, wxNullBitmap, wxDefaultPosition, wxSize(300, 80), wxBU_AUTODRAW );
+    m_LocImageIndex = new wxBitmapButton( itemDialog1, ID_BITMAPBUTTON_SEL_LOC, wxNullBitmap, wxDefaultPosition, wxSize(240, -1), wxBU_AUTODRAW );
     itemFlexGridSizer2->Add(m_LocImageIndex, 0, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
 
     wxArrayString m_ListStrings;
     m_List = new wxListBox( itemDialog1, ID_LISTBOX_SEL_LOC, wxDefaultPosition, wxSize(-1, 200), m_ListStrings, wxLB_SINGLE|wxLB_ALWAYS_SB|wxLB_SORT );
     itemFlexGridSizer2->Add(m_List, 1, wxGROW|wxALIGN_CENTER_VERTICAL|wxALL, 5);
+
+    itemFlexGridSizer2->AddGrowableRow(1);
 
 ////@end LocSelDlg content construction
 }
@@ -280,6 +364,8 @@ void LocSelDlg::OnListboxSelLocSelected( wxCommandEvent& event )
     return;
 
   m_Props = wxGetApp().getFrame()->findLoc( m_List->GetStringSelection().mb_str(wxConvUTF8) );
+  if( m_Props == NULL )
+    m_Props = wxGetApp().getFrame()->findCar( m_List->GetStringSelection().mb_str(wxConvUTF8) );
   InitValues();
 
 }
@@ -326,6 +412,8 @@ void LocSelDlg::OnBitmapbuttonSelLocClick( wxCommandEvent& event )
 {
   if(!m_MICmode) {
     m_Props = wxGetApp().getFrame()->findLoc( m_List->GetStringSelection().mb_str(wxConvUTF8) );
+    if( m_Props == NULL )
+      m_Props = wxGetApp().getFrame()->findCar( m_List->GetStringSelection().mb_str(wxConvUTF8) );
     EndModal( wxID_OK );
     return;
   }

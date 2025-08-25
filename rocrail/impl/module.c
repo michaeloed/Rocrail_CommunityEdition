@@ -1,8 +1,9 @@
-/** ------------------------------------------------------------
-  * Module: RocRail
-  * Object: Module
-  * ------------------------------------------------------------
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 #include "rocrail/impl/module_impl.h"
 #include "rocrail/public/clntcon.h"
@@ -23,6 +24,7 @@
 #include "rocrail/wrapper/public/SignalList.h"
 #include "rocrail/wrapper/public/FeedbackList.h"
 #include "rocrail/wrapper/public/TextList.h"
+#include "rocrail/wrapper/public/RouteList.h"
 #include "rocrail/wrapper/public/ZLevel.h"
 
 #include "rocrail/wrapper/public/Block.h"
@@ -36,6 +38,8 @@
 #include "rocrail/wrapper/public/Feedback.h"
 #include "rocrail/wrapper/public/Text.h"
 #include "rocrail/wrapper/public/Item.h"
+#include "rocrail/wrapper/public/Stage.h"
+#include "rocrail/wrapper/public/StageList.h"
 
 
 static int instCnt = 0;
@@ -153,6 +157,11 @@ static void _getRotationArea( iONode moduleRoot, int* Xmax, int* Ymax ) {
     if( *Ymax == -1 || ymax > *Ymax ) *Ymax = ymax;
   }
 
+  if( __getXYextremes(wStageList.name()    , moduleRoot, &xmax, &ymax) ) {
+    if( *Xmax == -1 || xmax > *Xmax ) *Xmax = xmax;
+    if( *Ymax == -1 || ymax > *Ymax ) *Ymax = ymax;
+  }
+
   if( __getXYextremes(wSwitchList.name()   , moduleRoot, &xmax, &ymax) ) {
     if( *Xmax == -1 || xmax > *Xmax ) *Xmax = xmax;
     if( *Ymax == -1 || ymax > *Ymax ) *Ymax = ymax;
@@ -188,6 +197,11 @@ static void _getRotationArea( iONode moduleRoot, int* Xmax, int* Ymax ) {
     if( *Ymax == -1 || ymax > *Ymax ) *Ymax = ymax;
   }
 
+  if( __getXYextremes(wRouteList.name(), moduleRoot, &xmax, &ymax) ) {
+    if( *Xmax == -1 || xmax > *Xmax ) *Xmax = xmax;
+    if( *Ymax == -1 || ymax > *Ymax ) *Ymax = ymax;
+  }
+
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "calculated module size %d, %d", *Xmax, *Ymax );
 
 }
@@ -216,8 +230,14 @@ static void __getItemSize( iONode item, int* iCX, int* iCY, Boolean defSize ) {
         *iCY = defOri ? 1:2;
       }
       else if( StrOp.equals( wSwitch.crossing, wSwitch.gettype(item) ) ) {
-        *iCX = defOri ? 2:1;
-        *iCY = defOri ? 1:2;
+        if( ( wSwitch.getaddr1(item) == 0 ) && ( wSwitch.getport1(item) == 0 ) ) {
+          /* a crossing without an address is just a 1x1 cross */
+          /* do nothing, keep defaults */
+        }
+        else {
+          *iCX = defOri ? 2:1;
+          *iCY = defOri ? 1:2;
+        }
       }
       else if( StrOp.equals( wSwitch.ccrossing, wSwitch.gettype(item) ) ) {
         *iCX = defOri ? 2:1;
@@ -242,6 +262,10 @@ static void __getItemSize( iONode item, int* iCX, int* iCY, Boolean defSize ) {
       *iCX = defOri ? blocklen:1;
       *iCY = defOri ? 1:blocklen;
     }
+    else if( StrOp.equals( wStage.name(), NodeOp.getName(item) ) ) {
+      *iCX = defOri ? 4:1;
+      *iCY = defOri ? 1:4;
+    }
     else if( StrOp.equals( wSelTab.name(), NodeOp.getName(item) ) ) {
       *iCX = defOri ? wSelTab.getnrtracks(item):1;
       *iCY = defOri ? 1:wSelTab.getnrtracks(item);
@@ -251,8 +275,14 @@ static void __getItemSize( iONode item, int* iCX, int* iCY, Boolean defSize ) {
       *iCY = defOri ? 1:wText.getcx(item);
     }
     else if( StrOp.equals( wTurntable.name(), NodeOp.getName(item) ) ) {
-      *iCX = 5;
-      *iCY = 5;
+      if( wTurntable.istraverser(item) ) {
+        *iCX = defOri ? 4:8;
+        *iCY = defOri ? 8:4;
+      }
+      else {
+        *iCX = wTurntable.getsymbolsize(item);
+        *iCY = wTurntable.getsymbolsize(item);
+      }
     }
   }
   else {
@@ -279,12 +309,18 @@ static void _rotate90( iONode item, int cx, int cy ) {
   iCX--;
   iCY--;
 
-  if( StrOp.equals( wItem.east, ori ) )
+  if( StrOp.equals( wItem.east, ori ) ) {
+    iX += iCX;
     wItem.setori( item, wItem.south );
-  else if( StrOp.equals( wItem.north, ori ) )
+  }
+  else if( StrOp.equals( wItem.north, ori ) ) {
+    iX += iCY;
     wItem.setori( item, wItem.east );
-  else if( StrOp.equals( wItem.south, ori ) )
+  }
+  else if( StrOp.equals( wItem.south, ori ) ) {
+    iX += iCY;
     wItem.setori( item, wItem.west );
+  }
   else {
     iX += iCX;
     wItem.setori( item, wItem.north );
@@ -383,6 +419,8 @@ static void _rotate180( iONode item, int cx, int cy ) {
   nX = rX - iX;
   nY = rY - iY;
 
+  TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Rotate 180 iX=%d iY=%d cx=%d cy=%d x=%d y=%d", iX, iY, iCX, iCY, nX, nY );
+
   wItem.setx( item, nX );
   wItem.sety( item, nY );
 }
@@ -443,9 +481,11 @@ static void _rotateModule( iONode model, iONode module, int level, int rotation 
   __rotateList( model, module, level, wSignalList.name(), rotation );
   __rotateList( model, module, level, wOutputList.name(), rotation );
   __rotateList( model, module, level, wBlockList.name(), rotation );
+  __rotateList( model, module, level, wStageList.name(), rotation );
   __rotateList( model, module, level, wTextList.name(), rotation );
   __rotateList( model, module, level, wTurntableList.name(), rotation );
   __rotateList( model, module, level, wSelTabList.name(), rotation );
+  __rotateList( model, module, level, wRouteList.name(), rotation );
 
   wModule.setrotation( module, rotation );
 

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -21,7 +24,7 @@
 
 #include "rocrail/public/app.h"
 
-#include "rocrail/wrapper/public/RocRail.h"
+#include "rocrail/wrapper/public/FreeRail.h"
 #include "rocrail/wrapper/public/Ctrl.h"
 
 #include "rocs/public/doc.h"
@@ -38,9 +41,12 @@
 #include "rocrail/wrapper/public/Action.h"
 #include "rocrail/wrapper/public/ActionCtrl.h"
 #include "rocrail/wrapper/public/ModelCmd.h"
+#include "rocrail/wrapper/public/Item.h"
+#include "rocrail/wrapper/public/Color.h"
 
 
 static int instCnt = 0;
+static Boolean __doCmd( struct OOutput* inst ,iONode nodeA ,Boolean update );
 
 /** ----- OBase ----- */
 static const char* __id( void* inst ) {
@@ -129,10 +135,10 @@ static const char* _getAddrKey( iOOutput inst ) {
 }
 
 /**  */
-static char* _createAddrKey( int bus, int addr, int port, const char* iid ) {
+static char* _createAddrKey( int bus, int addr, int port, int type, const char* iid ) {
   iONode node = AppOp.getIniNode( wDigInt.name() );
   const char* def_iid = wDigInt.getiid( node );
-  return StrOp.fmt( "%d_%d_%d_%s", bus, addr, port, (iid != NULL && StrOp.len( iid ) > 0) ? iid:def_iid );
+  return StrOp.fmt( "%d_%d_%d_%d_%s", bus, addr, port, type, (iid != NULL && StrOp.len( iid ) > 0) ? iid:def_iid );
 }
 
 /**
@@ -145,7 +151,7 @@ static void __checkActions(iOOutput inst, const char* cmd) {
 
 
   while( coaction != NULL ) {
-    if( StrOp.equals(wOutput.on, wOutput.getstate(data->props)) && StrOp.len( wActionCtrl.getstate(coaction) ) == 0 ||
+    if( (StrOp.equals(wOutput.on, wOutput.getstate(data->props)) && StrOp.len( wActionCtrl.getstate(coaction) ) == 0) ||
         StrOp.equals(wActionCtrl.getstate(coaction), wOutput.getstate(data->props) ) )
     {
       iOAction action = ModelOp.getAction(model, wActionCtrl.getid(coaction) );
@@ -154,8 +160,8 @@ static void __checkActions(iOOutput inst, const char* cmd) {
       }
     }
     else {
-      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "action state does not match: [%s-%s]",
-          wActionCtrl.getstate( coaction ), wOutput.getstate(data->props) );
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "%s action state does not match: [%s-%s]",
+          wOutput.getid(data->props), wActionCtrl.getstate( coaction ), wOutput.getstate(data->props) );
     }
 
 
@@ -165,44 +171,113 @@ static void __checkActions(iOOutput inst, const char* cmd) {
 }
 
 
+static void __delayedOffThread( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOOutput op = (iOOutput)ThreadOp.getParm( th );
+  iOOutputData data = Data(op);
+  iONode nodeF = NodeOp.inst( wOutput.name(), NULL, ELEMENT_NODE );
+  wOutput.setcmd( nodeF, wOutput.off );
+  wOutput.setid( nodeF, wOutput.getid( data->props ) );
+  if( wOutput.getiid( data->props ) != NULL )
+    wOutput.setiid( nodeF, wOutput.getiid( data->props ) );
+  ThreadOp.sleep(wOutput.getdelay(data->props)*1000);
+  __doCmd(op, nodeF, True);
+  ThreadOp.base.del(th);
+}
+
+
 /**  */
-static Boolean _cmd( struct OOutput* inst ,iONode nodeA ,Boolean update ) {
+static Boolean __doCmd( struct OOutput* inst ,iONode nodeA ,Boolean update ) {
   iOOutputData o = Data(inst);
   iOControl control = AppOp.getControl(  );
 
   const char* state = wOutput.getcmd( nodeA );
   const char* iid = wOutput.getiid( o->props );
+  int value = wOutput.getvalue( nodeA );
+  Boolean inv = wOutput.isinv(o->props);
+  iONode color = wOutput.getcolor(nodeA);
+
+  if( color != NULL ) {
+    iONode ocolor = wOutput.getcolor(o->props);
+    color = (iONode)NodeOp.base.clone(color);
+    if( ocolor != NULL && NodeOp.findAttr(color, "saturation") == NULL ) {
+      wColor.setsaturation(color, wColor.getsaturation(ocolor));
+    }
+  }
 
   if( StrOp.equals( wOutput.flip, state ) ) {
-    if( StrOp.equals( wOutput.on, wOutput.getstate( o->props ) ) )
+    if( wOutput.istristate(o->props) ) {
+      if( StrOp.equals( wOutput.on, wOutput.getstate( o->props ) ) )
+        state = wOutput.off;
+      else if( StrOp.equals( wOutput.off, wOutput.getstate( o->props ) ) )
+        state = wOutput.active;
+      else
+        state = wOutput.on;
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "flip tristate output %s to %s", wOutput.getid( o->props ), state);
+    }
+    else if( StrOp.equals( wOutput.on, wOutput.getstate( o->props ) ) )
       state = wOutput.off;
     else
       state = wOutput.on;
   }
 
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "setting output %s to %s",
-               wOutput.getid( o->props ), state );
-
   /* remember state */
-  wOutput.setstate( o->props, state );
+  wOutput.setvalue( o->props, value );
+
+  if( StrOp.equals(wOutput.active, state ) )
+    wOutput.setstate( o->props, wOutput.active );
+  else if( StrOp.equals(wOutput.off, state ) )
+    wOutput.setstate( o->props, wOutput.off );
+  else if( StrOp.equals(wOutput.on, state ) )
+    wOutput.setstate( o->props, wOutput.on );
+  else if( StrOp.equals(wOutput.value, state ) ) {
+    if( value > 0 ) {
+      wOutput.setstate( o->props, wOutput.on );
+      state = wOutput.on;
+    }
+    else {
+      wOutput.setstate( o->props, wOutput.off );
+      state = wOutput.off;
+    }
+  }
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "setting output %s to %s [%d]",
+               wOutput.getid( o->props ), state, StrOp.equals(wOutput.off, state )?0:wOutput.getvalue(o->props) );
 
   if( iid != NULL )
     wOutput.setiid( nodeA, iid );
 
   wOutput.setbus( nodeA, wOutput.getbus( o->props ) );
+  wItem.setuidname(nodeA, wItem.getuidname(o->props));
 
   wOutput.setprot( nodeA, wOutput.getprot( o->props ) );
+  wOutput.setblink( nodeA, wOutput.isblink( o->props ) );
+  wOutput.setcolortype( nodeA, wOutput.iscolortype( o->props ) );
+  wOutput.setparam( nodeA, wOutput.getparam( o->props ) );
+
+  wOutput.setredChannel( nodeA, wOutput.getredChannel( o->props ) );
+  wOutput.setgreenChannel( nodeA, wOutput.getgreenChannel( o->props ) );
+  wOutput.setblueChannel( nodeA, wOutput.getblueChannel( o->props ) );
+  wOutput.setwhiteChannel( nodeA, wOutput.getwhiteChannel( o->props ) );
+  wOutput.setwhite2Channel( nodeA, wOutput.getwhite2Channel( o->props ) );
+  wOutput.setbrightnessChannel( nodeA, wOutput.getbrightnessChannel( o->props ) );
+
+  if( inv )
+    wOutput.setvalue( nodeA, StrOp.equals(wOutput.off, state ) ? wOutput.getvalue( o->props ):0 );
+  else
+    wOutput.setvalue( nodeA, StrOp.equals(wOutput.off, state ) ? 0:wOutput.getvalue( o->props ) );
 
   if( wOutput.getaddr( o->props ) > 0 || wOutput.getport( o->props ) > 0 ){
+    Boolean on = StrOp.equals(wOutput.on, wOutput.getcmd(nodeA) );
+
     if( wOutput.isasswitch(o->props) ) {
-      Boolean inv = wOutput.isinv(o->props);
       NodeOp.setName( nodeA, wSwitch.name() );
 
       wSwitch.setaddr1( nodeA, wOutput.getaddr( o->props ) );
       wSwitch.setport1( nodeA, wOutput.getport( o->props ) );
 
-      wSwitch.setcmd( nodeA, StrOp.equals( state, wOutput.on ) ? (inv?wSwitch.straight:wSwitch.turnout):(inv?wSwitch.turnout:wSwitch.straight) );
+      wSwitch.setcmd( nodeA, ( StrOp.equals(state, wOutput.on) || StrOp.equals(state, wOutput.active) ) ? (inv?wSwitch.straight:wSwitch.turnout):(inv?wSwitch.turnout:wSwitch.straight) );
 
     }
     else {
@@ -210,13 +285,22 @@ static Boolean _cmd( struct OOutput* inst ,iONode nodeA ,Boolean update ) {
       wOutput.setport( nodeA, wOutput.getport( o->props ) );
       wOutput.setgate( nodeA, wOutput.getgate( o->props ) );
       wOutput.setcmd( nodeA, state );
+      wOutput.setcmd( nodeA, ( StrOp.equals(state, wOutput.on) || StrOp.equals(state, wOutput.active) ) ? (inv?wOutput.off:wOutput.on):(inv?wOutput.on:wOutput.off) );
     }
 
+    wOutput.setaccessory( nodeA, wOutput.isaccessory(o->props) );
+    wOutput.setporttype( nodeA, wOutput.getporttype( o->props ) );
     if( !ControlOp.cmd( control, nodeA, NULL ) ) {
-      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Output \"%s\" could not be set!",
+      TraceOp.trc( name, TRCLEVEL_EXCEPTION, __LINE__, 9999, "Output [%s] could not be set!",
                      wOutput.getid( o->props ) );
       return False;
     }
+
+    if( on && wOutput.getdelay( o->props ) > 0 ) {
+      iOThread th = ThreadOp.inst(NULL, &__delayedOffThread, inst);
+      ThreadOp.start(th);
+    }
+
   }
   else {
     /* no longer needed */
@@ -229,9 +313,17 @@ static Boolean _cmd( struct OOutput* inst ,iONode nodeA ,Boolean update ) {
     iONode nodeF = NodeOp.inst( wOutput.name(), NULL, ELEMENT_NODE );
     wOutput.setid( nodeF, wOutput.getid( o->props ) );
     wOutput.setstate( nodeF, wOutput.getstate( o->props ) );
+    wOutput.setvalue( nodeF, wOutput.getvalue( o->props ) );
     if( wOutput.getiid( o->props ) != NULL )
       wOutput.setiid( nodeF, wOutput.getiid( o->props ) );
+    if( color != NULL )
+      NodeOp.addChild(nodeF, color);
     AppOp.broadcastEvent( nodeF );
+  }
+  else {
+    /* clean up unused clone */
+    if( color != NULL )
+      NodeOp.base.del(color);
   }
 
   __checkActions(inst, state );
@@ -242,13 +334,28 @@ static Boolean _cmd( struct OOutput* inst ,iONode nodeA ,Boolean update ) {
 /* **/
 static void _event( iOOutput inst, iONode nodeC ) {
   iOOutputData data = Data(inst);
+  Boolean inv = wOutput.isinv(data->props);
 
   const char* state = wOutput.getstate( nodeC );
+  iONode color = wOutput.getcolor(nodeC);
 
-  if( StrOp.equals( state, wOutput.off ) )
-    wOutput.setstate( data->props, wOutput.on );
-  else if( StrOp.equals( state, wOutput.on ) )
-    wOutput.setstate( data->props, wOutput.off );
+  if( color != NULL ) {
+    iONode mycolor = wOutput.getcolor(data->props);
+    if( mycolor == NULL ) {
+      NodeOp.addChild( data->props, (iONode)NodeOp.base.clone(color));
+    }
+    else {
+      NodeOp.mergeNode(mycolor, color, True, False, False);
+    }
+  }
+  else {
+    color = wOutput.getcolor(data->props);
+  }
+
+  if( StrOp.equals( state, wOutput.on ) )
+    wOutput.setstate( data->props, inv?wOutput.off:wOutput.on );
+  else if( StrOp.equals( state, wOutput.off ) )
+    wOutput.setstate( data->props, inv?wOutput.on:wOutput.off );
 
   /* Broadcast to clients. Node4 */
   {
@@ -257,10 +364,30 @@ static void _event( iOOutput inst, iONode nodeC ) {
     wOutput.setstate( nodeD, wOutput.getstate( data->props) );
     wOutput.setaddr( nodeD, wOutput.getaddr( data->props ) );
     wOutput.setport( nodeD, wOutput.getport( data->props ) );
+    if( wOutput.iscolortype(data->props) && wOutput.getredChannel(data->props) > 0 && wOutput.getgreenChannel(data->props) > 0 && wOutput.getblueChannel(data->props) > 0  )
+      wOutput.setvalue( nodeD, wOutput.getvalue( data->props ) );
+    else if( NodeOp.findAttr(nodeC, "value" ) != NULL )
+      wOutput.setvalue( nodeD, wOutput.getvalue( nodeC ) );
+    else
+      wOutput.setvalue( nodeD, wOutput.getvalue( data->props ) );
+    if( color != NULL ) {
+      NodeOp.addChild( nodeD, (iONode)NodeOp.base.clone(color));
+    }
     AppOp.broadcastEvent( nodeD );
   }
 
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "informing %d listeners [%s:%s]",
+      ListOp.size( data->listeners ), wOutput.getid( data->props ), wOutput.getstate(data->props) );
 
+  {
+    obj listener = ListOp.first( data->listeners );
+    while( listener != NULL ) {
+      listener->event( listener, data->props );
+      listener = ListOp.next( data->listeners );
+    };
+  }
+
+  NodeOp.base.del(nodeC);
 }
 
 /**  */
@@ -268,6 +395,18 @@ static const char* _getId( struct OOutput* inst ) {
   iOOutputData data = Data(inst);
   return wOutput.getid( data->props );
 }
+
+static Boolean _addListener( iOOutput inst, obj listener ) {
+  iOOutputData data = Data(inst);
+  ListOp.add( data->listeners, listener );
+  return True;
+}
+static Boolean _removeListener( iOOutput inst, obj listener ) {
+  iOOutputData data = Data(inst);
+  ListOp.removeObj( data->listeners, listener );
+  return True;
+}
+
 
 
 /**  */
@@ -278,11 +417,13 @@ static struct OOutput* _inst( iONode props ) {
 
   /* Initialize data->xxx members... */
   data->props = props;
+  data->listeners = ListOp.inst();
 
   data->addrKey = _createAddrKey(
     wOutput.getbus( props ),
     wOutput.getaddr( props ),
     wOutput.getport( props ),
+    wOutput.getporttype( props ),
     wOutput.getiid( props )
     );
 
@@ -321,6 +462,7 @@ static void _modify( struct OOutput* inst ,iONode props ) {
       wOutput.getbus( o->props ),
       wOutput.getaddr( o->props ),
       wOutput.getport( o->props ),
+      wOutput.getporttype( o->props ),
       wOutput.getiid( o->props )
       );
     ModelOp.addCoKey( model, o->addrKey, inst );
@@ -330,7 +472,10 @@ static void _modify( struct OOutput* inst ,iONode props ) {
     cnt = NodeOp.getChildCnt( o->props );
     while( cnt > 0 ) {
       iONode child = NodeOp.getChild( o->props, 0 );
-      NodeOp.removeChild( o->props, child );
+      iONode removedChild = NodeOp.removeChild( o->props, child );
+      if( removedChild != NULL) {
+        NodeOp.base.del(removedChild);
+      }
       cnt = NodeOp.getChildCnt( o->props );
     }
 
@@ -376,6 +521,42 @@ static void _on( struct OOutput* inst ) {
 static Boolean _isState( iOOutput inst, const char* state ) {
   iOOutputData data = Data(inst);
   return StrOp.equals( state, wOutput.getstate(data->props) );
+}
+
+static void __doCmdThread( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOOutput op = (iOOutput)ThreadOp.getParm( th );
+  iOOutputData data = Data(op);
+
+  iONode nodeA = (iONode)ThreadOp.getPost(th);
+  if( nodeA != NULL ) {
+    Boolean update = wSwitch.iscmd_update(nodeA);
+    int error = 0;
+    if( wOutput.getpause(nodeA) > 0 ) {
+      TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "delay command for output[%s] %dms", OutputOp.getId(op), wOutput.getpause(nodeA) );
+      ThreadOp.sleep(wOutput.getpause(nodeA));
+    }
+    __doCmd(op, nodeA, update);
+  }
+  ThreadOp.base.del(th);
+}
+
+
+
+static Boolean _cmd( iOOutput inst, iONode nodeA, Boolean update ) {
+  iOOutputData data = Data(inst);
+
+  if( wOutput.getpause(nodeA) > 0 ) {
+    iOThread th = ThreadOp.inst(NULL, &__doCmdThread, inst);
+    wSwitch.setcmd_update(nodeA, update);
+    ThreadOp.post(th, (obj)nodeA);
+    ThreadOp.start(th);
+  }
+  else {
+    return __doCmd(inst, nodeA, update);
+  }
+
+  return True;
 }
 
 

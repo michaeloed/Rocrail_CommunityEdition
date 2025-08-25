@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -104,32 +107,38 @@ static int __count(void) {
 }
 static iOBase __clone_original( void* inst ) {
   iONode node = inst;
-  char* str = (char*)NodeOp.toEscString( node );
-  iODoc doc = DocOp.parse( str );
-  iONode clone = NULL;
-  if( doc == NULL )
-    return NULL;
-  clone = DocOp.getRootNode( doc );
-  doc->base.del(doc);
-  StrOp.free( str );
-  return (iOBase)clone;
+  if( inst != NULL ) {
+    char* str = (char*)NodeOp.toEscString( node );
+    iODoc doc = DocOp.parse( str );
+    iONode clone = NULL;
+    if( doc == NULL )
+      return NULL;
+    clone = DocOp.getRootNode( doc );
+    doc->base.del(doc);
+    StrOp.free( str );
+    return (iOBase)clone;
+  }
+  return NULL;
 }
 
 static iOBase __clone( void* inst ) {
   iONode node  = inst;
-  iONode clone = NodeOp.inst( NodeOp.getName( node ), NULL, ELEMENT_NODE );
-  int attrcnt  = NodeOp.getAttrCnt( node );
-  int childcnt = NodeOp.getChildCnt( node );
-  int i = 0;
-  for( i = 0; i < attrcnt; i++ ) {
-    iOAttr a = NodeOp.getAttr( node, i );
-    NodeOp.addAttr( clone, (iOAttr)a->base.clone( a ) );
+  if( inst != NULL ) {
+    iONode clone = NodeOp.inst( NodeOp.getName( node ), NULL, ELEMENT_NODE );
+    int attrcnt  = NodeOp.getAttrCnt( node );
+    int childcnt = NodeOp.getChildCnt( node );
+    int i = 0;
+    for( i = 0; i < attrcnt; i++ ) {
+      iOAttr a = NodeOp.getAttr( node, i );
+      NodeOp.addAttr( clone, (iOAttr)a->base.clone( a ) );
+    }
+    for( i = 0; i < childcnt; i++ ) {
+      iONode n = NodeOp.getChild( node, i );
+      NodeOp.addChild( clone,(iONode) n->base.clone( n ) );
+    }
+    return (iOBase)clone;
   }
-  for( i = 0; i < childcnt; i++ ) {
-    iONode n = NodeOp.getChild( node, i );
-    NodeOp.addChild( clone,(iONode) n->base.clone( n ) );
-  }
-  return (iOBase)clone;
+  return NULL;
 }
 
 
@@ -171,7 +180,7 @@ static iONode _removeChild( iONode inst, iONode child ) {
   for( i = 0; i < cnt; i++ ) {
     if( data->childs[i] == child ) {
       data->childs[i] = 0;
-      memcpy( &data->childs[i], &data->childs[i+1], ( data->childCnt - (i + 1) )* sizeof( iONode ) );
+      memmove( &data->childs[i], &data->childs[i+1], ( data->childCnt - (i + 1) )* sizeof( iONode ) );
       data->childCnt--;
       data->childs = reallocMem( data->childs, (data->childCnt+1) * sizeof( iONode ) );
       return child;
@@ -203,7 +212,7 @@ static void _removeAttr( iONode inst, iOAttr attr ) {
       data->attrs[i] = 0;
       /* should this be done here? */
       attr->base.del( attr );
-      memcpy( &data->attrs[i], &data->attrs[i+1], (data->attrCnt - (i + 1)) * sizeof( iOAttr ) );
+      memmove( &data->attrs[i], &data->attrs[i+1], (data->attrCnt - (i + 1)) * sizeof( iOAttr ) );
       data->attrCnt--;
       data->attrs = reallocMem( data->attrs, (data->attrCnt+1) * sizeof( iOAttr ) );
       break;
@@ -469,7 +478,19 @@ static iONode _mergeNode( iONode nodeA, iONode nodeB, Boolean overwrite, Boolean
     }
   }
 
-  if( recursive ) {
+  if( recursive && NodeOp.getBool(nodeA, "replacechilds", False) ) {
+    iONode child = NodeOp.getChild( nodeA, 0 );
+    while( child != NULL ) {
+      iONode rm = NodeOp.removeChild(nodeA, child);
+      if( rm != NULL ) NodeOp.base.del(rm);
+      child = NodeOp.getChild( nodeA, 0 );
+    }
+    cnt = NodeOp.getChildCnt(nodeB);
+    for( i = 0; i < cnt; i++) {
+      NodeOp.addChild( nodeA, (iONode)NodeOp.base.clone(NodeOp.getChild(nodeB, i)));
+    }
+  }
+  else if( recursive ) {
     cnt = NodeOp.getChildCnt( nodeB );
     for( i = 0; i < cnt; i++ ) {
       iONode node = NodeOp.getChild( nodeB, i );

@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -42,7 +45,7 @@
 void statusInitDest( iILcDriverInt inst ) {
   iOLcDriverData data = Data(inst);
   /* Lock the block and the needed street. */
-  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "Init destination for [%s]...",
+  TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "Init destination for [%s]...",
                  data->loc->getId( data->loc ) );
   {
     /*
@@ -58,7 +61,7 @@ void statusInitDest( iILcDriverInt inst ) {
     else
       swapDir = data->next1Route->isSwapPost( data->next1Route ) ? !data->next1RouteFromTo : data->next1RouteFromTo;
     swapDir = dir ? swapDir:!swapDir;
-    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
         "loco direction for [%s] is [%s], route direction [%s], swappost[%s]",
                    data->loc->getId( data->loc ), dir?"forwards":"reverse",
                    data->next1RouteFromTo?"fromTo":"toFrom",
@@ -72,8 +75,7 @@ void statusInitDest( iILcDriverInt inst ) {
                 data->next1Block,
                 data->next1Route,
                 data->curBlock,
-                swapDir, data->indelay ) &&
-        initializeSwap( (iOLcDriver)inst, data->next1Route ) )
+                swapDir, data->indelay ) )
     {
 
       if( !data->gomanual ) {
@@ -88,6 +90,9 @@ void statusInitDest( iILcDriverInt inst ) {
 
       if( !data->next1Block->isLinked( data->next1Block ) ) {
         data->next1Block->link( data->next1Block, data->curBlock );
+      }
+      if( data->next1Route != NULL ) {
+        data->next1Route->link(data->next1Route, data->curBlock->getTDport(data->curBlock));
       }
 
       if( data->secondnextblock || data->loc->trySecondNextBlock(data->loc) ) {
@@ -113,37 +118,51 @@ void statusInitDest( iILcDriverInt inst ) {
         }
       }
       else {
-        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+        TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 4201,
                        "Waiting for user to start loc \"%s\"",
                        data->loc->getId( data->loc ) );
       }
 
       data->state = LC_CHECKROUTE;
-      data->loc->setMode(data->loc, wLoc.mode_auto);
+      data->loc->setMode(data->loc, wLoc.mode_auto, wLoc.modereason_checkroute);
       /*data->run = False;*/
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                      "Setting state for \"%s\" from LC_INITDEST to LC_CHECKROUTE.",
                      data->loc->getId( data->loc ) );
     }
     else {
+      Boolean oppwait = True;
+      int ioppwait = 0;
       /* Error! */
       /* if running a schedule the schedule index should be decreased by one to match the current block */
       /* TODO: wait and getWait reverse signal flag */
-      if( data->curBlock->wait(data->curBlock, data->loc, False ) ) {
-        data->pause = data->curBlock->getWait(data->curBlock, data->loc, False );
-        if( data->pause != -1 )
+      if( data->curBlock->wait(data->curBlock, data->loc, False, &oppwait ) ) {
+        data->pause = data->curBlock->getWait(data->curBlock, data->loc, False, &ioppwait );
+        if( data->pause != -1 ) {
+          int maxwaittime = wLoc.getmaxwaittime( data->loc->base.properties( data->loc ) );
           data->pause = data->pause * wLoc.getpriority( data->loc->base.properties( data->loc ) );
-      } else
-        data->pause = wLoc.getpriority( data->loc->base.properties( data->loc ) );
+          if( maxwaittime > 0 && data->pause > maxwaittime )
+            data->pause = maxwaittime;
+        }
+      }
+      else {
+        if( wBlock.ismainline(data->curBlock->base.properties(data->curBlock) ) )
+          data->pause = 10;
+        else
+          data->pause = 10 + 2 * wLoc.getpriority( data->loc->base.properties( data->loc ) );
+      }
+
+      if( data->pause != -1 && data->pause < 10 )
+        data->pause = 10;
 
       if( data->schedule != NULL ) {
         data->scheduleIdx--;
-        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "set schedule index back to %d to match the current entry", data->scheduleIdx );
+        TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201, "set schedule index back to %d to match the current entry", data->scheduleIdx );
       }
 
       data->state = data->run ? LC_PAUSE:LC_IDLE;
-      data->loc->setMode(data->loc, wLoc.mode_wait);
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
+      data->loc->setMode(data->loc, wLoc.mode_wait, wLoc.modereason_initdest);
+      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 4201,
                      "Setting state for [%s] pause=%d from LC_INITDEST to %s.",
                      data->loc->getId( data->loc ), data->pause, data->run ? "LC_PAUSE":"LC_IDLE" );
     }

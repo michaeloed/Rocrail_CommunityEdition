@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Control System
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -57,6 +60,7 @@
 #include "rocrail/wrapper/public/State.h"
 #include "rocrail/wrapper/public/Program.h"
 #include "rocrail/wrapper/public/Clock.h"
+#include "rocrail/wrapper/public/BinStateCmd.h"
 
 
 /* loconet opcodes */
@@ -72,13 +76,19 @@
 #include "rocdigs/impl/loconet/lncv.h"
 #include "rocdigs/impl/loconet/locoio.h"
 #include "rocdigs/impl/loconet/ibcom-cv.h"
+#include "rocdigs/impl/loconet/lnutils.h"
 
 #include "rocutils/public/addr.h"
+
+#ifndef min
+  #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
+#endif
 
 static int instCnt = 0;
 
 /* proto types */
 static void __evaluatePacket(iOLocoNet loconet, byte* rsp, int size );
+int makereqDispatch(iOLocoNetData data, byte *msg, int slot, iONode node, int status, Boolean activeSlotServer);
 
 /** ----- OBase ----- */
 static const char* __id( void* inst ) {
@@ -139,12 +149,12 @@ static void* __properties( void* inst ) {
 
 static byte _checksum(const byte *cmd, int len)
 {
-    byte chksum = 0xff;
-    int i;
-    for (i = 0; i < len; i++) {
-        chksum ^= cmd[i];
-    }
-    return chksum;
+  byte chksum = 0xff;
+  int i;
+  for (i = 0; i < len; i++) {
+    chksum ^= cmd[i];
+  }
+  return chksum;
 }
 
 
@@ -156,7 +166,9 @@ static void _stateChanged( iOLocoNet loconet ) {
     wState.setiid( node, data->iid );
     wState.setpower( node, data->power?True:False );
     wState.setprogramming( node, data->pt?True:False );
-    wState.settrackbus( node, data->comm?True:False );
+    wState.settrackbus( node, data->commOK?True:False );
+    wState.setsensorbus( node, data->commOK?True:False );
+    wState.setaccessorybus( node, data->commOK?True:False );
 
     data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
   }
@@ -202,7 +214,7 @@ static int __rwLNOPSW(iOLocoNet loconet, int addr, int type, int opsw, int val, 
 }
 
 
-static int __rwCV(iOLocoNet loconet, int cvnum, int val, byte* cmd, Boolean writeCV, Boolean pom, Boolean direct, int decaddr) {
+static int __rwCV(iOLocoNet loconet, int cvnum, int val, byte* cmd, Boolean writeCV, Boolean pom, int pmode, int decaddr) {
   iOLocoNetData data = Data(loconet);
   int addr  = cvnum-1; /* cvnum is in human readable form; addr is what's sent over loconet */
   int lopsa = decaddr & 0x007F;
@@ -221,8 +233,10 @@ static int __rwCV(iOLocoNet loconet, int cvnum, int val, byte* cmd, Boolean writ
     pcmd = 0x03; /* LPE imples 0x00, but 0x03 is observed */
   }
 
-  if( direct )
+  if( pmode == wProgram.mode_direct )
     pcmd = pcmd | 0x28; /* DIRECTBYTEMODE */
+  else if( pmode == wProgram.mode_register )
+    pcmd = pcmd | 0x30; /* REGISTERMODE */
   else
     pcmd = pcmd | 0x20; /* PAGEBYTEMODE */
 
@@ -286,24 +300,27 @@ static Boolean _transact( iOLocoNet loconet, byte* out, int outsize, byte* in, i
 
       if( in != NULL && insize != NULL ) {
         int retry = 0;
+        in[0] = 0;
         do {
           ThreadOp.sleep(50);
           *insize = data->lnRead( (obj)loconet, in );
           if( *insize > 0 ) {
             data->rcvpkg++;
-            traceLocoNet(in);
+            if( data->monitor )
+              traceLocoNet(in, data->GBM16xn);
             TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "*** transact dump:" );
             TraceOp.dump ( name, TRCLEVEL_BYTE, (char*)in, *insize );
             if( waitforOPC_OK > 0 && in[0] == waitforOPC_OK ) {
               break;
             }
             if( waitforOPC_FAIL > 0 && in[0] == waitforOPC_FAIL ) {
+              ok = False;
               break;
             }
             __evaluatePacket(loconet, in, *insize);
           }
           retry++;
-        } while( retry < 10 );
+        } while( retry < 16 );
       }
     }
     else {
@@ -361,10 +378,24 @@ static void __loconetSensorQuery( void* threadinst ) {
   int k = 0;
 
   if( reportaddr > 0 ) {
+    int dir    = 0;
+    int action = 1;
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "LocoNet Sensor Query started with address %d.", reportaddr );
     cmd[0] = OPC_SW_REQ;
-    cmd[1] = reportaddr&0x7F;
-    cmd[2] = (reportaddr/128)&0x0F;
+    cmd[1]  = (unsigned short int) (reportaddr & 0x007f);
+    cmd[2]  = (unsigned short int) (( reportaddr >> 7) & 0x000f);
+    cmd[2] |= (unsigned short int) ( (dir & 0x0001) << 5);
+    cmd[2] |= (unsigned short int) ( (action & 0x0001) << 4);
+    cmd[3] = LocoNetOp.checksum( cmd, 3 );
+    LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False );
+
+    ThreadOp.sleep(100);
+    action = 0;
+    cmd[0] = OPC_SW_REQ;
+    cmd[1]  = (unsigned short int) (reportaddr & 0x007f);
+    cmd[2]  = (unsigned short int) (( reportaddr >> 7) & 0x000f);
+    cmd[2] |= (unsigned short int) ( (dir & 0x0001) << 5);
+    cmd[2] |= (unsigned short int) ( (action & 0x0001) << 4);
     cmd[3] = LocoNetOp.checksum( cmd, 3 );
     LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False );
   }
@@ -474,6 +505,7 @@ static void __loconetSensorQuery( void* threadinst ) {
   }
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "LocoNet Sensor Query ended." );
+  data->SensorQuery = NULL;
   ThreadOp.base.del(th);
 }
 
@@ -486,7 +518,8 @@ static void __handleLissy(iOLocoNet loconet, byte* msg) {
   int         lissyaddr = msg[4] & 0x7F;
   int         sensdata  = ( msg[6] & 0x7F ) + 128 * ( msg[5] & 0x7F );
   Boolean     dir       = ( msg[3] & 0x20 ) ? True:False;
-  Boolean     wheelcnt  = ( msg[2] & 0x01 ) ? True:False;
+  Boolean     wheelcnt  = ( msg[2] & 0x40 ) ? True:False;
+  char        ident[32];
 
   if( wheelcnt )
     lissyaddr = (msg[4] & 0x7F) + (128 * ( msg[3] & 0x7F ));
@@ -501,19 +534,21 @@ static void __handleLissy(iOLocoNet loconet, byte* msg) {
 
   if(wheelcnt) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "wheelcounter=%d count=%d", lissyaddr, sensdata );
-    wFeedback.setbus( nodeC, wFeedback.fbtype_wheelcounter );
     wFeedback.setfbtype( nodeC, wFeedback.fbtype_wheelcounter );
     wFeedback.setwheelcount( nodeC, sensdata );
   }
   else {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "lissy=%d ident=%d dir=%d", lissyaddr, sensdata, dir );
 
-    wFeedback.setbus( nodeC, wFeedback.fbtype_lissy );
     wFeedback.setfbtype( nodeC, wFeedback.fbtype_lissy );
 
-    wFeedback.setidentifier( nodeC, sensdata );
+    StrOp.fmtb(ident, "%d", sensdata);
+    wFeedback.setidentifier( nodeC, ident );
     wFeedback.setdirection( nodeC, dir );
   }
+
+  if( data->resetLissy )
+    ThreadOp.post( data->lissyReset, NodeOp.base.clone(nodeC) );
 
   data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
 }
@@ -553,9 +588,11 @@ static void __handleTransponding(iOLocoNet loconet, byte* msg) {
   int addr         = ( (msg[1]&0x1F) * 128 ) + msg[2];
   int boardaddr    = addr/16;
   int locoaddr     = 0;
+  Boolean locodirection = False;
   const char* zone = "";
   Boolean present  = False;
   Boolean enter    = (msg[1] & 0x20) != 0 ? True:False;
+  char ident[32];
 
   boardaddr++;
   addr++;
@@ -574,7 +611,15 @@ static void __handleTransponding(iOLocoNet loconet, byte* msg) {
     locoaddr=msg[4];
   else
     locoaddr=msg[3]*128+msg[4];
+    
+  if( data->GBM16xn ) {
+    if (locoaddr&0x1000)
+       locodirection = True;
+    else
+       locodirection = False;
 
+    locoaddr = locoaddr & 0x00FF;
+  }
   switch (type) {
   case OPC_MULTI_SENSE_POWER:
     __powerMultiSenseMessage(loconet, msg);
@@ -594,22 +639,26 @@ static void __handleTransponding(iOLocoNet loconet, byte* msg) {
     iONode nodeC = NodeOp.inst( wFeedback.name(), NULL, ELEMENT_NODE );
 
     wFeedback.setaddr( nodeC, addr );
-    wFeedback.setbus( nodeC, wFeedback.fbtype_transponder );
     wFeedback.setzone( nodeC, zone );
     wFeedback.setfbtype( nodeC, wFeedback.fbtype_transponder );
 
     if( data->iid != NULL )
       wFeedback.setiid( nodeC, data->iid );
 
-    wFeedback.setidentifier( nodeC, locoaddr );
+    if( present ) {
+      StrOp.fmtb(ident, "%d", locoaddr);
+      wFeedback.setidentifier( nodeC, ident );
+      if( data->GBM16xn )
+        wFeedback.setdirection(nodeC, locodirection);
+    }
     wFeedback.setstate( nodeC, present );
 /*
 D0 20 06 7D 01 75
 loconet  0549 Transponder [7] [present] in section [96] zone [D] decoder address [1]
  */
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999,
-        "BDL[%d] RX[%d] zone [%s] reports [%s] of decoder address [%d]",
-        boardaddr, addr, zone, present?"present":"absend", locoaddr );
+        "BDL[%d] RX[%d] zone [%s] reports [%s] of decoder address [%d] direction [%s]" ,
+        boardaddr, addr, zone, present?"present":"absend", locoaddr, data->GBM16xn ? (locodirection? "fwd":"rev"):"-" );
 
     data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
   }
@@ -620,10 +669,7 @@ loconet  0549 Transponder [7] [present] in section [96] zone [D] decoder address
 static void __handleSwitch(iOLocoNet loconet, int addr, int port, int value) {
   iOLocoNetData data = Data(loconet);
 
-  if( value == 0 )
-    return;
-
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sw %d=%s", addr, port?"straight":"thrown" );
+  TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "sw addr=%d port=%d value=%d", addr, port, value );
   {
     /* inform listener: Node3 */
     iONode nodeC = NodeOp.inst( wSwitch.name(), NULL, ELEMENT_NODE );
@@ -635,6 +681,7 @@ static void __handleSwitch(iOLocoNet loconet, int addr, int port, int value) {
       wSwitch.setiid( nodeC, data->iid );
 
     wSwitch.setstate( nodeC, port?"straight":"turnout" );
+    wSwitch.setgatevalue(nodeC, value);
 
     data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
   }
@@ -664,6 +711,7 @@ static void __handleLoco(iOLocoNet loconet, byte* rsp ) {
     wLoc.setthrottleid( nodeC, sthrottleid );
     wLoc.setcmd( nodeC, wLoc.velocity );
     data->listenerFun( data->listenerObj, nodeC, TRCLEVEL_INFO );
+    data->slotV[slot] = spd;
   }
   else if( rsp[0] == OPC_LOCO_DIRF ) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "slot=%d addr=%d dirf=0x%02X id=%d", slot, addr, dirf, throttleid );
@@ -721,32 +769,64 @@ static void __slotPing( void* threadinst ) {
     time_t currtime = time(NULL);
     int i;
 
-    if( MutexOp.trywait( data->slotmux, 500 ) ) {
     /* lookup slot for address: */
-      for( i = 0; i < 120; i++ ) {
-
+    for( i = 0; i < 120 && data->run; i++ ) {
+      if( MutexOp.trywait( data->slotmux, 1000 ) ) {
         if( data->locoslot[i] > 0 && ((currtime - data->slotaccessed[i]) >= (data->purgetime/2)) ) {
-          byte cmd[4];
+          byte* cmd = allocMem( 32 );
           TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sending a ping for slot# %d", i );
 
-          cmd[0] = OPC_LOCO_SPD;
-          cmd[1] = i; /* slot number */
-          cmd[2] = data->slotV[i] & 0x7F;
-          cmd[3] = LocoNetOp.checksum( cmd, 3 );
-          if( LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False ) ) {
-            data->slotaccessed[i] = currtime;
-          }
-        }
-      }
+          cmd[0] = 4;
+          cmd[1] = OPC_LOCO_SPD;
+          cmd[2] = i;
+          cmd[3] = data->slotV[i] & 0x7F;;
+          cmd[4] = LocoNetOp.checksum( cmd+1, 3 );
+          ThreadOp.post( data->loconetWriter, (obj)cmd );
 
-      /* Release the mutex. */
-      MutexOp.post( data->slotmux );
+          data->slotaccessed[i] = currtime;
+
+        }
+        /* Release the mutex. */
+        MutexOp.post( data->slotmux );
+        ThreadOp.sleep(10);
+      }
     }
 
-    ThreadOp.sleep(1000);
+    if( data->run )
+      ThreadOp.sleep(1000);
   };
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "LocoNet slotPing ended." );
+}
+
+
+static void __lissyReset( void* threadinst ) {
+  iOThread th = (iOThread)threadinst;
+  iOLocoNet loconet = (iOLocoNet)ThreadOp.getParm( th );
+  iOLocoNetData data = Data(loconet);
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "LocoNet lissyReset started." );
+
+  while( data->run ) {
+    obj post = ThreadOp.waitPost( th );
+    if( post != NULL ) {
+      iONode node = (iONode)post;
+
+      if( StrOp.equals( "quit", NodeOp.getName( node ) ) ) {
+        node->base.del( node );
+        break;
+      }
+
+      ThreadOp.sleep( 1000 );
+      wFeedback.setstate( node, False );
+      wFeedback.setidentifier( node, "" );
+      data->listenerFun( data->listenerObj, node, TRCLEVEL_INFO );
+
+    }
+
+    ThreadOp.sleep( 10 );
+  };
+
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "LocoNet lissyReset ended." );
 }
 
 
@@ -766,14 +846,17 @@ static void __swReset( void* threadinst ) {
         break;
       }
 
-      ThreadOp.sleep( data->swtime );
+      ThreadOp.sleep( wSwitch.getdelay( node ) > 0 ? wSwitch.getdelay( node ):data->swtime );
       {
         byte cmd[32];
+        byte rsp[32];
         int addr = wSwitch.getaddr1( node );
         int port  = wSwitch.getport1( node );
         int gate = 0;
         int dir  = 1;
         int action = 0;
+        int insize = 0;
+        int retry = 0;
 
         if( port == 0 )
           AddrOp.fromFADA( addr, &addr, &port, &gate );
@@ -793,7 +876,15 @@ static void __swReset( void* threadinst ) {
         cmd[2] |= (unsigned short int) ( (action & 0x0001) << 4);
         cmd[3] = LocoNetOp.checksum( cmd, 3 );
 
-        LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False );
+        while( !LocoNetOp.transact( loconet, cmd, 4, rsp, &insize, 0, OPC_LONG_ACK, False ) && retry < data->swretry) {
+          if( data->swack && insize > 0 && rsp[0] == OPC_LONG_ACK && rsp[1] == (OPC_SW_REQ & 0x7F) && rsp[2] == 0 ) {
+            ThreadOp.sleep(data->swsleep);
+          }
+          else {
+            break;
+          }
+          retry++;
+        }
 
       }
       node->base.del( node );
@@ -947,7 +1038,21 @@ static void __loconetWriter( void* threadinst ) {
       continue;
     }
     /* first byte is the message length */
-    if( !LocoNetOp.transact( (iOLocoNet)loconet, out+1, out[0], NULL, NULL, 0, 0, False ) ) {
+    if( data->swack && out[1] == OPC_SW_REQ ) {
+      byte rsp[32];
+      int insize = 0;
+      int retry = 0;
+      while( !LocoNetOp.transact( (iOLocoNet)loconet, out+1, out[0], rsp, &insize, 0, OPC_LONG_ACK, False ) && retry < data->swretry) {
+        if( insize > 0 && rsp[0] == OPC_LONG_ACK && rsp[1] == (OPC_SW_REQ & 0x7F) && rsp[2] == 0 ) {
+          ThreadOp.sleep(data->swsleep);
+        }
+        else {
+          break;
+        }
+        retry++;
+      }
+    }
+    else if( !LocoNetOp.transact( (iOLocoNet)loconet, out+1, out[0], NULL, NULL, 0, 0, False ) ) {
       /* sleep and send it again? */
     }
 
@@ -988,8 +1093,9 @@ static void __evaluatePacket(iOLocoNet loconet, byte* rsp, int size ) {
   int port = 0;
 
   data->rcvpkg++;
-  traceLocoNet(rsp);
-  TraceOp.trc( name, TRCLEVEL_BYTE, __LINE__, 9999, "*** read dump:" );
+  if( data->monitor )
+    traceLocoNet(rsp, data->GBM16xn);
+
   TraceOp.dump ( name, TRCLEVEL_BYTE, (char*)rsp, size );
 
   switch(rsp[0]) {
@@ -1005,24 +1111,33 @@ static void __evaluatePacket(iOLocoNet loconet, byte* rsp, int size ) {
       data->power = True;
       _stateChanged(loconet);
       if( !data->didSensorQuery && data->doSensorQuery ) {
-        iOThread t =  NULL;
+        char* threadname = StrOp.fmt("sod%X", loconet);
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Start of Day [%s]", data->iid );
+        data->SensorQuery =  ThreadOp.inst( threadname, &__loconetSensorQuery, loconet );
+        StrOp.free(threadname);
         data->didSensorQuery = True;
-        t =  ThreadOp.inst( "lnqGPON", &__loconetSensorQuery, loconet );
-        ThreadOp.start( t );
+        ThreadOp.start( data->SensorQuery );
       }
       __post2SlotServer( loconet, rsp, 2 );
       break;
 
   case OPC_SW_REP: {    // B1
-    int thrown = (rsp[2] & 0x10) >> 4;
-    int closed = (rsp[2] & 0x20) >> 5;
     addr = __address(rsp[1], rsp[2]);
+    value = (rsp[2] & OPC_SW_REP_THROWN) >> 4; // thown
+    port  = (rsp[2] & OPC_SW_REP_CLOSED) >> 5; // closed
+    __handleSensor(loconet, addr+1, value?1:0);
     break;
   }
 
   case OPC_SW_REQ: // B0
     if( !data->serveLConly )
       __post2SlotServer( loconet, rsp, 4 );
+    addr = __address(rsp[1], rsp[2]);
+    value = (rsp[2] & 0x10) >> 4;
+    port  = (rsp[2] & 0x20) >> 5;
+    __handleSwitch(loconet, addr, port, value);
+    break;
+
   case OPC_SW_STATE:    // BC
     addr = __address(rsp[1], rsp[2]);
     value = (rsp[2] & 0x10) >> 4;
@@ -1111,7 +1226,7 @@ static void __evaluatePacket(iOLocoNet loconet, byte* rsp, int size ) {
       wProgram.setvalue( node, val );
       wProgram.setcmd( node, wProgram.datarsp );
       wProgram.setcv( node, cv );
-      wProgram.setdecaddr( node, addr );
+      wProgram.setaddr( node, addr );
       wProgram.setmodid( node, modid );
       if( data->iid != NULL )
         wProgram.setiid( node, data->iid );
@@ -1214,7 +1329,7 @@ static void __evaluatePacket(iOLocoNet loconet, byte* rsp, int size ) {
       wProgram.setvalue( node, val );
       wProgram.setcmd( node, wProgram.datarsp );
       wProgram.setcv( node, cv );
-      wProgram.setdecaddr( node, addr );
+      wProgram.setaddr( node, addr );
       wProgram.setmodid( node, modid );
       if( data->iid != NULL )
         wProgram.setiid( node, data->iid );
@@ -1274,10 +1389,9 @@ static void __evaluatePacket(iOLocoNet loconet, byte* rsp, int size ) {
          */
         TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "System slot data: track = 0x%02X", track );
         if( (track & GTRK_POWER) && (!data->didSensorQuery) ) {
-          iOThread t =  NULL;
           data->didSensorQuery = True;
-          t =  ThreadOp.inst( "lnqCNFG", &__loconetSensorQuery, loconet );
-          ThreadOp.start( t );
+          data->SensorQuery =  ThreadOp.inst( "lnqCNFG", &__loconetSensorQuery, loconet );
+          ThreadOp.start( data->SensorQuery );
         }
       }
     }
@@ -1290,6 +1404,7 @@ static void __evaluatePacket(iOLocoNet loconet, byte* rsp, int size ) {
   }
 
 }
+
 
 static void __loconetReader( void* threadinst ) {
   iOThread th = (iOThread)threadinst;
@@ -1313,7 +1428,19 @@ static void __loconetReader( void* threadinst ) {
     cmd[2]  = 0;
     cmd[3] = LocoNetOp.checksum( cmd, 3 );
     LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False );
+
+    ThreadOp.sleep(100);
+
+    cmd[0] = OPC_RQ_SL_DATA;
+    cmd[1]  = 0; /* dispatch slot */
+    cmd[2]  = 0;
+    cmd[3] = LocoNetOp.checksum( cmd, 3 );
+    LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False );
+
+    if( StrOp.equals( wLocoNet.cs_ibcom, wLocoNet.getcmdstn( data->loconet ) ) )
+      initIBCom(loconet);
   }
+
 
   while( data->run && !data->dummyio ) {
     int available = data->lnAvailable( (obj)loconet);
@@ -1366,7 +1493,7 @@ static void _getSlot(iOLocoNet loconet, int slot, byte wait4opc) {
 }
 
 
-static int __getSlots(iOLocoNet loconet) {
+static void __getSlots(iOLocoNet loconet) {
   iOLocoNetData data = Data(loconet);
   byte cmd[8];
   byte rsp[128];
@@ -1380,7 +1507,7 @@ static int __getSlots(iOLocoNet loconet) {
 }
 
 
-static int __getConfig(iOLocoNet loconet) {
+static void __getConfig(iOLocoNet loconet) {
   iOLocoNetData data = Data(loconet);
   byte cmd[8];
   int i = 0;
@@ -1575,8 +1702,13 @@ static int __getLocoSlot(iOLocoNet loconet, iONode node, int* status) {
           cmd[1] = rsp[2];
           cmd[2] = __setDecoderType( rsp[3], node );
           cmd[3] = LocoNetOp.checksum( cmd, 3 );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set decoder type to %02X", cmd[2] );
           LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False );
         }
+
+        if( StrOp.equals( wLocoNet.cs_ibcom, wLocoNet.getcmdstn( data->loconet ) ) )
+          initIBCom(loconet);
+
 
       }
       else if(rsp[0] == OPC_LONG_ACK) {
@@ -1664,113 +1796,185 @@ static int __setFastClock(iOLocoNet loconet, iONode node, byte* cmd) {
  * Create packet for functions 9-28.
  * Group 3=f9-f12, 4=f13-f16, 5=f17-f20, 6=f21-f24, 7=f25-f28
  */
-static int __processFunctions(iOLocoNet loconet_inst, iONode node, byte* cmd) {
-  int addr  = wFunCmd.getaddr(node);
-  int group = wFunCmd.getgroup(node);
-  int Fn    = 0;
+static int __processFunctions(iOLocoNet loconet_inst, iONode node, byte* cmd, int slot) {
+  iOLocoNetData data = Data(loconet_inst);
+  int addr      = wFunCmd.getaddr(node);
+  int group     = wFunCmd.getgroup(node);
+  int fnchanged = wFunCmd.getfnchanged(node);
+  int Fn        = 0;
 
-  byte REPS  = 0;
-  byte DHI   = 0;
-  byte IM1   = 0;
-  byte IM2   = 0;
-  byte IM3   = 0;
-  byte IM4   = 0;
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "function command for address [%d] in group [%d]", addr, group );
 
-  /* static part of packet */
-  cmd[0] = OPC_IMM_PACKET;
-  cmd[1] = 0x0B;
-  cmd[2] = 0x7F;
-  cmd[9] = 0x00; /* IM5 */
+  if( StrOp.equals( wLocoNet.cs_ibcom, wLocoNet.getcmdstn(data->loconet) ) ||
+      StrOp.equals( wLocoNet.cs_intellibox, wLocoNet.getcmdstn(data->loconet) ) ||
+      StrOp.equals( wDigInt.sublib_ulni, wDigInt.getsublib( data->ini ) ) )
+  {
+    /*
+      addr 24 F9
+          00000000: D4 20 03 07 10 1F
+      addr 200 F9
+          00000000: D4 20 07 07 10 1B
 
-  if( group == 3 ) {
-    Fn |= wFunCmd.isf9 (node)?0x01:0x00;
-    Fn |= wFunCmd.isf10(node)?0x02:0x00;
-    Fn |= wFunCmd.isf11(node)?0x04:0x00;
-    Fn |= wFunCmd.isf12(node)?0x08:0x00;
-    REPS  = (addr < 128) ? 0x24:0x34;
-    DHI   = (addr < 128) ? 0x02:0x04;
-    if( addr < 128 ) {
-      IM2 = 0x20 | (Fn & 0x0F);
-    }
-    else {
-      IM3 = 0x20 | (Fn & 0x0F);
-    }
-  }
+      addr 24 F10
+          00000000: D4 20 03 07 30 3F
+      addr 24 F11
+          00000000: D4 20 03 07 70 7F
+      addr 24 F12 on
+          00000000: D4 20 03 05 10 1D
+      addr 24 F12 off
+          00000000: D4 20 03 05 00 0D
 
-  else if( group == 4 || group == 5 ) {
-    Fn |= wFunCmd.isf13(node)?0x01:0x00;
-    Fn |= wFunCmd.isf14(node)?0x02:0x00;
-    Fn |= wFunCmd.isf15(node)?0x04:0x00;
-    Fn |= wFunCmd.isf16(node)?0x08:0x00;
-    Fn |= wFunCmd.isf17(node)?0x10:0x00;
-    Fn |= wFunCmd.isf18(node)?0x20:0x00;
-    Fn |= wFunCmd.isf19(node)?0x40:0x00;
-    Fn |= wFunCmd.isf20(node)?0x80:0x00;
-    REPS  = (addr < 128) ? 0x34:0x44;
-    DHI   = (addr < 128) ? 0x02:0x04;
-    DHI  |= (Fn & 0x80)  ? 0x40:0x00;
-    if( addr < 128 ) {
-      IM2 = 0x5E;
-      IM3 = Fn & 0x7F;
+     */
+    cmd[0] = OPC_UHLI_FUN;
+    cmd[1] = 0x20;
+    cmd[2] = slot;
+    if( fnchanged > 8 && fnchanged < 12 ) {
+      cmd[3] = 0x07;
+      cmd[4]  = wFunCmd.isf9  (node)?0x10:0x00;;
+      cmd[4] |= wFunCmd.isf10 (node)?0x20:0x00;;
+      cmd[4] |= wFunCmd.isf11 (node)?0x40:0x00;;
+      cmd[5] = LocoNetOp.checksum( cmd, 5 );
+      return 6;
     }
-    else {
-      IM3 = 0x5E;
-      IM4 = Fn & 0x7F;
+    if( fnchanged == 12 || fnchanged == 20 || fnchanged == 28 ) {
+      cmd[3] = 0x05;
+      cmd[4]  = wFunCmd.isf12 (node)?0x10:0x00;;
+      cmd[4] |= wFunCmd.isf20 (node)?0x20:0x00;;
+      cmd[4] |= wFunCmd.isf28 (node)?0x40:0x00;;
+      cmd[5] = LocoNetOp.checksum( cmd, 5 );
+      return 6;
     }
-  }
+    if( fnchanged > 12 && fnchanged < 20 ) {
+      cmd[3] = 0x08;
+      cmd[4]  = wFunCmd.isf13 (node)?0x01:0x00;;
+      cmd[4] |= wFunCmd.isf14 (node)?0x02:0x00;;
+      cmd[4] |= wFunCmd.isf15 (node)?0x04:0x00;;
+      cmd[4] |= wFunCmd.isf16 (node)?0x08:0x00;;
+      cmd[4] |= wFunCmd.isf17 (node)?0x10:0x00;;
+      cmd[4] |= wFunCmd.isf18 (node)?0x20:0x00;;
+      cmd[4] |= wFunCmd.isf19 (node)?0x40:0x00;;
+      cmd[5] = LocoNetOp.checksum( cmd, 5 );
+      return 6;
+    }
+    if( fnchanged > 20 ) {
+      cmd[3] = 0x09;
+      cmd[4]  = wFunCmd.isf21 (node)?0x01:0x00;;
+      cmd[4] |= wFunCmd.isf22 (node)?0x02:0x00;;
+      cmd[4] |= wFunCmd.isf23 (node)?0x04:0x00;;
+      cmd[4] |= wFunCmd.isf24 (node)?0x08:0x00;;
+      cmd[4] |= wFunCmd.isf25 (node)?0x10:0x00;;
+      cmd[4] |= wFunCmd.isf26 (node)?0x20:0x00;;
+      cmd[4] |= wFunCmd.isf27 (node)?0x40:0x00;;
+      cmd[5] = LocoNetOp.checksum( cmd, 5 );
+      return 6;
+    }
 
-  else if( group == 6 || group == 7 ) {
-    Fn |= wFunCmd.isf21(node)?0x01:0x00;
-    Fn |= wFunCmd.isf22(node)?0x02:0x00;
-    Fn |= wFunCmd.isf23(node)?0x04:0x00;
-    Fn |= wFunCmd.isf24(node)?0x08:0x00;
-    Fn |= wFunCmd.isf25(node)?0x10:0x00;
-    Fn |= wFunCmd.isf26(node)?0x20:0x00;
-    Fn |= wFunCmd.isf27(node)?0x40:0x00;
-    Fn |= wFunCmd.isf28(node)?0x80:0x00;
-    REPS  = (addr < 128) ? 0x34:0x44;
-    DHI   = (addr < 128) ? 0x06:0x06;
-    DHI  |= (Fn & 0x80)  ? 0x80:0x00;
-    if( addr < 128 ) {
-      IM2 = 0x5F;
-      IM3 = Fn & 0x7F;
-    }
-    else {
-      IM3 = 0x5F;
-      IM4 = Fn & 0x7F;
-    }
-  }
-
-
-  if( addr < 128 ) {
-    cmd[3] = REPS;  /* REPS */
-    cmd[4] = DHI;   /* DHI  */
-    cmd[5] = addr;  /* IM1  */
-    cmd[6] = IM2;   /* IM2 */
-    cmd[7] = IM3;   /* IM3  */
-    cmd[8] = IM4;   /* IM4  */
   }
   else {
-    cmd[3] = REPS;  /* REPS */
-    cmd[4] = DHI;   /* DHI  */
+    byte REPS  = 0;
+    byte DHI   = 0;
+    byte IM1   = 0;
+    byte IM2   = 0;
+    byte IM3   = 0;
+    byte IM4   = 0;
 
-    if( ((addr / 256) + 192) & 0x80 > 0 )
-      cmd[4] |= 0x01;
+    /* static part of packet */
+    cmd[0] = OPC_IMM_PACKET;
+    cmd[1] = 0x0B;
+    cmd[2] = 0x7F;
+    cmd[9] = 0x00; /* IM5 */
 
-    if( ((addr % 256) & 0x80) > 0 )
-      cmd[4] |= 0x02;
+    if( group == 3 ) {
+      Fn |= wFunCmd.isf9 (node)?0x01:0x00;
+      Fn |= wFunCmd.isf10(node)?0x02:0x00;
+      Fn |= wFunCmd.isf11(node)?0x04:0x00;
+      Fn |= wFunCmd.isf12(node)?0x08:0x00;
+      REPS  = (addr < 128) ? 0x24:0x34;
+      DHI   = (addr < 128) ? 0x02:0x04;
+      if( addr < 128 ) {
+        IM2 = 0x20 | (Fn & 0x0F);
+      }
+      else {
+        IM3 = 0x20 | (Fn & 0x0F);
+      }
+    }
 
-    cmd[5] = ((addr / 256) + 192) & 0x7F; /* IM1 */
-    cmd[6] = (addr % 256) & 0x7F;         /* IM2 */
-    cmd[7] = IM3;   /* IM3 */
-    cmd[8] = IM4;   /* IM4  */
+    else if( group == 4 || group == 5 ) {
+      Fn |= wFunCmd.isf13(node)?0x01:0x00;
+      Fn |= wFunCmd.isf14(node)?0x02:0x00;
+      Fn |= wFunCmd.isf15(node)?0x04:0x00;
+      Fn |= wFunCmd.isf16(node)?0x08:0x00;
+      Fn |= wFunCmd.isf17(node)?0x10:0x00;
+      Fn |= wFunCmd.isf18(node)?0x20:0x00;
+      Fn |= wFunCmd.isf19(node)?0x40:0x00;
+      Fn |= wFunCmd.isf20(node)?0x80:0x00;
+      REPS  = (addr < 128) ? 0x34:0x44;
+      DHI   = (addr < 128) ? 0x02:0x04;
+      DHI  |= (Fn & 0x80)  ? 0x40:0x00;
+      if( addr < 128 ) {
+        IM2 = 0x5E;
+        IM3 = Fn & 0x7F;
+      }
+      else {
+        IM3 = 0x5E;
+        IM4 = Fn & 0x7F;
+      }
+    }
+
+    else if( group == 6 || group == 7 ) {
+      Fn |= wFunCmd.isf21(node)?0x01:0x00;
+      Fn |= wFunCmd.isf22(node)?0x02:0x00;
+      Fn |= wFunCmd.isf23(node)?0x04:0x00;
+      Fn |= wFunCmd.isf24(node)?0x08:0x00;
+      Fn |= wFunCmd.isf25(node)?0x10:0x00;
+      Fn |= wFunCmd.isf26(node)?0x20:0x00;
+      Fn |= wFunCmd.isf27(node)?0x40:0x00;
+      Fn |= wFunCmd.isf28(node)?0x80:0x00;
+      REPS  = (addr < 128) ? 0x34:0x44;
+      DHI   = (addr < 128) ? 0x06:0x06;
+      DHI  |= (Fn & 0x80)  ? 0x80:0x00;
+      if( addr < 128 ) {
+        IM2 = 0x5F;
+        IM3 = Fn & 0x7F;
+      }
+      else {
+        IM3 = 0x5F;
+        IM4 = Fn & 0x7F;
+      }
+    }
+
+
+    if( addr < 128 ) {
+      cmd[3] = REPS;  /* REPS */
+      cmd[4] = DHI;   /* DHI  */
+      cmd[5] = addr;  /* IM1  */
+      cmd[6] = IM2;   /* IM2 */
+      cmd[7] = IM3;   /* IM3  */
+      cmd[8] = IM4;   /* IM4  */
+    }
+    else {
+      cmd[3] = REPS;  /* REPS */
+      cmd[4] = DHI;   /* DHI  */
+
+      if( (((addr / 256) + 192) & 0x80) > 0 )
+        cmd[4] |= 0x01;
+
+      if( ((addr % 256) & 0x80) > 0 )
+        cmd[4] |= 0x02;
+
+      cmd[5] = ((addr / 256) + 192) & 0x7F; /* IM1 */
+      cmd[6] = (addr % 256) & 0x7F;         /* IM2 */
+      cmd[7] = IM3;   /* IM3 */
+      cmd[8] = IM4;   /* IM4  */
+    }
+
+
+    cmd[10] = LocoNetOp.checksum( cmd, 10 );
+    return 11;
   }
 
-
-  cmd[10] = LocoNetOp.checksum( cmd, 10 );
-  return 11;
+  return 0;
 }
 
 
@@ -1797,6 +2001,16 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
     *delnode = False;
     return 0;
   }
+
+  /* BinState command. */
+  else if( StrOp.equals( NodeOp.getName( node ), wBinStateCmd.name() ) ) {
+    int addr = wBinStateCmd.getaddr( node );
+    int nr   = wBinStateCmd.getnr( node );
+    int val  = wBinStateCmd.getdata( node );
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "binary state addr=%d nr=%d val=%d", addr, nr, val );
+    return binaryStateLN(cmd, addr, nr, val);
+  }
+
   /* Switch command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSwitch.name() ) ) {
     int addr = wSwitch.getaddr1( node );
@@ -1804,6 +2018,11 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
     int gate = wSwitch.getgate1( node );
     int dir  = 1;
     int action = 1;
+
+    if( addr == 0 && port == 0 ) {
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "not processing zero address and port");
+      return 0;
+    }
 
     if( port == 0 )
       AddrOp.fromFADA( addr, &addr, &port, &gate );
@@ -1849,6 +2068,11 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
     int gate = wOutput.getgate( node );
     int action = StrOp.equals( wOutput.getcmd( node ), wOutput.on ) ? 0x01:0x00;
 
+    if( addr == 0 && port == 0 ) {
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "not processing zero address and port");
+      return 0;
+    }
+
     if( port == 0 )
       AddrOp.fromFADA( addr, &addr, &port, &gate );
     else if( addr == 0 && port > 0 )
@@ -1869,9 +2093,23 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
 
   /* Function command groups > 1 */
   else if( StrOp.equals( NodeOp.getName( node ), wFunCmd.name() ) && wFunCmd.getgroup(node) > 2 ) {
-    return __processFunctions(loconet_inst, node, cmd);
+    if( MutexOp.trywait( data->slotmux, 1000 ) ) {
+      int status = 0;
+      int slot = __getLocoSlot( loconet_inst, node, &status);
+      int size = __processFunctions(loconet_inst, node, cmd, slot);
+      /* Release the mutex. */
+      MutexOp.post( data->slotmux );
+      return size;
+    }
   }
 
+
+  /* Function command > 100. */
+  else if( StrOp.equals( NodeOp.getName( node ), wFunCmd.name()) && wFunCmd.getfnchanged(node) > 100 ) {
+    TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "(function > 100) binary state addr=%d nr=%d val=%d",
+        wFunCmd.getaddr(node), wFunCmd.getfnchanged(node)-100, wFunCmd.isfnchangedstate(node)?1:0 );
+    return binaryStateLN(cmd, wFunCmd.getaddr(node), wFunCmd.getfnchanged(node)-100, wFunCmd.isfnchangedstate(node)?1:0);
+  }
 
   /* Loc command. */
   else if( StrOp.equals( NodeOp.getName( node ), wLoc.name() ) ||
@@ -1883,6 +2121,14 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
     if( MutexOp.trywait( data->slotmux, 1000 ) ) {
 
       slot =  __getLocoSlot( loconet_inst, node, &status);
+
+      if( wDigInt.isrestricted( data->ini ) ) {
+        TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
+            "Restricted functionality due to missing valid support key; Loco command ignored for %s.", wLoc.getid(node) );
+        /* Release the mutex. */
+        MutexOp.post( data->slotmux );
+        return 0;
+      }
 
       if( slot > 0 && StrOp.equals( wLoc.dispatch, wLoc.getcmd(node) ) ) {
         /* set as purged: */
@@ -1942,7 +2188,7 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
           cmd[3] = V;
           cmd[4] = LocoNetOp.checksum( cmd+1, 3 );
 
-          byte* bcmd = allocMem( 32 );
+          byte* bcmd = allocMem( 64 );
           MemOp.copy( bcmd, cmd, 32 );
           ThreadOp.prioPost( data->loconetWriter, (obj)bcmd, high );
         }
@@ -1954,7 +2200,7 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
           cmd[3] = dirf;
           cmd[4] = LocoNetOp.checksum( cmd+1, 3 );
 
-          byte* bcmd = allocMem( 32 );
+          byte* bcmd = allocMem( 64 );
           MemOp.copy( bcmd, cmd, 32 );
           ThreadOp.prioPost( data->loconetWriter, (obj)bcmd, high );
         }
@@ -1977,7 +2223,7 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
   /* System command. */
   else if( StrOp.equals( NodeOp.getName( node ), wSysCmd.name() ) ) {
     const char* cmdstr = wSysCmd.getcmd( node );
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "SysCmd %s", cmdstr );
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "SysCmd %s", cmdstr );
 
     if( StrOp.equals( cmdstr, wSysCmd.stop ) ) {
       if( !wLocoNet.isignorepowercmds(data->loconet) || !data->powerison ) {
@@ -2009,6 +2255,19 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
       cmd[1] = LocoNetOp.checksum( cmd, 1 );
       return 2;
     }
+    if( StrOp.equals( cmdstr, wSysCmd.sod ) ) {
+      if( data->SensorQuery == NULL ) {
+        char* threadname = StrOp.fmt("sod%X", loconet_inst);
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Start of Day [%s]", data->iid );
+        data->SensorQuery =  ThreadOp.inst( threadname, &__loconetSensorQuery, loconet_inst );
+        StrOp.free(threadname);
+        ThreadOp.start( data->SensorQuery );
+      }
+      else {
+        TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "Start of Day is already running [%s]", data->iid );
+      }
+      return 0;
+    }
     if( StrOp.equals( cmdstr, wSysCmd.slots ) ) {
       __getSlots(loconet_inst);
       return 0;
@@ -2030,6 +2289,16 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
   else if( StrOp.equals( NodeOp.getName( node ), wProgram.name() ) ) {
     if(  wProgram.getcmd( node ) == wProgram.ptstat ) {
       return 0;
+    }
+    else if(  wProgram.getcmd( node ) == wProgram.raw ) {
+      int len = StrOp.len(wProgram.getstrval1(node)) / 2;
+      byte* l_cmd = StrOp.strToByte(wProgram.getstrval1(node));
+      int i = 0;
+      TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "raw command[%s] len=%d", wProgram.getstrval1(node), len );
+      for( i = 0; i < len; i++ )
+        cmd[i] = l_cmd[i];
+      freeMem(l_cmd);
+      return len;
     }
     else if(  wProgram.getcmd( node ) == wProgram.pton ) {
       /* if cs == ibcom */
@@ -2057,12 +2326,11 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
       int decaddr = wProgram.getdecaddr( node );
       int addr = decaddr == 0 ? wProgram.getaddr( node ):decaddr;
       Boolean pom = wProgram.ispom( node );
-      Boolean direct = wProgram.isdirect( node );
       int size = 0;
       if( StrOp.equals( wLocoNet.cs_ibcom, wLocoNet.getcmdstn( data->loconet ) ) )
         size = makeIBComCVPacket( cv, 0, cmd, False);
       else
-        size = __rwCV(loconet_inst, cv, 0, cmd, False, pom, direct, addr);
+        size = __rwCV(loconet_inst, cv, 0, cmd, False, pom, wProgram.getmode(node), addr);
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "get CV%d of %d (ops=%d)...", cv, addr, pom );
       return size;
     }
@@ -2072,12 +2340,11 @@ static int __translate( iOLocoNet loconet_inst, iONode node, byte* cmd, Boolean*
       int decaddr = wProgram.getdecaddr( node );
       int addr = decaddr == 0 ? wProgram.getaddr( node ):decaddr;
       Boolean pom = wProgram.ispom( node );
-      Boolean direct = wProgram.isdirect( node );
       int size = 0;
       if( StrOp.equals( wLocoNet.cs_ibcom, wLocoNet.getcmdstn( data->loconet ) ) )
         size = makeIBComCVPacket( cv, value, cmd, True);
       else
-        size = __rwCV(loconet_inst, cv, value, cmd, True, pom, direct, addr);
+        size = __rwCV(loconet_inst, cv, value, cmd, True, pom, wProgram.getmode(node), addr);
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set CV%d to %d of %d (ops=%d)...", cv, value, addr, pom );
       return size;
     }
@@ -2163,6 +2430,7 @@ static void __writeStatus( iOLocoNet loconet, int slot, byte status, int statusf
   cmd[1] = slot;
   cmd[2] = (status&~LOCOSTAT_MASK)|statusflag;
   cmd[3] = LocoNetOp.checksum( cmd, 3 );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set decoder type to %02X", cmd[2] );
   LocoNetOp.transact( loconet, cmd, 4, NULL, NULL, 0, 0, False );
 }
 
@@ -2190,8 +2458,9 @@ int makereqDispatch(iOLocoNetData data, byte *msg, int slot, iONode node, int st
     msg[3] = (status&~LOCOSTAT_MASK)|LOCO_COMMON;
     msg[4] = LocoNetOp.checksum( msg+1, 3 );
 
-    byte* bcmd = allocMem( 32 );
+    byte* bcmd = allocMem( 64 );
     MemOp.copy( bcmd, msg, 32 );
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "set decoder type to %02X", msg[3] );
     ThreadOp.prioPost( data->loconetWriter, (obj)bcmd, high );
   }
 
@@ -2207,7 +2476,7 @@ int makereqDispatch(iOLocoNetData data, byte *msg, int slot, iONode node, int st
 
 
 
-static __writeSlotData(byte* cmd, int slot, int addr, int V, int dirf) {
+static void __writeSlotData(byte* cmd, int slot, int addr, int V, int dirf) {
   cmd[ 0] = OPC_WR_SL_DATA;
   cmd[ 1] = 0x0E; /* message length */
   cmd[ 2] = slot; /* slot number */
@@ -2228,7 +2497,7 @@ static __writeSlotData(byte* cmd, int slot, int addr, int V, int dirf) {
 /**  */
 static iONode _cmd( obj inst ,const iONode cmd ) {
   iOLocoNetData data = Data(inst);
-  char out[256];
+  byte out[256];
   Boolean delnode = True;
 
   if( !data->commOK ) {
@@ -2259,9 +2528,8 @@ static iONode _cmd( obj inst ,const iONode cmd ) {
 
 
 /**  */
-static void _halt( obj inst, Boolean poweroff ) {
+static void _halt( obj inst, Boolean poweroff, Boolean shutdown ) {
   iOLocoNetData data = Data(inst);
-  data->run = False;
   if( data->swReset != NULL ) {
     iONode quitNode = NodeOp.inst( "quit", NULL, ELEMENT_NODE );
     ThreadOp.post( data->swReset, (obj)quitNode );
@@ -2273,7 +2541,7 @@ static void _halt( obj inst, Boolean poweroff ) {
   }
   else {
     if( wDigInt.ispoweroffexit(data->ini) || poweroff ) {
-      byte* bcmd = allocMem(32);
+      byte* bcmd = allocMem(64);
       bcmd[0] = 2;
       bcmd[1] = wLocoNet.isuseidle(data->loconet)?OPC_IDLE:OPC_GPOFF;
       bcmd[2] = LocoNetOp.checksum( bcmd+1, 1 );
@@ -2286,7 +2554,9 @@ static void _halt( obj inst, Boolean poweroff ) {
     }
 
   }
-  ThreadOp.sleep(500); /* time for the last commands to send */
+  ThreadOp.sleep(400); /* time for the last commands to send */
+  data->run = False;
+  ThreadOp.sleep(100); /* time for the last commands to send */
   data->lnDisconnect(inst);
   return;
 }
@@ -2345,8 +2615,9 @@ static int _version( obj inst ) {
 static void __initLocoSlots( iOLocoNet loconet ) {
   iOLocoNetData data = Data(loconet);
   int i = 0;
-  for( i = 0; i < 256; i++ ) {
+  for( i = 0; i < 128; i++ ) {
     data->locoslot[i] = 0;
+    data->locothrottle[i] = 0;
   }
 }
 
@@ -2401,6 +2672,12 @@ static struct OLocoNet* _inst( const iONode ini ,const iOTrace trc ) {
   data->serveLConly = wLNSlotServer.islconly(data->slotserver);
   data->doSensorQuery = wLocoNet.issensorquery(data->loconet);
   data->stress = wDigInt.isstress(ini);
+  data->swack = wLocoNet.isswack(data->loconet);
+  data->swretry = wLocoNet.getswretry(data->loconet);
+  data->swsleep = wLocoNet.getswsleep(data->loconet);
+  data->resetLissy = wLocoNet.isresetlissy(data->loconet);
+  data->GBM16xn = wLocoNet.isGBM16xn(data->loconet);
+  data->monitor = wLocoNet.ismonitor(data->loconet);
 
   data->didSensorQuery = False;
 
@@ -2418,8 +2695,9 @@ static struct OLocoNet* _inst( const iONode ini ,const iOTrace trc ) {
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "----------------------------------------" );
   }
 
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid     =%s", wDigInt.getiid( ini ) != NULL ? wDigInt.getiid( ini ):"" );
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sublib  =%s", wDigInt.getsublib( ini ) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "iid        = %s", wDigInt.getiid( ini ) != NULL ? wDigInt.getiid( ini ):"" );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "sublib     = %s", wDigInt.getsublib( ini ) );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "restricted = %s", wDigInt.isrestricted( data->ini ) ? "yes":"no" );
 
   /* choose interface: */
   if( StrOp.equals( wDigInt.sublib_socket, wDigInt.getsublib( ini ) ) ) {
@@ -2479,34 +2757,52 @@ static struct OLocoNet* _inst( const iONode ini ,const iOTrace trc ) {
 
   data->commOK = data->lnConnect((obj)__LocoNet);
 
-  if( data->commOK ) {
+  if( data->commOK) {
+    char* threadname = NULL;
     if( data->stress ) {
-      data->stressRunner = ThreadOp.inst( "lnstress", &__stressRunner, __LocoNet );
+      threadname = StrOp.fmt("lnstress%X", __LocoNet);
+      data->stressRunner = ThreadOp.inst( threadname, &__stressRunner, __LocoNet );
+      StrOp.free(threadname);
       ThreadOp.start( data->stressRunner );
     }
 
-    data->loconetReader = ThreadOp.inst( "lnreader", &__loconetReader, __LocoNet );
+    threadname = StrOp.fmt("lnreader%X", __LocoNet);
+    data->loconetReader = ThreadOp.inst( threadname, &__loconetReader, __LocoNet );
+    StrOp.free(threadname);
     ThreadOp.start( data->loconetReader );
 
-    data->loconetWriter = ThreadOp.inst( "lnwriter", &__loconetWriter, __LocoNet );
+    threadname = StrOp.fmt("lnwriter%X", __LocoNet);
+    data->loconetWriter = ThreadOp.inst( threadname, &__loconetWriter, __LocoNet );
+    StrOp.free(threadname);
     ThreadOp.start( data->loconetWriter );
 
-    data->swReset = ThreadOp.inst( "swreset", &__swReset, __LocoNet );
+    threadname = StrOp.fmt("swreset%X", __LocoNet);
+    data->swReset = ThreadOp.inst( threadname, &__swReset, __LocoNet );
+    StrOp.free(threadname);
     ThreadOp.start( data->swReset );
 
+    threadname = StrOp.fmt("lissyreset%X", __LocoNet);
+    data->lissyReset = ThreadOp.inst( threadname, &__lissyReset, __LocoNet );
+    StrOp.free(threadname);
+    ThreadOp.start( data->lissyReset );
+
     if( data->purgetime > 0 && wLocoNet.isslotping(data->loconet) ) {
-      data->slotPing = ThreadOp.inst( "slotping", &__slotPing, __LocoNet );
+      threadname = StrOp.fmt("slotping%X", __LocoNet);
+      data->slotPing = ThreadOp.inst( threadname, &__slotPing, __LocoNet );
+      StrOp.free(threadname);
       ThreadOp.start( data->slotPing );
     }
 
     if( data->activeSlotServer ) {
-      data->slotServer = ThreadOp.inst( "slotsrvr", &lnmasterThread, __LocoNet );
+      threadname = StrOp.fmt("slotsrvr%X", __LocoNet);
+      data->slotServer = ThreadOp.inst( threadname, &lnmasterThread, __LocoNet );
+      StrOp.free(threadname);
       ThreadOp.start( data->slotServer );
     }
 
     if( data->initPacket[0] > 0 ) {
       byte* bcmd = allocMem( 128 );
-      MemOp.copy( bcmd, data->initPacket, data->initPacket[0] );
+      MemOp.copy( bcmd, data->initPacket, min(data->initPacket[0],127) );
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Send %d byte init packet", data->initPacket[0] & 0xFF );
       ThreadOp.prioPost( data->loconetWriter, (obj)bcmd, high );
     }

@@ -1,8 +1,8 @@
 /*
- * png2wx.c
- *
- *  Created on: Oct 23, 2009
- *      Author: rob
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
  */
 
 /* ------------------------------------------------------------

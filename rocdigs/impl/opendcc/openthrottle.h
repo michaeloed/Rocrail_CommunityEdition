@@ -1,8 +1,8 @@
 /*
- * openthrottle.h
- *
- *  Created on: 14.10.2008
- *      Author: jmf
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
  */
 
 #ifndef OPENTHROTTLE_H_

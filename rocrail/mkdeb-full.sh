@@ -76,9 +76,9 @@ fi
 
 if [ ! $4 ] || [ "$4" = "auto" ]; then
   echo "Getting Bazaar revision number..."
-  if which bzr > /dev/null
+  if which git > /dev/null
   then
-    BAZAARREVNO=`bzr revno`
+    BAZAARREVNO=`git rev-list --count HEAD`
     echo "    Revision number is $BAZAARREVNO"
     echo ""
   else
@@ -87,6 +87,11 @@ if [ ! $4 ] || [ "$4" = "auto" ]; then
     echo ""
   fi
 fi
+
+sed s/\<BZR\>/$BAZAARREV/ < ../rocrail/package/control.template > ../rocrail/package/control.tmp
+sed s/\<ARCH\>/$ARCH/ < ../rocrail/package/control.tmp > ../rocrail/package/control
+rm ../rocrail/package/control.tmp
+
 
 # Check and/or set distribution
 
@@ -110,7 +115,7 @@ echo ""
 
 # Show the user the filename being built
 
-PACKAGENAME="rocrail-setup-$VERSION.$PATCH-rev$BAZAARREVNO-$RELEASNAME-$DIST-$ARCH.deb"
+PACKAGENAME="rocrail-$BAZAARREVNO-$DIST-$ARCH.deb"
 echo "Building $PACKAGENAME in ../package/"
 if [ $DEBUGFLAG = 1 ]; then
   echo "  -- Building a debug package"
@@ -171,7 +176,8 @@ mkdir -p debian/usr/libexec/rocrail
 mkdir -p debian/usr/share/rocrail
 mkdir -p debian/usr/share/rocrail/default
 mkdir -p debian/usr/share/rocrail/stylesheets
-mkdir -p debian/usr/share/rocrail/symbols
+mkdir -p debian/usr/share/rocrail/decspecs
+mkdir -p debian/usr/share/rocrail/web
 mkdir -p debian/usr/share/rocrail/images
 mkdir -p debian/usr/share/pixmaps
 
@@ -186,7 +192,7 @@ echo ""
 
 echo "Copying objects and libraries..."
 
-cp ../rocrail/package/control-$ARCH debian/DEBIAN/control
+cp ../rocrail/package/control debian/DEBIAN/control
 
 cp ../unxbin/rocrail debian/usr/libexec/rocrail
 cp ../unxbin/rocview debian/usr/libexec/rocrail
@@ -245,10 +251,11 @@ cp -u ../rocrail/package/plan.xml debian/usr/share/rocrail/default
 
 cp ../rocrail/package/rocraild.png debian/usr/share/pixmaps
 cp ../rocrail/package/rocrail.xpm debian/usr/share/pixmaps
-cp -R ../stylesheets/*.* debian/usr/share/rocrail/stylesheets
+cp -R ../stylesheets/* debian/usr/share/rocrail/stylesheets
+cp -R ../decspecs/* debian/usr/share/rocrail/decspecs
 cp -R ../rocview/svg/* debian/usr/share/rocrail/svg
-cp -R ../rocrail/symbols/*.* debian/usr/share/rocrail/symbols
-cp -R ../rocrail/package/images/*.* debian/usr/share/rocrail/images
+cp -R ../rocrail/impl/web/html/* debian/usr/share/rocrail/web
+cp -R ../rocrail/package/images/* debian/usr/share/rocrail/images
 
 cp -R ../COPYING debian/usr/share/rocrail
 
@@ -259,7 +266,7 @@ echo ""
 
 echo "Building debian package..."
 
-dpkg-deb --build debian
+fakeroot dpkg-deb --build debian
 
 echo "    Done"
 echo ""

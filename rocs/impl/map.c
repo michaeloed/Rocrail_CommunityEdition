@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -113,7 +116,7 @@ static void __addMapItem( iOMapData data, const char* k, obj o ) {
   /* remove object with the same key if exist */
   __findMapItem(data, k, &keyfound );
   if( keyfound ) {
-    TraceOp.println( "replace existing object with key [%s]", k );
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "replace existing object with key [%s]", k );
     __removeMapItem(data, k);
   }
 

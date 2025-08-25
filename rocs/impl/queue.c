@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -143,7 +146,7 @@ static Boolean _post( iOQueue inst, obj po, q_prio prio ) {
     EventOp.set( data->evt );
   }
   else {
-    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999,
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
         "QueueOp.post: count(%d) is getting bigger than size(%d)! Post rejected for [%s].",
         data->count, data->size, data->desc==NULL?"":data->desc );
   }

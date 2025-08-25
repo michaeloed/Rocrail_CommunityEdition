@@ -1,7 +1,7 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2010 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -87,7 +87,7 @@ static void __writer( void* threadinst ) {
         freeMem( post);
 
         TraceOp.dump ( "lbtcpw", TRCLEVEL_BYTE, (char*)out, outlen );
-        ok = SocketOp.write( data->rwTCP, out, outlen );
+        ok = SocketOp.write( data->rwTCP, (char*)out, outlen );
       }
     }
     ThreadOp.sleep(10);
@@ -120,7 +120,7 @@ static void __reader( void* threadinst ) {
 
     do {
 
-      ok = SocketOp.read( data->rwTCP, &c, 1 );
+      ok = SocketOp.read( data->rwTCP, (char*)&c, 1 );
       if(ok && c < 0x80) {
         ThreadOp.sleep(10);
         bucket[garbage] = c;
@@ -159,7 +159,7 @@ static void __reader( void* threadinst ) {
           index = 1;
           break;
       case 0xe0:
-        SocketOp.read( data->rwTCP, &c, 1);
+        SocketOp.read( data->rwTCP, (char*)&c, 1);
           msg[1] = c;
           index = 2;
           msglen = c;
@@ -173,7 +173,7 @@ static void __reader( void* threadinst ) {
 
       TraceOp.trc( "lbtcpr", TRCLEVEL_DEBUG, __LINE__, 9999, "message 0x%02X length=%d", msg[0], msglen );
 
-      ok = SocketOp.read( data->rwTCP, &msg[index], msglen - index);
+      ok = SocketOp.read( data->rwTCP, (char*)&msg[index], msglen - index);
 
       if( ok ) {
         if( MutexOp.trywait( data->udpmux, 10 ) ) {

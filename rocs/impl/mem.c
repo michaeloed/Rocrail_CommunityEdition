@@ -1,7 +1,10 @@
 /*
  Rocs - OS independent C library
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public License
@@ -35,6 +38,8 @@ static long m_lAllocatedSize = 0;
 static long m_lAllocatedID[RocsLASTID];
 static struct __OMemTrace mt;
 static iOMutex mux = NULL;
+#define MAXSTRINGS 100
+static void* m_Strings[MAXSTRINGS];
 /*
  ***** _Public functions.
  */
@@ -53,15 +58,15 @@ static void _mem_init( void ) {
 static char __opStr[1024];
 static const char* _mem_getLastOperation( void ) {
   const char* op = "?";
-  if( mt.type = MEMTYPE_ALLOC )
+  if( mt.type == MEMTYPE_ALLOC )
     op = "alloc";
-  else if( mt.type = MEMTYPE_FREE )
+  else if( mt.type == MEMTYPE_FREE )
     op = "free";
-  else if( mt.type = MEMTYPE_CHECK )
+  else if( mt.type == MEMTYPE_CHECK )
     op = "check";
-  else if( mt.type = MEMTYPE_REALLOC )
+  else if( mt.type == MEMTYPE_REALLOC )
     op = "realloc";
-  sprintf( __opStr, ">>>>> memLastOp: op=%s p=0x%08X file=%s line=%d <<<<<", op, mt.p, mt.file, mt.line );
+  sprintf( __opStr, ">>>>> memLastOp: op=%s p=0x%lX file=%s line=%d <<<<<", op, (unsigned long)mt.p, mt.file, mt.line );
   return __opStr;
 }
 
@@ -73,7 +78,7 @@ static Boolean __isMemValid( char* p, const char* file, int line, long* size, in
     mt.file = file;
     mt.p    = p;
     if( memcmp( m->magic, __magic, MAGIC_SIZE ) != 0 ) {
-      printf( ">>>>> Unknown memory block( 0x%08X ) %s:%d <<<<<\n", m, file, line );
+      printf( ">>>>> Unknown memory block( 0x%lX ) %s:%d <<<<<\n", (unsigned long)m, file, line );
       return False;
     }
     else if( m->id != id ) {
@@ -167,7 +172,7 @@ static void* __mem_realloc_magic( char* p, long newsize, const char* file, int l
     }
   }
   else {
-    printf( ">>>>> realloc( 0x%08X, %ld ) with NULL pointer! %s:%d <<<<<\n", p, newsize, file, line );
+    printf( ">>>>> realloc( 0x%lX, %ld ) with NULL pointer! %s:%d <<<<<\n", (unsigned long)p, newsize, file, line );
     return __mem_alloc_magic( newsize, file, line, -1 );
   }
   return NULL;
@@ -198,26 +203,49 @@ static void _mem_resetDump(void) {
   memset( m_lAllocatedID, 0L, sizeof( m_lAllocatedID ) );
 }
 
+
+static void _dumpStrings(void) {
+  RocsMemID id = RocsStrID;
+  if( id == RocsStrID ) {
+    int i = 0;
+    for( i = 0; i < MAXSTRINGS; i++ ) {
+      if( m_Strings[i] != NULL ) {
+        printf("***DUMP STRING[%d]: [%s]\n", i, (char*)m_Strings[i]);
+      }
+    }
+  }
+}
+
 static void* _mem_alloc( long size, const char* file, int line ) {
   void* mp = __mem_alloc_magic( size, file, line, -1 );
   if( mp == NULL ) {
-    printf( "__mem_alloc_magic(%d) failed!", size );
+    printf( "__mem_alloc_magic(%ld) failed!", size );
   }
   if( m_bDebug )
-    printf( " 0x%08X = allocMem( %d ) %s line=%d\n", mp, size, file, line );
+    printf( " 0x%lX = allocMem( %ld ) %s line=%d\n", (unsigned long)mp, size, file, line );
   return mp;
 }
 
 static void* _mem_allocTID( long size, int id, const char* file, int line ) {
   void* p = __mem_alloc_magic( size, file, line, id );
   if( p == NULL ) {
-    printf( "__mem_alloc_magic(%d) failed!", size );
+    printf( "__mem_alloc_magic(%ld) failed!", size );
   }
   if( id == -1 ) {
-    printf( " allicIDMem( 0x%08X, %d ) %s line=%d: id -1 not allowed!!!\n", p, size, file, line );
+    printf( " allicIDMem( 0x%lX, %ld ) %s line=%d: id -1 not allowed!!!\n", (unsigned long)p, size, file, line );
   }
   /*if( m_bDebug )
     printf( " 0x%08X = allocIDMem( 0x%08X ) %s line=%d\n", p, size, file, line );*/
+
+  if( id == RocsStrID ) {
+    int i = 0;
+    for( i = 0; i < MAXSTRINGS; i++ ) {
+      if( m_Strings[i] == NULL ) {
+        m_Strings[i] = p;
+        break;
+      }
+    }
+  }
 
   return p;
 }
@@ -225,7 +253,7 @@ static void* _mem_allocTID( long size, int id, const char* file, int line ) {
 static void* _mem_realloc( void* p, long size, const char* file, int line ) {
   void* mp = __mem_realloc_magic( p, size, file, line );
   if( mp == NULL ) {
-    printf( "__mem_realloc_magic(%08X, %d) failed!", p, size );
+    printf( "__mem_realloc_magic(0x%lX, %ld) failed!", (unsigned long)p, size );
   }
   /*if( m_bDebug )
     printf( " 0x%08X = reallocMem( 0x%08X, %d ) %s line=%d\n", p, p2, size, file, line );*/
@@ -237,15 +265,28 @@ static void _mem_free( void* p, const char* file, int line ) {
     __mem_free_magic( p, file, line, -1 );
   }
   if( m_bDebug )
-    printf( " freeMem( 0x%08X ) %s line=%d\n", p, file, line );
+    printf( " freeMem( 0x%lX ) %s line=%d\n", (unsigned long)p, file, line );
 }
 
 static void _mem_freeTID( void* p, int id, const char* file, int line ) {
   if( id == -1 && p!= NULL ) {
-    printf( " freeIDMem( 0x%08X ) %s line=%d: id -1 not allowed!!!\n", p, file, line );
+    printf( " freeIDMem( 0x%lX ) %s line=%d: id -1 not allowed!!!\n", (unsigned long)p, file, line );
   }
   /*if( m_bDebug )
     printf( " freeMem( 0x%08X ) %s line=%d\n", p, file, line );*/
+
+  if( id == RocsStrID ) {
+    int i = 0;
+    for( i = 0; i < MAXSTRINGS; i++ ) {
+      if( m_Strings[i] == p ) {
+        m_Strings[i] = NULL;
+        break;
+      }
+    }
+  }
+
+
+
   __mem_free_magic( p, file, line, id );
 }
 

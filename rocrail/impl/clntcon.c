@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) 2002-2007 - Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -34,6 +37,7 @@
 
 #include "rocrail/wrapper/public/Command.h"
 #include "rocrail/wrapper/public/AutoCmd.h"
+#include "rocrail/wrapper/public/SysCmd.h"
 #include "rocrail/wrapper/public/Plan.h"
 #include "rocrail/wrapper/public/Tcp.h"
 #include "rocrail/wrapper/public/ModelCmd.h"
@@ -90,6 +94,7 @@ struct __OClntService {
   iOClntCon     ClntCon;
   iOSocket      clntSocket;
   Boolean       readonly;
+  Boolean       slave;
   Boolean       quit;
   Boolean       disablemonitor;
 };
@@ -123,12 +128,12 @@ static void __infoWriter( void* threadinst ) {
 
         NodeOp.setInt( xml, "size", infoLen );
         XmlhOp.addNode( xmlh, xml );
-        xmlhStr = XmlhOp.base.serialize( xmlh, &xmlhLen );
+        xmlhStr = (char*)XmlhOp.base.serialize( xmlh, &xmlhLen );
         XmlhOp.base.del( xmlh );
 
         TraceOp.trc( name, TRCLEVEL_XMLH, __LINE__, 9999, "%s", xmlhStr );
 
-        TraceOp.trc( name, TRCLEVEL_XMLH, __LINE__, 9999, "%80.80s...", info );
+        TraceOp.trc( name, TRCLEVEL_XMLH, __LINE__, 9999, "%.320s...", info );
 
         if( SocketOp.write( o->clntSocket, xmlhStr, xmlhLen ) )
           ok = SocketOp.write( o->clntSocket, info, infoLen );
@@ -185,7 +190,7 @@ static Boolean __readXmlh( iOSocket sh, iOXmlh xmlh ) {
   char b = 0;
   while( SocketOp.peek( sh, &b, 1 ) ) {
     SocketOp.read( sh, &b, 1 );
-    if( XmlhOp.read( xmlh, &b, 1 ) ) {
+    if( XmlhOp.read( xmlh, (byte*)&b, 1 ) ) {
       return True;
     }
     else if( XmlhOp.isError( xmlh ) ){
@@ -200,6 +205,7 @@ static void __cmdReader( void* threadinst ) {
   iOThread         th = (iOThread)threadinst;
   __iOClntService   o = (__iOClntService)ThreadOp.getParm(th);
   iOClntCon   clntcon = o->ClntCon;
+  iOClntConData data  = Data(clntcon);
   char*         sname = NULL;
   Boolean          ok = False;
   iOThread infoWriter = NULL;
@@ -239,7 +245,7 @@ static void __cmdReader( void* threadinst ) {
       continue;
     }
     XmlhOp.reset( xmlh );
-    if( ok = __readXmlh( o->clntSocket, xmlh ) ) {
+    if( (ok = __readXmlh( o->clntSocket, xmlh )) ) {
       long size = XmlhOp.getSizeByTagName( xmlh, XmlhOp.xml_tagname, 0 );
       int len = 0;
       freeMem( cmd );
@@ -263,6 +269,24 @@ static void __cmdReader( void* threadinst ) {
               /* inform broadcaster */
               o->disablemonitor = wModelCmd.isdisablemonitor(nodeA);
               TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "monitoring for client is %s", o->disablemonitor?"off":"on" );
+
+              /* TODO: check control-code for setting the readonly flag. */
+              if( StrOp.len( wTcp.getcontrolcode(data->ini) ) > 0 ) {
+                if( StrOp.equals( wTcp.getcontrolcode(data->ini), wModelCmd.getcontrolcode(nodeA) ) ) {
+                  o->readonly = False;
+                  o->slave = False;
+                }
+                else if( StrOp.equals( wTcp.getslavecode(data->ini), wModelCmd.getcontrolcode(nodeA) ) ) {
+                  o->readonly = False;
+                  o->slave = True;
+                }
+                else {
+                  o->readonly = True;
+                }
+                TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "client has %scontrol access%s",
+                    o->readonly?"no ":"", o->slave?" (slave)":"" );
+              }
+
             }
 
             if( !o->readonly ||
@@ -271,7 +295,24 @@ static void __cmdReader( void* threadinst ) {
                 (StrOp.equals( wModelCmd.name(), NodeOp.getName(nodeA) ) && StrOp.equals( wModelCmd.fstat, wCommand.getcmd( nodeA ) ) )
             )
             {
-              Data(o->ClntCon)->callback( Data(o->ClntCon)->callbackObj, nodeA );
+              if( o->slave ) {
+                if( StrOp.equals( wSysCmd.name(), NodeOp.getName(nodeA) ) ) {
+                  const char* cmd = wSysCmd.getcmd(nodeA);
+                  if( StrOp.equals( wSysCmd.shutdown, cmd ) || StrOp.equals( wSysCmd.go, cmd ) )
+                  {
+                    /* ignore */
+                    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "ignore [%s] from slave client", cmd);
+                  }
+                  else {
+                    Data(o->ClntCon)->callback( Data(o->ClntCon)->callbackObj, nodeA );
+                  }
+                }
+                else
+                  Data(o->ClntCon)->callback( Data(o->ClntCon)->callbackObj, nodeA );
+              }
+              else {
+                Data(o->ClntCon)->callback( Data(o->ClntCon)->callbackObj, nodeA );
+              }
             }
             else {
               TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999,
@@ -418,6 +459,10 @@ static void __doBroadcast( iOClntCon inst, iONode nodeDF ) {
         /* skipping this broadcast for the client */
         TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Skipping exception broadcast for %s.", ThreadOp.getName(iw) );
       }
+      else if( param->disablemonitor && StrOp.equals( NodeOp.getName(nodeDF), wLoc.name() ) && wLoc.isbbtevent(nodeDF) ) {
+        /* skipping this broadcast for the client */
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Skipping bbt event broadcast for %s.", ThreadOp.getName(iw) );
+      }
       else {
         iONode clone = (iONode)nodeDF->base.clone( nodeDF );
         TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "broadcasting %s...", NodeOp.getName(clone) );
@@ -467,6 +512,7 @@ static void _broadcastEvent( iOClntCon inst, iONode nodeDF ) {
     TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Broadcast event...%s", NodeOp.getName(nodeDF) );
     if( !ThreadOp.post( data->broadcaster, (obj)nodeDF ) ) {
       TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Unable to broadcast event!" );
+      NodeOp.base.del(nodeDF);
     }
   }
 }

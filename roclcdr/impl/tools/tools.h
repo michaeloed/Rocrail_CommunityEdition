@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Software
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -35,7 +38,6 @@ void resetNext2( iOLcDriver inst, Boolean unLock );
 
 Boolean initializeDestination( iOLcDriver inst, iIBlockBase block, iORoute street, iIBlockBase curBlock, Boolean dir, int indelay );
 Boolean initializeGroup( iOLcDriver inst, iIBlockBase block, iIBlockBase curBlock );
-Boolean initializeSwap( iOLcDriver inst, iORoute route );
 const char* getBlockV_hint( iILcDriverInt inst, iIBlockBase block, Boolean onexit, iORoute street, Boolean reverse, int* maxkmh );
 
 
@@ -43,7 +45,7 @@ void resetSignals(iOLcDriver inst );
 Boolean setSignals(iOLcDriver inst, Boolean onEnter );
 
 void checkScheduleActions( iILcDriverInt inst, int state);
-Boolean checkScheduleEntryActions( iILcDriverInt inst, int index );
+Boolean checkScheduleEntryActions( iILcDriverInt inst, int index, Boolean checkSwapOnly );
 
 Boolean checkScheduleTime( iILcDriverInt inst, const char* scheduleID, int scheduleIdx );
 Boolean isScheduleEnd( iILcDriverInt inst );

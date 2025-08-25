@@ -1,9 +1,9 @@
-/** ------------------------------------------------------------
-  * $Author: rob $
-  * $Date: 2006/12/22 06:44:08 $
-  * $Revision: 1.1 $
-  * $Source $
-  */
+/*
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
+ */
 
 
 
@@ -158,7 +158,7 @@ static void __addlang( iONode xml, const char* newlang, Boolean empty, Boolean r
     else if( all == NULL ) {
       /* not adding a line in case a global text is wanted */
     
-      if( lang == NULL && en == NULL || lang == NULL && empty) {
+      if( ((lang == NULL) && (en == NULL)) || ((lang == NULL) && empty) ) {
         lang = NodeOp.inst( newlang, msg, ELEMENT_NODE );
         NodeOp.setStr( lang, "txt", "" );
         NodeOp.addChild( msg, lang );

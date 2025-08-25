@@ -1,7 +1,10 @@
 /*
  Rocrail - Model Railroad Control System
 
- Copyright (C) Rob Versluis <r.j.versluis@rocrail.net>
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -51,8 +54,9 @@
 #include "rocrail/wrapper/public/Program.h"
 #include "rocrail/wrapper/public/ModelCmd.h"
 #include "rocrail/wrapper/public/SysCmd.h"
+#include "rocrail/wrapper/public/Item.h"
 
-static void _fbEvent( obj inst ,Boolean puls ,const char* id ,int ident, int val );
+static void _fbEvent( obj inst ,Boolean puls ,const char* id ,const char* ident, int val );
 static void _sysEvent( obj inst, const char* cmd );
 
 static int instCnt = 0;
@@ -144,7 +148,8 @@ static iIBlockBase __getActiveTrackBlock(iIBlockBase inst, const char* msg ) {
     }
     pos = wSelTab.nextseltabpos( data->props, pos );
   };
-  TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "no active block found for track %d.", data->tablepos );
+  TraceOp.trc( name, data->tablepos==-1?TRCLEVEL_DEBUG:TRCLEVEL_WARNING, __LINE__, 9999,
+      "no active block found for track %d.", data->tablepos );
   return NULL;
 }
 
@@ -199,12 +204,14 @@ static iIBlockBase __getBlock4Loc(iIBlockBase inst, const char* locid, Boolean* 
     iIBlockBase block = ModelOp.getBlock( model, wSelTabPos.getbkid(pos) );
     if( block != NULL && StrOp.equals( locid, block->getLoc(block) ) ) {
       if( inBlock != NULL && block->getInLoc(block) != NULL) {
-        *inBlock = StrOp.equals( locid, block->getInLoc(block) );
+        iONode blockProps = block->base.properties(block);
+        if( !wBlock.isreserved(blockProps) )
+          *inBlock = StrOp.equals( locid, block->getInLoc(block) );
       }
       return block;
     }
     else {
-      TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "block=0x%08X does not have set locid to %s...", locid );
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "block=0x%08X does not have set locid to %s...", block, locid );
     }
     pos = wSelTab.nextseltabpos( data->props, pos );
   };
@@ -223,6 +230,9 @@ static void __initSensors( iOSelTab inst ) {
   iOFBack b1 = ModelOp.getFBack( model, wSelTab.getb1sen(data->props) );
   iOFBack b2 = ModelOp.getFBack( model, wSelTab.getb2sen(data->props) );
   iOFBack b3 = ModelOp.getFBack( model, wSelTab.getb3sen(data->props) );
+  iOFBack b4 = ModelOp.getFBack( model, wSelTab.getb4sen(data->props) );
+  iOFBack b5 = ModelOp.getFBack( model, wSelTab.getb5sen(data->props) );
+  iOFBack b6 = ModelOp.getFBack( model, wSelTab.getb6sen(data->props) );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Init sensor for the Selectiontable..." );
 
@@ -238,10 +248,14 @@ static void __initSensors( iOSelTab inst ) {
     FBackOp.addListener( b1, (obj)inst );
     FBackOp.addListener( b2, (obj)inst );
     FBackOp.addListener( b3, (obj)inst );
+    if( b4 != NULL ) FBackOp.addListener( b4, (obj)inst );
+    if( b5 != NULL ) FBackOp.addListener( b5, (obj)inst );
+    if( b6 != NULL ) FBackOp.addListener( b6, (obj)inst );
   }
   else {
-    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "Position sensors for the Selectiontable could not be initialized." );
+    TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "Position sensors for the Selectiontable could not be initialized." );
   }
+
 }
 
 
@@ -253,6 +267,9 @@ static void __removeSensors( iOSelTab inst ) {
   iOFBack b1 = ModelOp.getFBack( model, wSelTab.getb1sen(data->props) );
   iOFBack b2 = ModelOp.getFBack( model, wSelTab.getb2sen(data->props) );
   iOFBack b3 = ModelOp.getFBack( model, wSelTab.getb3sen(data->props) );
+  iOFBack b4 = ModelOp.getFBack( model, wSelTab.getb4sen(data->props) );
+  iOFBack b5 = ModelOp.getFBack( model, wSelTab.getb5sen(data->props) );
+  iOFBack b6 = ModelOp.getFBack( model, wSelTab.getb6sen(data->props) );
 
   TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Remove sensor for the Selectiontable..." );
 
@@ -266,6 +283,9 @@ static void __removeSensors( iOSelTab inst ) {
     FBackOp.removeListener( b2, (obj)inst );
     FBackOp.removeListener( b3, (obj)inst );
   }
+  if( b4 ) FBackOp.removeListener( b4, (obj)inst );
+  if( b5 ) FBackOp.removeListener( b5, (obj)inst );
+  if( b6 ) FBackOp.removeListener( b6, (obj)inst );
 }
 
 
@@ -277,17 +297,22 @@ static void __evaluatePosition( obj inst ) {
   iOFBack b1 = ModelOp.getFBack( model, wSelTab.getb1sen(data->props) );
   iOFBack b2 = ModelOp.getFBack( model, wSelTab.getb2sen(data->props) );
   iOFBack b3 = ModelOp.getFBack( model, wSelTab.getb3sen(data->props) );
+  iOFBack b4 = ModelOp.getFBack( model, wSelTab.getb4sen(data->props) );
+  iOFBack b5 = ModelOp.getFBack( model, wSelTab.getb5sen(data->props) );
+  iOFBack b6 = ModelOp.getFBack( model, wSelTab.getb6sen(data->props) );
 
   int tablepos = data->tablepos;
 
   if( b0 != NULL && b1 != NULL && b2 != NULL && b3 != NULL ) {
-    data->reportedPos  = FBackOp.getState( b0 ) ? 1:0;
-    data->reportedPos |= FBackOp.getState( b1 ) ? 2:0;
-    data->reportedPos |= FBackOp.getState( b2 ) ? 4:0;
-    data->reportedPos |= FBackOp.getState( b3 ) ? 8:0;
+    data->reportedPos  = FBackOp.getState( b0 ) ? 0x01:0;
+    data->reportedPos |= FBackOp.getState( b1 ) ? 0x02:0;
+    data->reportedPos |= FBackOp.getState( b2 ) ? 0x04:0;
+    data->reportedPos |= FBackOp.getState( b3 ) ? 0x08:0;
+    if( b4 != NULL ) data->reportedPos |= FBackOp.getState( b4 ) ? 0x10:0;
+    if( b5 != NULL ) data->reportedPos |= FBackOp.getState( b5 ) ? 0x20:0;
+    if( b6 != NULL ) data->reportedPos |= FBackOp.getState( b6 ) ? 0x40:0;
 
     tablepos = data->reportedPos;
-
   }
   else {
     data->reportedPos = -1;
@@ -329,11 +354,10 @@ static void _sysEvent( obj inst, const char* cmd ) {
 
 
 /**  */
-static void _fbEvent( obj inst ,Boolean state ,const char* id ,int ident, int val ) {
+static void _fbEvent( obj inst ,Boolean state ,const char* id ,const char* ident, int val ) {
   iOSelTabData data = Data(inst);
   iOModel model = AppOp.getModel();
-  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbid=%s state=%s ident=%d",
-                 id, state?"true":"false", ident );
+  TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "fbid=%s state=%s ident=%s", id, state?"true":"false", ident );
   /* process the event */
   /* when reaching the wanted position the GUI must be informed by setting the SelTabPos sensors to "true" */
   /* reset the pending flag */
@@ -376,6 +400,8 @@ static void _fbEvent( obj inst ,Boolean state ,const char* id ,int ident, int va
 
         /* set the protocol */
         wSwitch.setprot( cmd, wSelTab.getprot(data->props) );
+        wSwitch.setbus( cmd, wItem.getbus(data->props) );
+        wItem.setuidname( cmd, wItem.getuidname(data->props) );
         wSwitch.setaddr1( cmd, wSelTab.getaddr4(data->props) );
         wSwitch.setport1( cmd, wSelTab.getport4(data->props) );
         wOutput.setcmd( cmd, wSelTab.isinvnew(data->props) ? wSwitch.straight:wSwitch.turnout );
@@ -405,14 +431,17 @@ static void _fbEvent( obj inst ,Boolean state ,const char* id ,int ident, int va
     }
   }
   else if( StrOp.equals( wSelTab.getb0sen(data->props), id) ||
-           StrOp.equals( wSelTab.getb1sen(data->props), id) ||
-           StrOp.equals( wSelTab.getb2sen(data->props), id) ||
-           StrOp.equals( wSelTab.getb3sen(data->props), id) )
+            StrOp.equals( wSelTab.getb1sen(data->props), id) ||
+            StrOp.equals( wSelTab.getb2sen(data->props), id) ||
+            StrOp.equals( wSelTab.getb3sen(data->props), id) ||
+            StrOp.equals( wSelTab.getb4sen(data->props), id) ||
+            StrOp.equals( wSelTab.getb5sen(data->props), id) ||
+            StrOp.equals( wSelTab.getb6sen(data->props), id) )
   {
     __evaluatePosition(inst);
 
   }
-  else if( wSelTab.issharedfb(data->props) ) {
+  else if( wSelTab.issharedfb(data->props) && !data->pending ) {
     /* dispatch event to the active track block */
     iONode pos = wSelTab.getseltabpos( data->props );
     TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dispatching [%s]", id);
@@ -429,22 +458,28 @@ static void _fbEvent( obj inst ,Boolean state ,const char* id ,int ident, int va
           iONode fbevt = (iONode)MapOp.get( data->fbEvents, key );
 
           if( fbevt == NULL ) {
+            Boolean blockSide = False;
+            if( data->byRouteId != NULL && StrOp.len(data->byRouteId) > 0 ) {
+              iORoute byRoute = ModelOp.getRoute( AppOp.getModel(), data->byRouteId );
+              blockSide = RouteOp.getToBlockSide(byRoute);
+            }
             TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "seltab [%s] no event found for fromBlockId [%s], try to find one for all...",
                 wSelTab.getid( data->props ), fromBlockId?fromBlockId:"?" );
 
-            /* TODO: check running direction -> from_all or from_all_reverse */
-            if( data->reverse ) {
-              StrOp.fmtb( key, "%s-%s", id, wFeedbackEvent.from_all_reverse );
+            /* check running direction -> from_all or from_all_reverse */
+            TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "seltab [%s] fromBlockId[%s] id[%s] ident[%s] inst[%08.8X] data->reverse[%s]", wSelTab.getid( data->props ), fromBlockId, id, ident, inst, data->reverse?"True":"False" );
+            if( blockSide ) {
+              StrOp.fmtb( key, "%s-%s", id, wFeedbackEvent.from_all );
             }
             else {
-              StrOp.fmtb( key, "%s-%s", id, wFeedbackEvent.from_all );
+              StrOp.fmtb( key, "%s-%s", id, wFeedbackEvent.from_all_reverse );
             }
             fbevt = (iONode)MapOp.get( data->fbEvents, key );
           }
 
           /* dispatch */
-          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dispatching [%s]", key);
-          block->event( block, state, id, ident, val, 0, fbevt );
+          TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dispatching [%s] to [%s]", key, block->base.id(block));
+          block->event( block, state, id, ident, NULL, NULL, NULL, val, 0, fbevt, True );
         }
         break;
       }
@@ -500,7 +535,7 @@ static void __processCmd( struct OSelTab* inst ,iONode nodeA ) {
   if( StrOp.equals( wSwitch.unlock, cmdStr ) ) {
     TraceOp.trc( name, TRCLEVEL_MONITOR, __LINE__, 9999, "unlock seltab [%s]",
                  SelTabOp.base.id( inst ) );
-    SelTabOp.unLock((iIBlockBase)inst, data->lockedId );
+    SelTabOp.unLock((iIBlockBase)inst, data->lockedId, NULL );
     return;
   }
 
@@ -546,6 +581,9 @@ static void __processCmd( struct OSelTab* inst ,iONode nodeA ) {
     if( iid != NULL )
       wOutput.setiid( cmd, iid );
 
+    wSwitch.setbus( cmd, wItem.getbus(data->props) );
+    wItem.setuidname( cmd, wItem.getuidname(data->props) );
+
     if( StrOp.equals( wSelTab.prot_MP, wSelTab.getprot(data->props) ) ) {
       /* rename node to program */
       NodeOp.setName( cmd, wProgram.name() );
@@ -572,6 +610,7 @@ static void __processCmd( struct OSelTab* inst ,iONode nodeA ) {
       /* signal new position will be set: */
       wSwitch.setaddr1( cmd, wSelTab.getaddr4(data->props) );
       wSwitch.setport1( cmd, wSelTab.getport4(data->props) );
+      wSwitch.setsinglegate( cmd, wSelTab.issinglegate( data->props ) );
       wOutput.setcmd( cmd, invnew ? wSwitch.straight:wSwitch.turnout );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
@@ -612,6 +651,39 @@ static void __processCmd( struct OSelTab* inst ,iONode nodeA ) {
         wSwitch.setcmd( cmd, gotopos & 0x08 ? wSwitch.turnout:wSwitch.straight );
       lcmd = (iONode)NodeOp.base.clone(cmd);
       ControlOp.cmd( control, lcmd, NULL );
+
+      if( wSelTab.getaddr5(data->props) != 0 || wSelTab.getport5(data->props) != 0 ) {
+        wSwitch.setaddr1( cmd, wSelTab.getaddr5(data->props) );
+        wSwitch.setport1( cmd, wSelTab.getport5(data->props) );
+        if( inv )
+          wSwitch.setcmd( cmd, gotopos & 0x10 ? wSwitch.straight:wSwitch.turnout );
+        else
+          wSwitch.setcmd( cmd, gotopos & 0x10 ? wSwitch.turnout:wSwitch.straight );
+        lcmd = (iONode)NodeOp.base.clone(cmd);
+        ControlOp.cmd( control, lcmd, NULL );
+      }
+
+      if( wSelTab.getaddr6(data->props) != 0 || wSelTab.getport6(data->props) != 0 ) {
+        wSwitch.setaddr1( cmd, wSelTab.getaddr6(data->props) );
+        wSwitch.setport1( cmd, wSelTab.getport6(data->props) );
+        if( inv )
+          wSwitch.setcmd( cmd, gotopos & 0x20 ? wSwitch.straight:wSwitch.turnout );
+        else
+          wSwitch.setcmd( cmd, gotopos & 0x20 ? wSwitch.turnout:wSwitch.straight );
+        lcmd = (iONode)NodeOp.base.clone(cmd);
+        ControlOp.cmd( control, lcmd, NULL );
+      }
+
+      if( wSelTab.getaddr7(data->props) != 0 || wSelTab.getport7(data->props) != 0 ) {
+        wSwitch.setaddr1( cmd, wSelTab.getaddr7(data->props) );
+        wSwitch.setport1( cmd, wSelTab.getport7(data->props) );
+        if( inv )
+          wSwitch.setcmd( cmd, gotopos & 0x40 ? wSwitch.straight:wSwitch.turnout );
+        else
+          wSwitch.setcmd( cmd, gotopos & 0x40 ? wSwitch.turnout:wSwitch.straight );
+        lcmd = (iONode)NodeOp.base.clone(cmd);
+        ControlOp.cmd( control, lcmd, NULL );
+      }
 
       /* signal new position is set: */
       ThreadOp.sleep(10);
@@ -723,7 +795,7 @@ static struct OSelTab* _inst( iONode ini ) {
 
   data->muxLock = MutexOp.inst( NULL, True );
   data->fbEvents = MapOp.inst();
-  data->lockedId = wSelTab.getlocid(ini);
+  /*data->lockedId = wSelTab.getlocid(ini);*/
   data->lockedRouteList = ListOp.inst();
 
   NodeOp.removeAttrByName(data->props, "cmd");
@@ -753,7 +825,7 @@ static int __getOccTrackBlocks(iIBlockBase inst, long* oldestOccTick) {
     iIBlockBase block = ModelOp.getBlock( model, wSelTabPos.getbkid(pos) );
     if( block != NULL && !block->isFree(block, NULL) ) {
       long blockOccTime = block->getOccTime(block);
-      if( blockOccTime > 0 && blockOccTime < *oldestOccTick || blockOccTime > 0 && *oldestOccTick == 0 )
+      if( (blockOccTime > 0 && blockOccTime < *oldestOccTick) || (blockOccTime > 0 && *oldestOccTick == 0) )
         *oldestOccTick = block->getOccTime(block);
       occBlocks++;
     }
@@ -835,8 +907,19 @@ static Boolean _isReady( iIBlockBase inst ) {
 }
 
 
-static Boolean _hasExtStop( iIBlockBase inst ) {
+static Boolean _isFreeBlockOnEnter( iIBlockBase inst ) {
+  iOSelTabData data = Data(inst);
   return False;
+}
+
+
+static Boolean _hasExtStop( iIBlockBase inst, const char* locoid ) {
+  return False;
+}
+
+static Boolean _allowBBT( iIBlockBase inst ) {
+  iOSelTabData data = Data(inst);
+  return True;
 }
 
 
@@ -882,6 +965,17 @@ static Boolean _isState( iIBlockBase inst, const char* state ) {
   return False;
 }
 
+static Boolean _isTTBlock( iIBlockBase inst ) {
+  return False;
+}
+
+static Boolean _isTD( iIBlockBase inst ) {
+  return False;
+}
+
+static void _resetTD( iIBlockBase inst ) {
+}
+
 static Boolean _isFree( iIBlockBase inst, const char* locId ) {
   iOSelTabData data = Data(inst);
   iIBlockBase block = NULL;
@@ -903,7 +997,7 @@ static Boolean _isFree( iIBlockBase inst, const char* locId ) {
   return block != NULL ? True:False;
 }
 
-static int _isSuited( iIBlockBase inst, iOLoc loc ) {
+static int _isSuited( iIBlockBase inst, iOLoc loc, int* restlen, Boolean checkprev ) {
   iOSelTabData data = Data(inst);
   return suits_ok;
 }
@@ -919,12 +1013,18 @@ static int _getOccTime( iIBlockBase inst ) {
 }
 
 /**  */
-static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, const char* routeid, Boolean crossing, Boolean reset, Boolean reverse, int indelay ) {
+static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, const char* routeid, Boolean crossing, Boolean reset, Boolean reverse, int indelay, const char* masterId, Boolean force ) {
   iOSelTabData data = Data(inst);
   iIBlockBase block = NULL;
   int           pos = 0;
   Boolean        ok = True;
   Boolean   manager = False;
+
+  iOControl control = AppOp.getControl();
+  if( !ControlOp.hasBlockPower(control, inst->base.id(inst)) ) {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "fiddleyard [%s] has no power; locking is rejected", inst->base.id(inst) );
+    return False;
+  }
 
   /* wait only 10ms for getting the mutex: */
   if( !MutexOp.trywait( data->muxLock, 10 ) ) {
@@ -934,7 +1034,7 @@ static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, con
   if( !StrOp.startsWith(blockid, wRoute.routelock) && wSelTab.ismanager(data->props) ) {
     manager = True;
     block = __getFreeTrackBlock( inst, id, &pos );
-    if( block == NULL || !block->lock(block, id, blockid, NULL, crossing, reset, reverse, 0 ) ) {
+    if( block == NULL || !block->lock(block, id, blockid, NULL, crossing, reset, reverse, 0, NULL, False ) ) {
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "could not lock block [%s] for [%s]", block->base.id(block), id);
       ok = False;
     }
@@ -948,6 +1048,12 @@ static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, con
         ListOp.add( data->lockedRouteList, (obj)routeid );
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Selectiontable [%s] is locked by [%s] with %d routes, new is [%s].",
           inst->base.id( inst ), data->lockedId, ListOp.size(data->lockedRouteList), routeid );
+      if( wSelTab.ismanager(data->props) ) {
+        data->reverse     = reverse;
+        data->fromBlockId = blockid;
+        data->byRouteId   = routeid;
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "seltab lock: inst[%08.8X] data->reverse[%s] reverse[%s]", inst, data->reverse?"True":"False", reverse?"True":"False" );
+      }
     }
     else if( data->lockedId == NULL || StrOp.len(data->lockedId) == 0 ) {
       data->lockedId = id;
@@ -958,6 +1064,15 @@ static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, con
 
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "Selectiontable [%s] is locked by [%s] with route [%s].",
           inst->base.id( inst ), data->lockedId, routeid );
+
+      TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "seltab lock: inst[%08.8X] reverse[%s] id[%s] blockid[%s] routeid[%s] manager[%s]", inst, reverse?"True":"False", id, blockid, routeid, manager?"True":"False" );
+
+      if( wSelTab.ismanager(data->props) ) {
+        data->reverse     = reverse;
+        data->fromBlockId = blockid;
+        data->byRouteId   = routeid;
+        TraceOp.trc( name, TRCLEVEL_DEBUG, __LINE__, 9999, "seltab lock: inst[%08.8X] data->reverse[%s] reverse[%s]", inst, data->reverse?"True":"False", reverse?"True":"False" );
+      }
 
       /* goto position */
       if( manager ) {
@@ -987,7 +1102,7 @@ static Boolean _lock( iIBlockBase inst, const char* id, const char* blockid, con
           inst->base.id( inst ), data->lockedId );
       ok = False;
       if( block != NULL ) {
-        block->unLock(block, id);
+        block->unLock(block, id, NULL);
       }
     }
   }
@@ -1024,7 +1139,10 @@ static void _modify( struct OSelTab* inst ,iONode props ) {
     cnt = NodeOp.getChildCnt( data->props );
     while( cnt > 0 ) {
       iONode child = NodeOp.getChild( data->props, 0 );
-      NodeOp.removeChild( data->props, child );
+      iONode removedChild = NodeOp.removeChild( data->props, child );
+      if( removedChild != NULL) {
+        NodeOp.base.del(removedChild);
+      }
       cnt = NodeOp.getChildCnt( data->props );
     }
     cnt = NodeOp.getChildCnt( props );
@@ -1053,11 +1171,11 @@ static void _modify( struct OSelTab* inst ,iONode props ) {
 
 
 /**  */
-static void _reset( iIBlockBase inst ) {
+static void _reset( iIBlockBase inst, Boolean saveCurBlock ) {
   iOSelTabData data = Data(inst);
   TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999,
              "reset selectiontable [%s]", inst->base.id( inst ) );
-  SelTabOp.unLock( inst, data->lockedId );
+  SelTabOp.unLock( inst, data->lockedId, NULL );
   ListOp.clear( data->lockedRouteList );
 
   {
@@ -1070,7 +1188,7 @@ static void _reset( iIBlockBase inst ) {
 }
 
 
-static Boolean _setLocSchedule( iIBlockBase inst, const char* scid ) {
+static Boolean _setLocSchedule( iIBlockBase inst, const char* scid, Boolean manual ) {
   Boolean ok = False;
   if( inst != NULL && scid != NULL ) {
     iOSelTabData data = Data(inst);
@@ -1078,8 +1196,16 @@ static Boolean _setLocSchedule( iIBlockBase inst, const char* scid ) {
   return ok;
 }
 
+static Boolean _setLocTour( iIBlockBase inst, const char* tourid, Boolean manual ) {
+  Boolean ok = False;
+  if( inst != NULL && tourid != NULL ) {
+    iOSelTabData data = Data(inst);
+  }
+  return ok;
+}
+
 /**  */
-static Boolean _unLock( iIBlockBase inst ,const char* id ) {
+static Boolean _unLock( iIBlockBase inst ,const char* id, const char* routeid ) {
   iOSelTabData data = Data(inst);
   TraceOp.trc( name, TRCLEVEL_USER1, __LINE__, 9999, "unlock for [%s]", id!=NULL?id:"?" );
 
@@ -1094,7 +1220,7 @@ static Boolean _unLock( iIBlockBase inst ,const char* id ) {
     if( block != NULL ) {
       int track = __getTrack4Loc(inst, id);
       TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "unlock FY block [%s] for [%s]", block->base.id(block), id );
-      block->unLock( block, id );
+      block->unLock( block, id, NULL );
     }
   }
   else if( StrOp.startsWith(id, wRoute.routelock) && wSelTab.ismanager(data->props) ) {
@@ -1169,12 +1295,14 @@ static const char* _getInLoc( iIBlockBase inst ) {
   return block != NULL ? block->getInLoc( block ) : "";
 }
 
-static void _event( iIBlockBase inst, Boolean puls, const char* id, long ident, int val, int wheelcount, iONode fbevt ) {
+static Boolean _event( iIBlockBase inst, Boolean puls, const char* id, const char* ident, const char* ident2, const char* ident3, const char* ident4, int val, int wheelcount, iONode fbevt, Boolean dir ) {
   iOSelTabData data = Data(inst);
   iIBlockBase block = __getActiveTrackBlock(inst, "event");
   /* dispatch to active tracke block */
-  if( block != NULL && !data->pending )
-    block->event( block, puls, id, ident, val, 0, fbevt );
+  if( block != NULL && !data->pending ) {
+    return block->event( block, puls, id, ident, NULL, NULL, NULL, val, 0, fbevt, dir );
+  }
+  return False;
 }
 
 
@@ -1237,8 +1365,16 @@ static void _enterBlock( iIBlockBase inst, const char* id ) {
   iOSelTabData data = Data(inst);
   iIBlockBase block = __getActiveTrackBlock(inst, "enterBlock");
   /* dispatch to active tracke block */
-  if( block != NULL )
+  if( block != NULL ) {
+    TraceOp.trc( name, TRCLEVEL_INFO, __LINE__, 9999, "dispatch enter to block [%s] id=%s", block->base.id(block), id );
     block->enterBlock( block, id );
+  }
+  else {
+    TraceOp.trc( name, TRCLEVEL_WARNING, __LINE__, 9999, "no block found for dispatching enter... id=%s", id );
+  }
+}
+
+static void _exitBlock( iIBlockBase inst, const char* id, Boolean unexpected ) {
 }
 
 static const char* _getVelocity( iIBlockBase inst, int* percent, Boolean onexit, Boolean reverse, Boolean onstop ) {
@@ -1249,16 +1385,29 @@ static const char* _getVelocity( iIBlockBase inst, int* percent, Boolean onexit,
   return block != NULL ? block->getVelocity( block, percent, onexit, reverse, onstop ) : "";
 }
 
+static int _getDepartDelay( iIBlockBase inst ) {
+  return 0;
+}
+
+static float _getmvspeed( iIBlockBase inst ) {
+  return 0;
+}
+
 static int _getMaxKmh( iIBlockBase inst ) {
   return 0;
 }
 
+static int _getRandomRate( iIBlockBase inst, const char* lcid ) {
+  iOSelTabData data = Data(inst);
+  return wSelTab.getrandomrate(data->props);
+}
 
-static int _getWait( iIBlockBase inst, iOLoc loc, Boolean reverse ) {
+
+static int _getWait( iIBlockBase inst, iOLoc loc, Boolean reverse, int* oppwait ) {
   iOSelTabData data = Data(inst);
   iIBlockBase block = __getActiveTrackBlock(inst, "getWait");
   /* dispatch to active tracke block */
-  return block != NULL ? block->getWait( block, loc, reverse ) : 0;
+  return block != NULL ? block->getWait( block, loc, reverse, oppwait ) : 0;
 }
 
 static Boolean _green( iIBlockBase inst, Boolean distant, Boolean reverse ) {
@@ -1387,11 +1536,11 @@ static void _resetTrigs( iIBlockBase inst ) {
     block->resetTrigs( block );
 }
 
-static Boolean _wait( iIBlockBase inst, iOLoc loc, Boolean reverse ) {
+static Boolean _wait( iIBlockBase inst, iOLoc loc, Boolean reverse, Boolean* oppwait ) {
   iOSelTabData data = Data(inst);
   iIBlockBase block = __getActiveTrackBlock(inst, "wait");
   /* dispatch to active tracke block */
-  return block != NULL ? block->wait( block, loc, reverse ) : False;
+  return block != NULL ? block->wait( block, loc, reverse, oppwait ) : False;
 }
 
 static void _setCarCount( iIBlockBase inst, int count ) {
@@ -1400,10 +1549,26 @@ static void _setCarCount( iIBlockBase inst, int count ) {
 static void _acceptIdent( iIBlockBase inst, Boolean accept ) {
 }
 
-static Boolean _isDepartureAllowed( iIBlockBase inst, const char* id ) {
+static void _didNotDepart( iIBlockBase inst, const char* id ) {
+}
+
+static Boolean _isDepartureAllowed( iIBlockBase inst, const char* id, Boolean force ) {
   return True;
 }
 
+static void _setTempWait(iIBlockBase inst, Boolean wait) {
+}
+
+static void _setClass( iIBlockBase inst, const char* p_Class ) {
+}
+
+static Boolean _hasClass( iIBlockBase inst, const char* class ) {
+  return False;
+}
+
+
+static void _setMasterID( iIBlockBase inst, const char* masterid ) {
+}
 
 
 static void _init( iIBlockBase inst ) {
@@ -1412,6 +1577,9 @@ static void _init( iIBlockBase inst ) {
   __initTrackBlocks( inst );
 }
 
+static void _setGhostDetected(iIBlockBase inst, const char* key, const char* ident) {
+  iOSelTabData data = Data(inst);
+}
 
 /* ----- DO NOT REMOVE OR EDIT THIS INCLUDE LINE! -----*/
 #include "rocrail/impl/seltab.fm"

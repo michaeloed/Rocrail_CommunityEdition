@@ -1,0 +1,4 @@
+The files in this directory were moved here during renaming the project to FreeRail.
+Many of them seemed already obsolete, as they use now invalid references, e.g. to
+bazaar & sourceforge svn repositories or invalid paths due to moving them here. They
+generally need revision to sort out if they would still be useful for the project.

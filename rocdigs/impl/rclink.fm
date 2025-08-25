@@ -1,0 +1,35 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  3 2018 14:01:50)
+  * Module: RocDigs
+  * XML: $Source: /cvsroot/rojav/rocdigs/rocdigs.xml,v $
+  * XML: $Revision: 1.14 $
+  * Date: Fri Aug  3 14:03:49 2018
+  */
+
+struct ORcLink RcLinkOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _cmd,
+  _cmdRaw,
+  _halt,
+  _setListener,
+  _setRawListener,
+  _shortcut,
+  _state,
+  _supportPT,
+  _version,
+  _inst,
+};

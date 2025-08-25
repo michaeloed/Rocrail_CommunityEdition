@@ -1,0 +1,43 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  3 2018 14:01:50)
+  * Module: RocRail
+  * XML: $Source: /cvsroot/rojav/rocrail/rocrail.xml,v $
+  * XML: $Revision: 1.56 $
+  * Date: Fri Aug  3 14:03:35 2018
+  */
+
+struct OModPlan ModPlanOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _addModule,
+  _getBlocks4Point,
+  _getEvent4Block,
+  _getModPlan,
+  _getModule,
+  _getModuleRouteIDs,
+  _getResolvedRouteID,
+  _inst,
+  _mergeList,
+  _mergeLocs,
+  _modify,
+  _parse,
+  _parsePlan,
+  _resolveRoutes,
+  _save,
+  _saveLocs,
+  _setModPlan,
+  _setModule,
+};

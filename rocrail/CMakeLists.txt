@@ -1,0 +1,261 @@
+message(STATUS "Configure freerail")
+set(CMAKE_CXX_STANDARD 99)
+set(CMAKE_C_STANDARD 99)
+
+# client connection lib
+set(LIBFR_SRC
+    impl/rcon.c
+    impl/script.c
+    )
+add_library(frail STATIC ${LIBFR_SRC})
+set_target_properties(frail PROPERTIES FOLDER "Libs")
+add_dependencies(frail wrapper)
+
+# wrapper lib
+#============
+set(LIBWRAP_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wrapper)
+set(LIBWRAP_SRC
+    ${LIBWRAP_SRC_DIR}/impl/Accessory.c
+    ${LIBWRAP_SRC_DIR}/impl/AccessoryCtrl.c
+    ${LIBWRAP_SRC_DIR}/impl/Action.c
+    ${LIBWRAP_SRC_DIR}/impl/ActionCond.c
+    ${LIBWRAP_SRC_DIR}/impl/ActionCtrl.c
+    ${LIBWRAP_SRC_DIR}/impl/ActionList.c
+    ${LIBWRAP_SRC_DIR}/impl/AnaOpt.c
+    ${LIBWRAP_SRC_DIR}/impl/AutoCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/BBT.c
+    ${LIBWRAP_SRC_DIR}/impl/BiDiB.c
+    ${LIBWRAP_SRC_DIR}/impl/BiDiBnode.c
+    ${LIBWRAP_SRC_DIR}/impl/BinCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/BinStateCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/Block.c
+    ${LIBWRAP_SRC_DIR}/impl/BlockList.c
+    ${LIBWRAP_SRC_DIR}/impl/Booster.c
+    ${LIBWRAP_SRC_DIR}/impl/BoosterEvent.c
+    ${LIBWRAP_SRC_DIR}/impl/BoosterList.c
+    ${LIBWRAP_SRC_DIR}/impl/Car.c
+    ${LIBWRAP_SRC_DIR}/impl/CarList.c
+    ${LIBWRAP_SRC_DIR}/impl/CBus.c
+    ${LIBWRAP_SRC_DIR}/impl/CBusNode.c
+    ${LIBWRAP_SRC_DIR}/impl/CBusNodeEvent.c
+    ${LIBWRAP_SRC_DIR}/impl/CBusNodeVar.c
+    ${LIBWRAP_SRC_DIR}/impl/ChannelSetup.c
+    ${LIBWRAP_SRC_DIR}/impl/Clock.c
+    ${LIBWRAP_SRC_DIR}/impl/Cmdline.c
+    ${LIBWRAP_SRC_DIR}/impl/Color.c
+    ${LIBWRAP_SRC_DIR}/impl/Command.c
+    ${LIBWRAP_SRC_DIR}/impl/ConCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/CSOptions.c
+    ${LIBWRAP_SRC_DIR}/impl/Ctrl.c
+    ${LIBWRAP_SRC_DIR}/impl/CustomCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/CVByte.c
+    ${LIBWRAP_SRC_DIR}/impl/DataReq.c
+    ${LIBWRAP_SRC_DIR}/impl/DCC232.c
+    ${LIBWRAP_SRC_DIR}/impl/DDX.c
+    ${LIBWRAP_SRC_DIR}/impl/Dec.c
+    ${LIBWRAP_SRC_DIR}/impl/DecFamily.c
+    ${LIBWRAP_SRC_DIR}/impl/DecList.c
+    ${LIBWRAP_SRC_DIR}/impl/Decoder.c
+    ${LIBWRAP_SRC_DIR}/impl/DecoderConfig.c
+    ${LIBWRAP_SRC_DIR}/impl/DecVariable.c
+    ${LIBWRAP_SRC_DIR}/impl/DecVariables.c
+    ${LIBWRAP_SRC_DIR}/impl/Description.c
+    ${LIBWRAP_SRC_DIR}/impl/Devices.c
+    ${LIBWRAP_SRC_DIR}/impl/DigInt.c
+    ${LIBWRAP_SRC_DIR}/impl/DIP.c
+    ${LIBWRAP_SRC_DIR}/impl/DIPGroup.c
+    ${LIBWRAP_SRC_DIR}/impl/DIPValue.c
+    ${LIBWRAP_SRC_DIR}/impl/DirEntry.c
+    ${LIBWRAP_SRC_DIR}/impl/DMX.c
+    ${LIBWRAP_SRC_DIR}/impl/Exception.c
+    ${LIBWRAP_SRC_DIR}/impl/ExtCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/FbInfo.c
+    ${LIBWRAP_SRC_DIR}/impl/FbMods.c
+    ${LIBWRAP_SRC_DIR}/impl/Feedback.c
+    ${LIBWRAP_SRC_DIR}/impl/FeedbackEvent.c
+    ${LIBWRAP_SRC_DIR}/impl/FeedbackList.c
+    ${LIBWRAP_SRC_DIR}/impl/FeedbackStatistic.c
+    ${LIBWRAP_SRC_DIR}/impl/FileEntry.c
+    ${LIBWRAP_SRC_DIR}/impl/FreeRail.c
+    ${LIBWRAP_SRC_DIR}/impl/FunCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/FunDef.c
+    ${LIBWRAP_SRC_DIR}/impl/Global.c
+    ${LIBWRAP_SRC_DIR}/impl/HSI88.c
+    ${LIBWRAP_SRC_DIR}/impl/HttpService.c
+    ${LIBWRAP_SRC_DIR}/impl/HUEConfig.c
+    ${LIBWRAP_SRC_DIR}/impl/IO8255.c
+    ${LIBWRAP_SRC_DIR}/impl/Issue.c
+    ${LIBWRAP_SRC_DIR}/impl/Item.c
+    ${LIBWRAP_SRC_DIR}/impl/JsEvent.c
+    ${LIBWRAP_SRC_DIR}/impl/JsMap.c
+    ${LIBWRAP_SRC_DIR}/impl/Link.c
+    ${LIBWRAP_SRC_DIR}/impl/LinkCond.c
+    ${LIBWRAP_SRC_DIR}/impl/LinkList.c
+    ${LIBWRAP_SRC_DIR}/impl/LNSlotServer.c
+    ${LIBWRAP_SRC_DIR}/impl/Location.c
+    ${LIBWRAP_SRC_DIR}/impl/LocationList.c
+    ${LIBWRAP_SRC_DIR}/impl/Loc.c
+    ${LIBWRAP_SRC_DIR}/impl/LocList.c
+    ${LIBWRAP_SRC_DIR}/impl/LocoNet.c
+    ${LIBWRAP_SRC_DIR}/impl/LocoSetup.c
+    ${LIBWRAP_SRC_DIR}/impl/Macro.c
+    ${LIBWRAP_SRC_DIR}/impl/MacroLine.c
+    ${LIBWRAP_SRC_DIR}/impl/MCS2.c
+    ${LIBWRAP_SRC_DIR}/impl/ModelCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/ModOcc.c
+    ${LIBWRAP_SRC_DIR}/impl/ModPlan.c
+    ${LIBWRAP_SRC_DIR}/impl/Module.c
+    ${LIBWRAP_SRC_DIR}/impl/ModuleConnection.c
+    ${LIBWRAP_SRC_DIR}/impl/MVTrack.c
+    ${LIBWRAP_SRC_DIR}/impl/NetReq.c
+    ${LIBWRAP_SRC_DIR}/impl/NetRsp.c
+    ${LIBWRAP_SRC_DIR}/impl/Night.c
+    ${LIBWRAP_SRC_DIR}/impl/Noon.c
+    ${LIBWRAP_SRC_DIR}/impl/Occupancy.c
+    ${LIBWRAP_SRC_DIR}/impl/OpenDCC.c
+    ${LIBWRAP_SRC_DIR}/impl/Operator.c
+    ${LIBWRAP_SRC_DIR}/impl/OperatorList.c
+    ${LIBWRAP_SRC_DIR}/impl/Output.c
+    ${LIBWRAP_SRC_DIR}/impl/OutputList.c
+    ${LIBWRAP_SRC_DIR}/impl/PermExclude.c
+    ${LIBWRAP_SRC_DIR}/impl/PermInclude.c
+    ${LIBWRAP_SRC_DIR}/impl/Plan.c
+    ${LIBWRAP_SRC_DIR}/impl/PortSetup.c
+    ${LIBWRAP_SRC_DIR}/impl/Product.c
+    ${LIBWRAP_SRC_DIR}/impl/ProductList.c
+    ${LIBWRAP_SRC_DIR}/impl/Program.c
+    ${LIBWRAP_SRC_DIR}/impl/PwrCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/PwrEvent.c
+    ${LIBWRAP_SRC_DIR}/impl/R2RnetIni.c
+    ${LIBWRAP_SRC_DIR}/impl/Response.c
+    ${LIBWRAP_SRC_DIR}/impl/RocNet.c
+    ${LIBWRAP_SRC_DIR}/impl/RocNetNode.c
+    ${LIBWRAP_SRC_DIR}/impl/RocNetNodeOptions.c
+    ${LIBWRAP_SRC_DIR}/impl/rocrail_doc.c
+    ${LIBWRAP_SRC_DIR}/impl/Route.c
+    ${LIBWRAP_SRC_DIR}/impl/RouteCondition.c
+    ${LIBWRAP_SRC_DIR}/impl/RouteList.c
+    ${LIBWRAP_SRC_DIR}/impl/SBT.c
+    ${LIBWRAP_SRC_DIR}/impl/Schedule.c
+    ${LIBWRAP_SRC_DIR}/impl/ScheduleEntry.c
+    ${LIBWRAP_SRC_DIR}/impl/ScheduleList.c
+    ${LIBWRAP_SRC_DIR}/impl/SelTab.c
+    ${LIBWRAP_SRC_DIR}/impl/SelTabList.c
+    ${LIBWRAP_SRC_DIR}/impl/SelTabPos.c
+    ${LIBWRAP_SRC_DIR}/impl/Service.c
+    ${LIBWRAP_SRC_DIR}/impl/Signal.c
+    ${LIBWRAP_SRC_DIR}/impl/SignalList.c
+    ${LIBWRAP_SRC_DIR}/impl/SnmpService.c
+    ${LIBWRAP_SRC_DIR}/impl/SpeedCondition.c
+    ${LIBWRAP_SRC_DIR}/impl/SPL.c
+    ${LIBWRAP_SRC_DIR}/impl/SrcpBus.c
+    ${LIBWRAP_SRC_DIR}/impl/SRCP.c
+    ${LIBWRAP_SRC_DIR}/impl/SrcpCon.c
+    ${LIBWRAP_SRC_DIR}/impl/Stage.c
+    ${LIBWRAP_SRC_DIR}/impl/StageList.c
+    ${LIBWRAP_SRC_DIR}/impl/StageSection.c
+    ${LIBWRAP_SRC_DIR}/impl/State.c
+    ${LIBWRAP_SRC_DIR}/impl/Sunrise.c
+    ${LIBWRAP_SRC_DIR}/impl/Sunset.c
+    ${LIBWRAP_SRC_DIR}/impl/SvnLog.c
+    ${LIBWRAP_SRC_DIR}/impl/SvnLogEntry.c
+    ${LIBWRAP_SRC_DIR}/impl/Switch.c
+    ${LIBWRAP_SRC_DIR}/impl/SwitchCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/SwitchList.c
+    ${LIBWRAP_SRC_DIR}/impl/SysCmd.c
+    ${LIBWRAP_SRC_DIR}/impl/SystemActions.c
+    ${LIBWRAP_SRC_DIR}/impl/Tcp.c
+    ${LIBWRAP_SRC_DIR}/impl/Text.c
+    ${LIBWRAP_SRC_DIR}/impl/TextList.c
+    ${LIBWRAP_SRC_DIR}/impl/Tour.c
+    ${LIBWRAP_SRC_DIR}/impl/TourList.c
+    ${LIBWRAP_SRC_DIR}/impl/Trace.c
+    ${LIBWRAP_SRC_DIR}/impl/Track.c
+    ${LIBWRAP_SRC_DIR}/impl/TrackList.c
+    ${LIBWRAP_SRC_DIR}/impl/TTTrack.c
+    ${LIBWRAP_SRC_DIR}/impl/Turntable.c
+    ${LIBWRAP_SRC_DIR}/impl/TurntableList.c
+    ${LIBWRAP_SRC_DIR}/impl/uConS88.c
+    ${LIBWRAP_SRC_DIR}/impl/Variable.c
+    ${LIBWRAP_SRC_DIR}/impl/VariableList.c
+    ${LIBWRAP_SRC_DIR}/impl/Waybill.c
+    ${LIBWRAP_SRC_DIR}/impl/WaybillList.c
+    ${LIBWRAP_SRC_DIR}/impl/Weather.c
+    ${LIBWRAP_SRC_DIR}/impl/WeatherColor.c
+    ${LIBWRAP_SRC_DIR}/impl/WeatherList.c
+    ${LIBWRAP_SRC_DIR}/impl/WeatherTheme.c
+    ${LIBWRAP_SRC_DIR}/impl/WebClient.c
+    ${LIBWRAP_SRC_DIR}/impl/wrapper.c
+    ${LIBWRAP_SRC_DIR}/impl/wrapperinfo.c
+    ${LIBWRAP_SRC_DIR}/impl/ZLevel.c
+    )
+  
+add_library(wrapper STATIC ${LIBWRAP_SRC})
+set_target_properties(wrapper PROPERTIES FOLDER "Libs")
+target_link_libraries(wrapper rocs)
+
+# the freerail (rocrail) binary target
+set(FREERAIL_SRC
+    impl/action.c
+    impl/analyse.c
+    impl/app.c
+    impl/block.c
+    impl/blockgroup.c
+    impl/car.c
+    impl/clntcon.c
+    impl/control.c
+    impl/dec.c
+    impl/fback.c
+    impl/hclient.c
+    impl/http.c
+    impl/location.c
+    impl/loc.c
+    impl/main.c
+    impl/model.c
+    impl/modelutils.c
+    impl/modplan.c
+    impl/module.c
+    impl/mvtrack.c
+    impl/operator.c
+    impl/output.c
+    impl/pclient.c
+    impl/powerman.c
+    impl/r2rnet.c
+    impl/rcon.c
+    impl/route.c
+    impl/script.c
+    impl/seltab.c
+    impl/signal.c
+    impl/snmp.c
+    impl/srcpcon.c
+    impl/stage.c
+    impl/switch.c
+    impl/text.c
+    impl/track.c
+    impl/tt.c
+    impl/var.c
+    impl/weather.c
+    impl/web
+    impl/xmlscript.c
+    )
+set(FREERAIL_WEB_SRC
+    impl/web/rocweb.c
+    )
+add_executable(freerail
+    ${FREERAIL_SRC}
+    ${FREERAIL_WEB_SRC}
+    ${LIBWEB_SRC}
+    )
+
+set_target_properties(freerail PROPERTIES FOLDER "Executables/FreeRail") 
+
+set(FREERAILLIBS 
+    wrapper
+    frail
+    rocutils
+    rocs
+    ${LIBS})
+if(WIN32)
+    list(APPEND FREERAILLIBS ws2_32 iphlpapi mpr winmm)
+endif(WIN32)
+target_link_libraries(freerail ${FREERAILLIBS})

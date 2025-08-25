@@ -1,0 +1,497 @@
+<html>
+<head>
+  <title>RocRail Interfaces</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+<h2>RocRail Interfaces</h2>
+XML: $Source: /cvsroot/rojav/rocint/rocint.xml,v $<br>
+XML: $Revision: 1.4 $<br>
+Module: RocInt<br>
+Auto generated at: Fri Aug  3 14:03:34 2018
+<br>
+Index: <a href="rocintapi-index.html">rocintapi-index.html</a><br>
+<p><a name="BlockBase"/><h3>1. <i>interface BlockBase</i></h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="BlockBase"/><tt>Summary of interface BlockBase<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_acceptIdent"/><tt><b>acceptIdent( iOBlockBase <i>inst</i>, Boolean <i>accept</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_allowBBT"/><tt><b>allowBBT( iOBlockBase <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_cmd"/><tt><b>cmd( iOBlockBase <i>inst</i>, iONode <i>cmd</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>BlockBase instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>cmd</i></tt></td><td>Command node</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_depart"/><tt><b>depart( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_didNotDepart"/><tt><b>didNotDepart( iOBlockBase <i>inst</i>, const char* <i>LocoId</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_enterBlock"/><tt><b>enterBlock( iOBlockBase <i>inst</i>, const char* <i>locid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>locid</i></tt></td><td>Loc id</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_event"/><tt><b>event( iOBlockBase <i>inst</i>, Boolean <i>puls</i>, const char* <i>id</i>, const char* <i>ident1</i>, const char* <i>ident2</i>, const char* <i>ident3</i>, const char* <i>ident4</i>, int <i>val</i>, int <i>wheelcount</i>, iONode <i>evtDescr</i>, Boolean <i>dir</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>puls</i></tt></td><td>event value</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>event(fb) ID</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ident1</i></tt></td><td>ID of object which triggered the event.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ident2</i></tt></td><td>ID of object which triggered the event.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ident3</i></tt></td><td>ID of object which triggered the event.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ident4</i></tt></td><td>ID of object which triggered the event.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Value of object which triggered the event.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>wheelcount</i></tt></td><td>Number of wheels counted sofar.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>evtDescr</i></tt></td><td>event description: optional</td><td>*</td><td></td></tr>
+<tr><td><tt><i>dir</i></tt></td><td>Running direction of loco</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_exitBlock"/><tt><b>exitBlock( iOBlockBase <i>inst</i>, const char* <i>locid</i>, Boolean <i>unexpected</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>locid</i></tt></td><td>Loco id</td><td>*</td><td></td></tr>
+<tr><td><tt><i>unexpected</i></tt></td><td>Train did not stop within the IN section.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getDepartDelay"/><tt><b>getDepartDelay( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block departure delay</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="BlockBase_getFromBlockId"/><tt><b>getFromBlockId( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="BlockBase_getInLoc"/><tt><b>getInLoc( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Loc instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="BlockBase_getLoc"/><tt><b>getLoc( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Loc instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOBlockBase</tt></td><td valign="top"><a name="BlockBase_getManager"/><tt><b>getManager( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getMaxKmh"/><tt><b>getMaxKmh( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getOccTime"/><tt><b>getOccTime( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getRandomRate"/><tt><b>getRandomRate( iOBlockBase <i>inst</i>, const char* <i>lcid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="BlockBase_getState"/><tt><b>getState( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getTDaddress"/><tt><b>getTDaddress( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="BlockBase_getTDiid"/><tt><b>getTDiid( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getTDport"/><tt><b>getTDport( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="BlockBase_getVelocity"/><tt><b>getVelocity( iOBlockBase <i>inst</i>, int* <i>percent</i>, Boolean <i>onexit</i>, Boolean <i>reverse</i>, Boolean <i>onstop</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>percent</i></tt></td><td>Speed percent</td><td>*</td><td></td></tr>
+<tr><td><tt><i>onexit</i></tt></td><td>Speed on exit</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>onstop</i></tt></td><td>On stop speed</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getVisitCnt"/><tt><b>getVisitCnt( iOBlockBase <i>inst</i>, const char* <i>locid</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getWait"/><tt><b>getWait( iOBlockBase <i>inst</i>, iOLoc <i>loc</i>, Boolean <i>reverse</i>, int* <i>oppwait</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>loc</i></tt></td><td>Loc instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>oppwait</i></tt></td><td>Wait for opposite direction.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_getWheelCount"/><tt><b>getWheelCount( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>float</tt></td><td valign="top"><a name="BlockBase_getmvspeed"/><tt><b>getmvspeed( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>get last speed measured in this block</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_green"/><tt><b>green( iOBlockBase <i>inst</i>, Boolean <i>distant</i>, Boolean <i>reverse</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>distant</i></tt></td><td>distant signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_hasClass"/><tt><b>hasClass( iOBlockBase <i>inst</i>, const char* <i>class</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_hasEnter2Route"/><tt><b>hasEnter2Route( iOBlockBase <i>inst</i>, const char* <i>fromBlockId</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>fromBlockId</i></tt></td><td>from block ID</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_hasExtStop"/><tt><b>hasExtStop( iOBlockBase <i>inst</i>, const char* <i>locoid</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="BlockBase_hasManualSignal"/><tt><b>hasManualSignal( iOBlockBase <i>inst</i>, Boolean <i>distant</i>, Boolean <i>reverse</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>distant</i></tt></td><td>distant signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_hasPre2In"/><tt><b>hasPre2In( iOBlockBase <i>inst</i>, const char* <i>fromBlockId</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>fromBlockId</i></tt></td><td>from block ID</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_inBlock"/><tt><b>inBlock( iOBlockBase <i>inst</i>, const char* <i>locid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>locid</i></tt></td><td>Loc id</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_init"/><tt><b>init( iOBlockBase <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isDepartureAllowed"/><tt><b>isDepartureAllowed( iOBlockBase <i>inst</i>, const char* <i>LocoId</i>, Boolean <i>force</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isFree"/><tt><b>isFree( iOBlockBase <i>inst</i>, const char* <i>locid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>locid</i></tt></td><td>Querying loc</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isFreeBlockOnEnter"/><tt><b>isFreeBlockOnEnter( iOBlockBase <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isLinked"/><tt><b>isLinked( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isReady"/><tt><b>isReady( iOBlockBase <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isState"/><tt><b>isState( iOBlockBase <i>inst</i>, const char* <i>state</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>state</i></tt></td><td>State to compare with.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="BlockBase_isSuited"/><tt><b>isSuited( iOBlockBase <i>inst</i>, iOLoc <i>loc</i>, int* <i>restlen</i>, Boolean <i>checkprev</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>loc</i></tt></td><td>Loc instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isTD"/><tt><b>isTD( iOBlockBase <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isTTBlock"/><tt><b>isTTBlock( iOBlockBase <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_isTerminalStation"/><tt><b>isTerminalStation( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_link"/><tt><b>link( iOBlockBase <i>inst</i>, iOBlockBase <i>linkto</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>linkto</i></tt></td><td>link to block</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_lock"/><tt><b>lock( iOBlockBase <i>inst</i>, const char* <i>locid</i>, const char* <i>blockid</i>, const char* <i>routeid</i>, Boolean <i>crossing</i>, Boolean <i>reset</i>, Boolean <i>reverse</i>, int <i>indelay</i>, const char* <i>masterId</i>, Boolean <i>force</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>locid</i></tt></td><td>Locking loc</td><td>*</td><td></td></tr>
+<tr><td><tt><i>blockid</i></tt></td><td>Comming from block</td><td>*</td><td></td></tr>
+<tr><td><tt><i>routeid</i></tt></td><td>Route ID</td><td>*</td><td></td></tr>
+<tr><td><tt><i>crossing</i></tt></td><td>if this block overlaps turnouts used by other routes, this flag does ignore all events!</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reset</i></tt></td><td>reset all triggers</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse enter</td><td>*</td><td></td></tr>
+<tr><td><tt><i>indelay</i></tt></td><td>in event delay timer</td><td>*</td><td></td></tr>
+<tr><td><tt><i>masterId</i></tt></td><td>Master block</td><td>*</td><td></td></tr>
+<tr><td><tt><i>force</i></tt></td><td>force reverse by action</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_lockForGroup"/><tt><b>lockForGroup( iOBlockBase <i>inst</i>, const char* <i>locid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>locid</i></tt></td><td>Locking loc</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_red"/><tt><b>red( iOBlockBase <i>inst</i>, Boolean <i>distant</i>, Boolean <i>reverse</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>distant</i></tt></td><td>distant signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_reset"/><tt><b>reset( iOBlockBase <i>inst</i>, Boolean <i>saveCurBlock</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>saveCurBlock</i></tt></td><td>save current block occupation</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_resetTD"/><tt><b>resetTD( iOBlockBase <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_resetTrigs"/><tt><b>resetTrigs( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setAnalog"/><tt><b>setAnalog( iOBlockBase <i>inst</i>, Boolean <i>analog</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setCarCount"/><tt><b>setCarCount( iOBlockBase <i>inst</i>, int <i>count</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>count</i></tt></td><td>Car count; Count cars before firing an event.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setClass"/><tt><b>setClass( iOBlockBase <i>inst</i>, const char* <i>class</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setDefaultAspect"/><tt><b>setDefaultAspect( iOBlockBase <i>inst</i>, Boolean <i>signalpair</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setGhostDetected"/><tt><b>setGhostDetected( iOBlockBase <i>inst</i>, const char* <i>key</i>, const char* <i>ident</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setGroup"/><tt><b>setGroup( iOBlockBase <i>inst</i>, const char* <i>group</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_setLocSchedule"/><tt><b>setLocSchedule( iOBlockBase <i>inst</i>, const char* <i>scid</i>, Boolean <i>manual</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>scid</i></tt></td><td>schedule for current loc</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_setLocTour"/><tt><b>setLocTour( iOBlockBase <i>inst</i>, const char* <i>tourid</i>, Boolean <i>manual</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>tourid</i></tt></td><td>tour for current loc</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setManager"/><tt><b>setManager( iOBlockBase <i>inst</i>, iOBlockBase <i>manager</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setMasterID"/><tt><b>setMasterID( iOBlockBase <i>inst</i>, const char* <i>masterid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="BlockBase_setTempWait"/><tt><b>setTempWait( iOBlockBase <i>inst</i>, Boolean <i>wait</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_unLink"/><tt><b>unLink( iOBlockBase <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_unLock"/><tt><b>unLock( iOBlockBase <i>inst</i>, const char* <i>locid</i>, const char* <i>routeid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>locid</i></tt></td><td>Unlocking loc</td><td>*</td><td></td></tr>
+<tr><td><tt><i>routeid</i></tt></td><td>By route</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_unLockForGroup"/><tt><b>unLockForGroup( iOBlockBase <i>inst</i>, const char* <i>locid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>locid</i></tt></td><td>Unlocking loc</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_wait"/><tt><b>wait( iOBlockBase <i>inst</i>, iOLoc <i>loc</i>, Boolean <i>reverse</i>, Boolean* <i>oppwait</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>loc</i></tt></td><td>Loc instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>oppwait</i></tt></td><td>Wait for opposite direction.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_white"/><tt><b>white( iOBlockBase <i>inst</i>, Boolean <i>distant</i>, Boolean <i>reverse</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>distant</i></tt></td><td>distant signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="BlockBase_yellow"/><tt><b>yellow( iOBlockBase <i>inst</i>, Boolean <i>distant</i>, Boolean <i>reverse</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Block instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>distant</i></tt></td><td>distant signal</td><td>*</td><td></td></tr>
+<tr><td><tt><i>reverse</i></tt></td><td>reverse signal</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DigInt"/><h3>2. <i>interface DigInt</i></h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DigInt"/><tt>Summary of interface DigInt<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void (*digint_listener)(obj,iONode,int)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void (*digint_rawlistener)(obj,byte*,int)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>iONode(*queryProperties)(obj,const char*,const char*)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="DigInt_cmd"/><tt><b>cmd( obj <i>inst</i>, const iONode <i>cmd</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>byte*</tt></td><td valign="top"><a name="DigInt_cmdRaw"/><tt><b>cmdRaw( obj <i>inst</i>, const byte* <i>cmd</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="DigInt_halt"/><tt><b>halt( obj <i>inst</i>, Boolean <i>poweroff</i>, Boolean <i>shutdown</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="DigInt_setListener"/><tt><b>setListener( obj <i>inst</i>, obj <i>listenerObj</i>, const digint_listener <i>listenerFun</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="DigInt_setRawListener"/><tt><b>setRawListener( obj <i>inst</i>, obj <i>listenerObj</i>, const digint_rawlistener <i>listenerRawFun</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="DigInt_shortcut"/><tt><b>shortcut( obj <i>inst</i> );</b></tt><br>external shortcut event</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="DigInt_state"/><tt><b>state( obj <i>inst</i> );</b></tt><br>bit0=power, bit1=programming, bit2=connection</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="DigInt_supportPT"/><tt><b>supportPT( obj <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="DigInt_version"/><tt><b>version( obj <i>inst</i> );</b></tt><br>vmajor*1000 + vminor*100 + patch</td></tr>
+</table></p>
+<p><a name="LcDriverInt"/><h3>3. <i>interface LcDriverInt</i></h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Interface for a LcDriver<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="LcDriverInt"/><tt>Summary of interface LcDriverInt<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_brake"/><tt><b>brake( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_curblock"/><tt><b>curblock( iOLcDriverInt <i>inst</i>, const char* <i>blockid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>blockid</i></tt></td><td>New current block.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_drive"/><tt><b>drive( iOLcDriverInt <i>inst</i>, obj <i>emitter</i>, int <i>event</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>emitter</i></tt></td><td>Sender of event</td><td>*</td><td></td></tr>
+<tr><td><tt><i>event</i></tt></td><td>Event code</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="LcDriverInt_getCurblock"/><tt><b>getCurblock( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="LcDriverInt_getCurroute"/><tt><b>getCurroute( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="LcDriverInt_getGotoblock"/><tt><b>getGotoblock( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="LcDriverInt_getScheduleIdx"/><tt><b>getScheduleIdx( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="LcDriverInt_getschedule"/><tt><b>getschedule( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="LcDriverInt_gettour"/><tt><b>gettour( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_go"/><tt><b>go( iOLcDriverInt <i>inst</i>, Boolean <i>gomanual</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>gomanual</i></tt></td><td>half-automatic mode</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_goNet"/><tt><b>goNet( iOLcDriverInt <i>inst</i>, Boolean <i>gomanual</i>, const char* <i>curblock</i>, const char* <i>nextblock</i>, const char* <i>nextroute</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>gomanual</i></tt></td><td>half-automatic mode</td><td>*</td><td></td></tr>
+<tr><td><tt><i>curblock</i></tt></td><td>current block</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nextblock</i></tt></td><td>next block</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nextroute</i></tt></td><td>next route</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_gogo"/><tt><b>gogo( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_gotoblock"/><tt><b>gotoblock( iOLcDriverInt <i>inst</i>, const char* <i>blockid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>blockid</i></tt></td><td>Block to find.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_info"/><tt><b>info( iOLcDriverInt <i>inst</i>, iONode <i>info</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>info</i></tt></td><td>Info node</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="LcDriverInt_isRun"/><tt><b>isRun( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_reset"/><tt><b>reset( iOLcDriverInt <i>inst</i>, Boolean <i>saveCurBlock</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>saveCurBlock</i></tt></td><td>save current block occupation</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="LcDriverInt_stepvirtual"/><tt><b>stepvirtual( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_stop"/><tt><b>stop( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_stopNet"/><tt><b>stopNet( iOLcDriverInt <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_useschedule"/><tt><b>useschedule( iOLcDriverInt <i>inst</i>, const char* <i>scheduleid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>scheduleid</i></tt></td><td>Schedule to use.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LcDriverInt_usetour"/><tt><b>usetour( iOLcDriverInt <i>inst</i>, const char* <i>tourid</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>LcDriver instance</td><td>*</td><td></td></tr>
+<tr><td><tt><i>tourid</i></tt></td><td>Tour to use.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="LcDriverInt_version"/><tt><b>version( obj <i>inst</i> );</b></tt><br>vmajor*1000 + vminor*100 + patch</td></tr>
+</table></p>
+</body>
+</html>

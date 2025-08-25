@@ -1,0 +1,31 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  3 2018 14:01:50)
+  * Module: RocRail
+  * XML: $Source: /cvsroot/rojav/rocrail/rocrail.xml,v $
+  * XML: $Revision: 1.56 $
+  * Date: Fri Aug  3 14:03:35 2018
+  */
+
+struct OModule ModuleOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _getRotationArea,
+  _inst,
+  _rotate180,
+  _rotate270,
+  _rotate90,
+  _rotateModule,
+};

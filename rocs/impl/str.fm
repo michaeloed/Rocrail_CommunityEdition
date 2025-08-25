@@ -1,0 +1,59 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  2 2018 14:02:35)
+  * Module: rocs
+  * XML: $Source: /home/cvs/xspooler/rocs/rocs.xml,v $
+  * XML: $Revision: 1.85 $
+  * Date: Thu Aug  2 14:02:39 2018
+  */
+
+struct OStr StrOp = {
+  _byteToStr,
+  _cat,
+  _catID,
+  _copy,
+  _copynz,
+  _createStamp,
+  _createStampID,
+  _createStampNoDots,
+  _decode4URL,
+  _dup,
+  _dupID,
+  _encode4URL,
+  _endsWith,
+  _endsWithi,
+  _equals,
+  _equalsi,
+  _equalsn,
+  _equalsni,
+  _find,
+  _findc,
+  _findi,
+  _fmt,
+  _fmtID,
+  _fmtb,
+  _freeStr,
+  _freeStrID,
+  _getCntLinefeeds,
+  _getExtension,
+  _getLine,
+  _getLineID,
+  _getNextLine,
+  _int2snz,
+  _isoDate,
+  _isoTime,
+  _len,
+  _long2snz,
+  _replaceAll,
+  _replaceAllSub,
+  _replaceAllSubstitutions,
+  _snz2sz,
+  _snz2szID,
+  _startsWith,
+  _startsWithi,
+  _strToByte,
+  __strlwr,
+  __strupr,
+  _trim,
+  _trimID,
+};

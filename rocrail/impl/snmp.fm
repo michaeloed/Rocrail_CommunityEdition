@@ -1,0 +1,54 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  3 2018 14:01:50)
+  * Module: RocRail
+  * XML: $Source: /cvsroot/rojav/rocrail/rocrail.xml,v $
+  * XML: $Revision: 1.56 $
+  * Date: Fri Aug  3 14:03:35 2018
+  */
+
+struct OSNMP SNMPOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  0x30,
+  0xA0,
+  0xA1,
+  0xA2,
+  0xA3,
+  0xA4,
+  0xA5,
+  2,
+  4,
+  6,
+  5,
+  67,
+  64,
+  130,
+  0,
+  1,
+  2,
+  3,
+  7,
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  _exception,
+  _inst,
+  _link,
+  _shutdown,
+};

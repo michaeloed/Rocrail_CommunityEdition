@@ -1,0 +1,5 @@
+;LIBRARY bidib
+
+EXPORTS
+	bidibGetClassName		  @1
+  bidibGetFeatureName   @2

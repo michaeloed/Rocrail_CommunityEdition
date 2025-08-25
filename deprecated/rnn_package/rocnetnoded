@@ -1,0 +1,46 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides: rocnetnoded
+# Required-Start: $all
+# Required-Stop:
+# Default-Start: 2 3
+# Default-Stop: 0 1 6
+# Short-Description: Starts the RocNetNode Daemon
+# Description: Starts the RocNetNode Daemon
+### END INIT INFO
+
+rocnetnoded_BIN=/opt/rocnet/rocnetnode
+rocnetnoded_PID=/tmp/rocnetnoded.pid
+rocnetnoded_SH=/opt/rocnet/rocnetnode.sh
+
+if [ ! -x $rocnetnoded_BIN ] ; then
+	echo -n "RocNetNode not installed ! "
+	exit 5
+fi
+
+case "$1" in
+    start)
+	if [ ! -e $rocnetnoded_PID ] ; then
+		echo "Starting RocNetNode"
+	else
+		echo "rocnetnoded.pid already exists ! "
+		exit 5
+	fi
+ 	su - root -c "$rocnetnoded_SH"
+	;;
+    stop)
+	if [ -e $rocnetnoded_PID ] ; then
+		echo "Shutting down RocNetNode"
+	else
+		echo "RocNetNode not running or missing PID File ! "
+		exit 5
+	fi
+	su - root -c "kill `head $rocnetnoded_PID`"
+	su - root -c "rm $rocnetnoded_PID"
+	;;
+*)
+	echo "Usage: $0 {start|stop}"
+	exit 1
+
+esac

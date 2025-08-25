@@ -1,0 +1,228 @@
+====== Build Rocrail from sources ======
+[[english|{{ rocrail-logo-35.png}}]]
+[[:develop-corner-en|Developer corner]] 
+  * **[[:develop-corner-en#windows|Windows]]**
+ \\
+
+====== From the scratch ======
+=====Installing GIT=====
+Download GIT from [[http://git-scm.com/download/win]]\\
+
+**Git-2.14.2.3-64-bit.exe** (or current version)
+\\
+Just follow the installer with all its defaults.\\
+\\
+
+=====Get Rocrail Sources=====
+Access to Sources have to be granted in advance by Rocrail (request in the forum).\\
+
+start the **Git CMD** application
+  * git clone <granted link> for the first time
+  
+
+\\
+
+=====Installing MinGW=====
+Download TDM-GCC from http://tdm-gcc.tdragon.net/download \\
+
+====32 Bit====
+32bit: **tdm-gcc-5.1.0-3.exe**\\
+
+====64 Bit====
+64bit: **tdm64-gcc-5.1.0-2.exe** (Make sure the 32 bit compiler is deinstalled.)\\
+
+Just follow the installer with all its defaults.\\
+
+ \\
+
+=====Get wxWidgets Source=====
+Download:\\
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.0.3/wxWidgets-3.0.3.zip
+
+Extract wxWidgets-3.0.3.zip into Downloads\wxWidgets-3.0.3
+
+ \\
+=====Enable Graphics Context=====
+wxGraphicsContext is disabled by default for other compilers than Visual C++.\\
+To enable it you just have to edit the "setup.h" file (in the include\wx\msw subfolder of the wxWidgets sources).\\
+If the file is not present, make a copy of the one named "setup0.h" and name it "setup.h"\\
+In this file, search for wxGraphicsContext.\\
+You should find a section like the following (this is the wx-3.0.x version of the setup.h file):\\
+<code c>
+// notice that we can't use wxCHECK_VISUALC_VERSION() here as this file is
+// included from wx/platform.h before wxCHECK_VISUALC_VERSION() is defined
+#ifdef _MSC_VER
+#   if _MSC_VER >= 1310
+        // MSVC7.1+ comes with new enough Platform SDK, enable
+        // wxGraphicsContext support for it
+#       define wxUSE_GRAPHICS_CONTEXT 1
+#   else
+        // MSVC 6 didn't include GDI+ headers so disable by default, enable it
+        // here if you use MSVC 6 with a newer SDK
+#       define wxUSE_GRAPHICS_CONTEXT 0
+#   endif
+#else
+    // Disable support for other Windows compilers, enable it if your compiler
+    // comes with new enough SDK or you installed the headers manually.
+    //
+    // Notice that this will be set by configure under non-Windows platforms
+    // anyhow so the value there is not important.
+#   define wxUSE_GRAPHICS_CONTEXT 0
+#endif
+</code>
+
+Replace the last # define wxUSE_GRAPHICS_CONTEXT 0 by **# define wxUSE_GRAPHICS_CONTEXT 1**\\
+Save and launch the build process and wxGraphicsContext should be enabled.\\
+
+ \\
+
+=====Build the libraries=====
+Open a terminal. (cmd.exe)\\
+<code>
+cd Downloads\wxWidgets-3.0.3\build\msw
+mingw32-make -f makefile.gcc BUILD=release UNICODE=1 MONOLITHIC=1 SHARED=0 USE_GUI=1 CXXFLAGS="-std=gnu++11"
+</code>
+After the build is ready, the libraries are found here:
+<code>
+Downloads\wxWidgets-3.0.3\lib\gcc_lib
+</code>
+
+====Enable Graphics Context====
+In the build setup.h file the wxUSE_GRAPHICS_CONTEXT must also be set to 1.\\
+Path to the setup.h is:
+<code>
+lib\gcc_lib\mswu\wx\setup.h
+</code>
+See also [[#enable_graphics_context|Enable Graphics Context in the sources]]\\
+
+ \\
+=====Build Rocrail=====
+
+As a prerequisite move the full wxWidgets-3.0.3 directory from
+
+<code>
+Downloads\wxWidgets-3.0.3
+</code>
+
+to
+
+<code>
+\Users\<name>\wxWidgets-3.0.3
+</code>
+
+(or any path you may use)
+\\
+\\
+
+=====Build the project=====
+Open a terminal and:
+====32 Bit====
+<code>
+cd C:\Users\<name>\Rocrail
+mingw32-make PLATFORM=WIN32 NATIVE=WIN32 DEBUG= MINGWINSTALL=C:\Users\<name>\wxWidgets-3.0.3
+</code>
+
+====64 Bit====
+<code>
+cd C:\Users\<name>\Rocrail
+mingw32-make PLATFORM=WIN64 NATIVE=WIN64 DEBUG= MINGWINSTALL=C:\Users\<name>\wxWidgets-3.0.3
+</code>
+
+If another path for wxwidgets was chosen, then MINGWINSTALL= have to point the selected path. 
+\\
+\\
+
+=====Transfer into operational Rocrail environment =====
+After successful compilation the new build is located in
+<code>
+C:\Users\<name>\Rocrail\winbin
+</code>
+
+Move rocrail.exe, rocview.exe, all .dll and optional the svg directory in your operational Rocrail directory
+
+======Build Rocrail Update ======
+
+=====Get Rocrail Update=====
+Updates are only possible after the procedure from the scratch. The whole environment and a local git clone & build have to be in place.
+
+Start the **Git CMD** application
+
+<code>
+cd C:\Users\<name>\Rocrail
+git pull 
+</code>
+\\
+
+=====Build the project=====
+Open a terminal and:
+====32 Bit====
+<code>
+cd C:\Users\<name>\Rocrail
+mingw32-make PLATFORM=WIN32 NATIVE=WIN32 DEBUG= MINGWINSTALL=C:\Users\<name>\wxWidgets-3.0.3
+</code>
+
+====64 Bit====
+<code>
+cd C:\Users\<name>\Rocrail
+mingw32-make PLATFORM=WIN64 NATIVE=WIN64 DEBUG= MINGWINSTALL=C:\Users\<name>\wxWidgets-3.0.3
+</code>
+
+If another path for wxwidgets was chosen, then MINGWINSTALL= have to point the selected path. 
+\\
+\\
+
+=====Transfer into operational Rocrail environment =====
+After successful compilation the new build is located in
+<code>
+C:\Users\<name>\(Projects)\Rocrail\winbin
+</code>
+
+Move rocrail.exe, rocview.exe, all .dll and optional the svg directory in your operational Rocrail directory
+
+
+
+
+
+====== Build Rocrail with debug option ======
+Sometimes debugging will create useful information for the developers, especially when there is a Rocrail server crash.\\
+Building Rocrail from sources for debugging needs the same environment as described above.\\
+\\
+Open a terminal and:
+
+====32 Bit====
+<code>
+cd C:\Users\<name>\Rocrail
+mingw32-make PLATFORM=WIN32 NATIVE=WIN32 MINGWINSTALL=C:\Users\<name>\wxWidgets-3.0.3
+</code>
+
+====64 Bit====
+<code>
+cd C:\Users\<name>\Rocrail
+mingw32-make PLATFORM=WIN64 NATIVE=WIN64 MINGWINSTALL=C:\Users\<name>\wxWidgets-3.0.3
+</code>
+
+If another path for wxwidgets was chosen, then MINGWINSTALL= have to point the selected path. 
+\\
+\\
+After successful compilation the new debug build is located in
+<code>
+C:\Users\<name>\Rocrail\winbin
+</code>
+
+
+=====Start the Rocrail Server in gdb Environment =====
+
+Open a console\\
+
+<code>
+cd C:\Users\<name>\Rocrail\winbin
+gdb --args rocrail.exe -l <your-dll-directory> -w <your-workspace-directory>
+
+[example: gdb --args rocrail.exe -l c:\users\xxx\rocrail\winbin -w c:\users\xxx\documents\ROCRAIL\Taktplan_8_FPA5]
+
+run
+</code>
+
+  * After starting the server with this options start Rocview and the plan to test&debug should be presented.\\
+  * When the server crash occurs, switch immediately to the console windows and enter the cmd **bt** (which means backtrace)\\
+  * Copy the full information of the **bt** output into a editor, save the file and post it in the Rocrail Forum for analysis.

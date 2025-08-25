@@ -1,0 +1,2539 @@
+<html>
+<head>
+  <title>Rocs API</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+<h2>Rocs API</h2>
+XML: $Source: /home/cvs/xspooler/rocs/rocs.xml,v $<br>
+XML: $Revision: 1.85 $<br>
+Module: rocs<br>
+Auto generated at: Fri Jun 12 09:55:11 2015
+<br>
+Index: <a href="rocsapi-index.html">rocsapi-index.html</a><br>
+<p><a name="Attr"/><h3>1. object Attr</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+DOM Attribute as used in Node.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Attr"/><tt>Summary of object Attr<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Attr_getBoolean"/><tt><b>getBoolean( iOAttr <i>inst</i> );</b></tt><br>Attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Attr_getEscVal"/><tt><b>getEscVal( iOAttr <i>inst</i> );</b></tt><br>Escaped attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>double</tt></td><td valign="top"><a name="Attr_getFloat"/><tt><b>getFloat( iOAttr <i>inst</i> );</b></tt><br>Attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Attr_getInt"/><tt><b>getInt( iOAttr <i>inst</i> );</b></tt><br>Attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Attr_getLong"/><tt><b>getLong( iOAttr <i>inst</i> );</b></tt><br>Attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Attr_getName"/><tt><b>getName( iOAttr <i>inst</i> );</b></tt><br>Attribute name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Attr_getVal"/><tt><b>getVal( iOAttr <i>inst</i> );</b></tt><br>Attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOAttr</tt></td><td valign="top"><a name="Attr_inst"/><tt><b>inst( const char* <i>name</i>, const char* <i>val</i> );</b></tt><br>Creates an attribute with given name and value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Attribute value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOAttr</tt></td><td valign="top"><a name="Attr_instInt"/><tt><b>instInt( const char* <i>name</i>, int <i>val</i> );</b></tt><br>Creates an attribute with given name and integer value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Attribute value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Attr_setBoolean"/><tt><b>setBoolean( iOAttr <i>inst</i>, Boolean <i>val</i> );</b></tt><br>Change attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>New attribute value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Attr_setFloat"/><tt><b>setFloat( iOAttr <i>inst</i>, double <i>val</i> );</b></tt><br>Change attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>New attribute value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Attr_setInt"/><tt><b>setInt( iOAttr <i>inst</i>, int <i>val</i> );</b></tt><br>Change attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>New attribute value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Attr_setLong"/><tt><b>setLong( iOAttr <i>inst</i>, long <i>val</i> );</b></tt><br>Change attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>New attribute value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Attr_setName"/><tt><b>setName( iOAttr <i>inst</i>, const char* <i>name</i> );</b></tt><br>Change attribute name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>name</i></tt></td><td>New attribute name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Attr_setVal"/><tt><b>setVal( iOAttr <i>inst</i>, const char* <i>val</i> );</b></tt><br>Change attribute value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Attribute instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>New attribute value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="CmdLn"/><h3>2. object CmdLn</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Commandline helper object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="CmdLn"/><tt>Summary of object CmdLn<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="CmdLn_getIntDef"/><tt><b>getIntDef( iOCmdLn <i>inst</i>, const char* <i>key</i>, int <i>defval</i> );</b></tt><br>Get an integer value by key. Returns given default value if not found.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>CmdLn instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Default value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="CmdLn_getStr"/><tt><b>getStr( iOCmdLn <i>inst</i>, const char* <i>key</i> );</b></tt><br>Get a string value by key.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>CmdLn instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="CmdLn_getStrDef"/><tt><b>getStrDef( iOCmdLn <i>inst</i>, const char* <i>key</i>, const char* <i>defval</i> );</b></tt><br>Get a string value by key. Returns given default value if not found.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>CmdLn instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Default value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="CmdLn_hasKey"/><tt><b>hasKey( iOCmdLn <i>inst</i>, const char* <i>key</i> );</b></tt><br>Test if the given key was on the commandline.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>CmdLn instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOCmdLn</tt></td><td valign="top"><a name="CmdLn_inst"/><tt><b>inst( int <i>argc</i>, const char** <i>argv</i> );</b></tt><br>Creates a commandline object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>argc</i></tt></td><td>Argument count.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>argv</i></tt></td><td>Argument values.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Dir"/><h3>3. object Dir</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Directory helper object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Dir"/><tt>Summary of object Dir<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {SORT_NAME=0, SORT_OLDEST=1, SORT_NEWEST=2} sortmode</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Dir_cleandirlist"/><tt><b>cleandirlist( iOList <i>list</i> );</b></tt><br>free all memory allocated by listdir()
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>list</i></tt></td><td>Directory list.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Dir_close"/><tt><b>close( iODir <i>inst</i> );</b></tt><br>Closes the direntry.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Dir instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Dir_getRc"/><tt><b>getRc( iODir <i>inst</i> );</b></tt><br>Get the last error.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Dir instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iODir</tt></td><td valign="top"><a name="Dir_inst"/><tt><b>inst( const char* <i>path</i> );</b></tt><br>Creates a directory object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>path</i></tt></td><td>Path pointing to the directory.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOList</tt></td><td valign="top"><a name="Dir_listdir"/><tt><b>listdir( const char* <i>path</i>, const char* <i>ext</i>, sortmode <i>sort</i> );</b></tt><br>Scans the directory for entries with given ending.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>path</i></tt></td><td>Directory to scan.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ext</i></tt></td><td>File filter.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Dir_open"/><tt><b>open( iODir <i>inst</i> );</b></tt><br>Opens the directory for reading.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Dir instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Dir_read"/><tt><b>read( iODir <i>inst</i> );</b></tt><br>Reads an direntry.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Dir instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Dir_scandir"/><tt><b>scandir( const char* <i>path</i>, const char* <i>ext</i> );</b></tt><br>Scans the directory for entries with given ending.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>path</i></tt></td><td>Directory to scan.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ext</i></tt></td><td>File filter.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Doc"/><h3>4. object Doc</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+XML Document parser and builder.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Doc"/><tt>Summary of object Doc<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {MaxNodeNameLen=1024,MaxAttrNameLen=1024,MaxAttrValLen=2048} parserConst</b></tt><br>File type.</td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>ENC_UTF8</b></i> = UTF-8</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>ENC_ISO885915</b></i> = ISO-8859-15</tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Doc_getBool"/><tt><b>getBool( iODoc <i>inst</i>, const char* <i>nodename</i>, const char* <i>attrname</i>, Boolean <i>defval</i> );</b></tt><br>Search for a given attribute in the given node.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Doc instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nodename</i></tt></td><td>Node name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Default value if attribute or node is not found in the document.</td><td>True,False</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Doc_getDocNode"/><tt><b>getDocNode( iODoc <i>inst</i> );</b></tt><br>Document node keeps all 1st level nodes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Doc instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Doc_getEncoding"/><tt><b>getEncoding( void );</b></tt><br>Get XML encoding for serialize.</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Doc_getEncodingProperty"/><tt><b>getEncodingProperty( void );</b></tt><br>Get XML encoding as a property: <?xml encoding="UTF-8"?></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Doc_getInt"/><tt><b>getInt( iODoc <i>inst</i>, const char* <i>nodename</i>, const char* <i>attrname</i>, int <i>defval</i> );</b></tt><br>Search for a given attribute in the given node.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Doc instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nodename</i></tt></td><td>Node name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Default value if attribute or node is not found in the document.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Doc_getRootNode"/><tt><b>getRootNode( iODoc <i>inst</i> );</b></tt><br>This is probably what you want.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Doc instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Doc_getStr"/><tt><b>getStr( iODoc <i>inst</i>, const char* <i>nodename</i>, const char* <i>attrname</i>, const char* <i>defval</i> );</b></tt><br>Search for a given attribute in the given node.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Doc instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nodename</i></tt></td><td>Node name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Default value if attribute or node is not found in the document.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Doc_isHTMLEscapes"/><tt><b>isHTMLEscapes( void );</b></tt><br>Is HTML escapes set.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Doc_isIgnoreCase"/><tt><b>isIgnoreCase( void );</b></tt><br>Ignoring case in node and attribute names.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Doc_isUTF2Latin"/><tt><b>isUTF2Latin( void );</b></tt><br>Is UTF-8 decoded to Latin.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Doc_isUTF8Encoded"/><tt><b>isUTF8Encoded( iODoc <i>inst</i> );</b></tt><br>Is XML UTF-8 encoded.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Doc instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Doc_isUTF8Encoding"/><tt><b>isUTF8Encoding( void );</b></tt><br>UTF-8 encoding for serializing.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Doc_isUniCodeEscapes"/><tt><b>isUniCodeEscapes( void );</b></tt><br>Is UniCode escapes set.</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Doc_node2String"/><tt><b>node2String( iONode <i>node</i>, Boolean <i>escaped</i> );</b></tt><br>Represents a node recursive as string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>node</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>escaped</i></tt></td><td>Write attribute values escaped.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iODoc</tt></td><td valign="top"><a name="Doc_parse"/><tt><b>parse( const char* <i>xml</i> );</b></tt><br>Parses given buffer.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>xml</i></tt></td><td>XML buffer to parse.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Doc_setEncoding"/><tt><b>setEncoding( const char* <i>enc</i> );</b></tt><br>Set XML encoding for serialize.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>enc</i></tt></td><td>Encoding.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Doc_setHTMLEscapes"/><tt><b>setHTMLEscapes( Boolean <i>html</i> );</b></tt><br>Set HTML escapes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>html</i></tt></td><td>Default is False.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Doc_setIgnoreCase"/><tt><b>setIgnoreCase( Boolean <i>ignore</i> );</b></tt><br>Ignoring case in node and attribute names.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ignore</i></tt></td><td>Default is True.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Doc_setUTF2Latin"/><tt><b>setUTF2Latin( Boolean <i>decode</i> );</b></tt><br>Is UTF-8 decoded to Latin.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>decode</i></tt></td><td>Default is True.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Doc_setUniCodeEscapes"/><tt><b>setUniCodeEscapes( Boolean <i>uni</i> );</b></tt><br>Set UniCode escapes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>uni</i></tt></td><td>Default is False.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Doc_setXMLProlog"/><tt><b>setXMLProlog( Boolean <i>prolog</i> );</b></tt><br>Add XML Prolog.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>prolog</i></tt></td><td>Default is True.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Ebcdic"/><h3>5. object Ebcdic</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Converter for ASCII - EBCDIC.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Ebcdic"/><tt>Summary of object Ebcdic<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {CODEPAGE_DEFAULT=0,CODEPAGE_1252=1252,CODEPAGE_437=437,CODEPAGE_850=437} codepage</b></tt><br>CodePage.</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Ebcdic_Ascii2Ebcdic"/><tt><b>Ascii2Ebcdic( iOEbcdic <i>inst</i>, char* <i>ascii</i>, int <i>count</i> );</b></tt><br>Converts ascii into ebcdic.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Ebcdic instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ascii</i></tt></td><td>Ascii buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>count</i></tt></td><td>Number of chars to convert.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Ebcdic_Ebcdic2Ascii"/><tt><b>Ebcdic2Ascii( iOEbcdic <i>inst</i>, char* <i>ebcdic</i>, int <i>count</i> );</b></tt><br>Converts ebcdic into ascii.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Ebcdic instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ebcdic</i></tt></td><td>Ebcdic buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>count</i></tt></td><td>Number of chars to convert.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Ebcdic_Ebcdic2ExtAscii"/><tt><b>Ebcdic2ExtAscii( iOEbcdic <i>inst</i>, char* <i>ebcdic</i>, int <i>count</i> );</b></tt><br>Converts ebcdic into ascii.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Ebcdic instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ebcdic</i></tt></td><td>Ebcdic buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>count</i></tt></td><td>Number of chars to convert.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Ebcdic_Ebcdic2TrueAscii"/><tt><b>Ebcdic2TrueAscii( iOEbcdic <i>inst</i>, char* <i>ebcdic</i>, int <i>count</i> );</b></tt><br>Converts ebcdic into ascii.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Ebcdic instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ebcdic</i></tt></td><td>Ebcdic buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>count</i></tt></td><td>Number of chars to convert.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char</tt></td><td valign="top"><a name="Ebcdic_getAscii"/><tt><b>getAscii( iOEbcdic <i>inst</i>, char <i>ebcdic</i> );</b></tt><br>Gets the ascii coding for the given ebcdic code.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Ebcdic instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ebcdic</i></tt></td><td>Ebcdic char.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char</tt></td><td valign="top"><a name="Ebcdic_getEbcdic"/><tt><b>getEbcdic( iOEbcdic <i>inst</i>, char <i>ascii</i> );</b></tt><br>Gets the ebcdic coding for the given ascii code.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Ebcdic instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ascii</i></tt></td><td>Ascii char.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOEbcdic</tt></td><td valign="top"><a name="Ebcdic_inst"/><tt><b>inst( codepage <i>CodePage</i>, const char* <i>converterfile</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>CodePage</i></tt></td><td>Codepage to use for converting.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>converterfile</i></tt></td><td>Optional converterfile in XML format.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Event"/><h3>6. object Event</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Event semaphore.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Event"/><tt>Summary of object Event<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOEvent</tt></td><td valign="top"><a name="Event_inst"/><tt><b>inst( const char* <i>name</i>, Boolean <i>create</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Event name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>create</i></tt></td><td>Create event if not exist.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Event_reset"/><tt><b>reset( iOEvent <i>inst</i> );</b></tt><br>Reset the event.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Event instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Event_set"/><tt><b>set( iOEvent <i>inst</i> );</b></tt><br>Set the event.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Event instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Event_trywait"/><tt><b>trywait( iOEvent <i>inst</i>, int <i>time</i> );</b></tt><br>Wait a given time for event to become posted.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Event instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>time</i></tt></td><td>Time to wait in ms.</td><td>*</td><td>ms</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Event_wait"/><tt><b>wait( iOEvent <i>inst</i> );</b></tt><br>Wait for event to become posted.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Event instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="File"/><h3>7. object File</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+File helper object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="File"/><tt>Summary of object File<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {OPEN_WRITE=0, OPEN_READONLY=1, OPEN_APPEND=2, OPEN_READWRITE=3, OPEN_RW=4, OPEN_RA=5, OPEN_R=6} openmode</b></tt><br>CodePage.</td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>FUSER_RC</b></i> = R</tt><br>Use the fusers returncode to determine the access state.</td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>FUSER_FILE</b></i> = F</tt><br>Redirect the fuser output into a tempfile to determine the access state.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_access"/><tt><b>access( const char* <i>filename</i> );</b></tt><br>Test for read permission.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_append"/><tt><b>append( iOFile <i>inst</i>, const char* <i>buffer</i>, long <i>size</i> );</b></tt><br>Appends a buffer to the file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Data buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of databuffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_cd"/><tt><b>cd( const char* <i>pathname</i> );</b></tt><br>Change the working directory.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>pathname</i></tt></td><td>Relative or absolute.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_close"/><tt><b>close( iOFile <i>inst</i> );</b></tt><br>Closes the file. It does not cleanup this object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="File_convertPath2OSType"/><tt><b>convertPath2OSType( const char* <i>pathname</i> );</b></tt><br>Changes the separators according the OS.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>pathname</i></tt></td><td>Relative.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_cp"/><tt><b>cp( const char* <i>src</i>, const char* <i>dst</i> );</b></tt><br>Copies a file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>src</i></tt></td><td>Source file.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>dst</i></tt></td><td>Destination file.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_exist"/><tt><b>exist( const char* <i>name</i> );</b></tt><br>Checks for file or directory existence.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Relative or absolute.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="File_fileSize"/><tt><b>fileSize( const char* <i>filename</i> );</b></tt><br>Gets the filesize in bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="File_fileTime"/><tt><b>fileTime( const char* <i>filename</i> );</b></tt><br>Gets the modification time for the given file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_flush"/><tt><b>flush( iOFile <i>inst</i> );</b></tt><br>Writes all buffered byte on disk.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_fmt"/><tt><b>fmt( iOFile <i>inst</i>, const char* <i>fstr</i>, ... <i></i> );</b></tt><br>Writes a formatted string into the file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>fstr</i></tt></td><td>Format string.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Arguments.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_forcerename"/><tt><b>forcerename( const char* <i>oldname</i>, const char* <i>newname</i> );</b></tt><br>Renames a file, target will be removed if the newname already exist.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>oldname</i></tt></td><td>Old filename.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>newname</i></tt></td><td>New filename.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="File_getFilename"/><tt><b>getFilename( iOFile <i>inst</i> );</b></tt><br>Gets the filename used by this file object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="File_getPath"/><tt><b>getPath( const char* <i>path</i> );</b></tt><br>Returns a new allocated path string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>path</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="File_getRc"/><tt><b>getRc( iOFile <i>inst</i> );</b></tt><br>Get the latest error.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="File_getReaded"/><tt><b>getReaded( iOFile <i>inst</i> );</b></tt><br>Gets the count of the readed bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>FILE*</tt></td><td valign="top"><a name="File_getStream"/><tt><b>getStream( iOFile <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="File_getWritten"/><tt><b>getWritten( iOFile <i>inst</i> );</b></tt><br>Gets the count of the written bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="File_getpos"/><tt><b>getpos( iOFile <i>inst</i> );</b></tt><br>Gets the filepointer position.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOFile</tt></td><td valign="top"><a name="File_inst"/><tt><b>inst( const char* <i>path</i>, int <i>openflag</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>path</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>openflag</i></tt></td><td>How to open this file. See typedef openmode.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_isAbsolute"/><tt><b>isAbsolute( const char* <i>path</i> );</b></tt><br>Checks if given path is absolute.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>path</i></tt></td><td>Path to check.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_isAccessed"/><tt><b>isAccessed( const char* <i>filename</i> );</b></tt><br>Checks with fuser if the file is accessed by another process.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>Path and filename.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_isDirectory"/><tt><b>isDirectory( const char* <i>filename</i> );</b></tt><br>True if given name points to a directory.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_isRegularFile"/><tt><b>isRegularFile( const char* <i>filename</i> );</b></tt><br>False if given name points not to a regular file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_mkdir"/><tt><b>mkdir( const char* <i>dirname</i> );</b></tt><br>Make directory.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>dirname</i></tt></td><td>Directory path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="File_pwd"/><tt><b>pwd( void );</b></tt><br>The process working directory.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_read"/><tt><b>read( iOFile <i>inst</i>, char* <i>buffer</i>, long <i>size</i> );</b></tt><br>Reads from file; True if successful.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Number of bytes to read.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_readStr"/><tt><b>readStr( iOFile <i>inst</i>, char* <i>buffer</i> );</b></tt><br>Reads one line from file; True if successful.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_remove"/><tt><b>remove( const char* <i>filename</i> );</b></tt><br>Removes the given file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_rename"/><tt><b>rename( const char* <i>oldname</i>, const char* <i>newname</i> );</b></tt><br>Renames a file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>oldname</i></tt></td><td>Old filename.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>newname</i></tt></td><td>New filename.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_reopen"/><tt><b>reopen( iOFile <i>inst</i>, Boolean <i>truncate</i> );</b></tt><br>Reopens this file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>truncate</i></tt></td><td>Truncates the file contents if set to true! Otherwise it is opened in appending mode.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_rewind"/><tt><b>rewind( iOFile <i>inst</i> );</b></tt><br>Sets the filepointer to the beginning of the file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="File_ripPath"/><tt><b>ripPath( const char* <i>filename</i> );</b></tt><br>Returns a pointer to the filename.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_rmdir"/><tt><b>rmdir( const char* <i>path</i> );</b></tt><br>Removes given directory.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>path</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="File_setFilename"/><tt><b>setFilename( iOFile <i>inst</i>, const char* <i>filename</i> );</b></tt><br>Sets the filename to use with this object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>filename</i></tt></td><td>The (new) filenam to use.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="File_setFuser"/><tt><b>setFuser( const char* <i>filename</i> );</b></tt><br>Sets the fuser command to use for isAccessed.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>Path and filename of the fuser command.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="File_setFuserUsage"/><tt><b>setFuserUsage( const char* <i>usage</i> );</b></tt><br>The Linux fuser returns a useable rc. With all other unixes we must use a temp file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>usage</i></tt></td><td>R for returncode and F for file.</td><td>R,F</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_setfileTime"/><tt><b>setfileTime( const char* <i>filename</i>, long <i>filetime</i> );</b></tt><br>Sets the modification time for the given file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filename</i></tt></td><td>File path and name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>filetime</i></tt></td><td>New file modification time.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_setpos"/><tt><b>setpos( iOFile <i>inst</i>, long <i>offset</i> );</b></tt><br>Sets the filepointer to the given offset.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>offset</i></tt></td><td>The new filepointer offset.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="File_size"/><tt><b>size( iOFile <i>inst</i> );</b></tt><br>Get the filesize in bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_write"/><tt><b>write( iOFile <i>inst</i>, const char* <i>buffer</i>, long <i>size</i> );</b></tt><br>Write to file; True if successful.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Write buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Number of bytes to write.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="File_writeStr"/><tt><b>writeStr( iOFile <i>inst</i>, const char* <i>str</i> );</b></tt><br>Appends a string to the file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>File instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>str</i></tt></td><td>Null terminated string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="GZip"/><h3>8. object GZip</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+GNU ZIP wrapper.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="GZip"/><tt>Summary of object GZip<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="GZip_compress"/><tt><b>compress( iOGZip <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="GZip_deCompress"/><tt><b>deCompress( iOGZip <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="GZip_getRc"/><tt><b>getRc( iOGZip <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOGZip</tt></td><td valign="top"><a name="GZip_inst"/><tt><b>inst( const char* <i>fileName</i> );</b></tt><br>Object creator.</td></tr>
+</table></p>
+<p><a name="JS"/><h3>9. object JS</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+JoyStick support.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="JS"/><tt>Summary of object JS<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*jsListener )( int dev, int type, int number, int value, unsigned long msec )</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="JS_init"/><tt><b>init( iOJS <i>inst</i>, int* <i>devicemap</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>JS instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>devicemap</i></tt></td><td>bit 0 = /dev/js0...</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOJS</tt></td><td valign="top"><a name="JS_inst"/><tt><b>inst( void );</b></tt><br>Object creator.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="JS_setListener"/><tt><b>setListener( iOJS <i>inst</i>, jsListener <i>listener</i>, int <i>devnr</i> );</b></tt><br>Set an JS listener.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>JS instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>listener</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>devnr</i></tt></td><td>Device number: /dev/js0.../dev/jsn</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="JS_start"/><tt><b>start( iOJS <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>JS instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="JSon"/><h3>10. object JSon</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+JSon converter<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="JSon"/><tt>Summary of object JSon<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="JSon_toJSon"/><tt><b>toJSon( iONode <i>xml</i> );</b></tt><br>Convert XML to a JSon string.</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="JSon_toXML"/><tt><b>toXML( const char* <i>json</i> );</b></tt><br>Convert a JSon string to XML.</td></tr>
+</table></p>
+<p><a name="Lib"/><h3>11. object Lib</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Library helper object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Lib"/><tt>Summary of object Lib<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>const void*</tt></td><td valign="top"><a name="Lib_getProc"/><tt><b>getProc( iOLib <i>inst</i>, const char* <i>procname</i> );</b></tt><br>Get a library procedure.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Lib instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>procname</i></tt></td><td>Procedure name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOLib</tt></td><td valign="top"><a name="Lib_inst"/><tt><b>inst( const char* <i>name</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Library path and name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="List"/><h3>12. object List</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+List helper object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="List"/><tt>Summary of object List<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*comparator)(obj* o1, obj* o2)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="List_add"/><tt><b>add( iOList <i>inst</i>, obj <i>object</i> );</b></tt><br>Adds an object to the list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>object</i></tt></td><td>Object to add.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="List_clear"/><tt><b>clear( iOList <i>inst</i> );</b></tt><br>Empties the list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="List_first"/><tt><b>first( iOList <i>inst</i> );</b></tt><br>Gets the first object from the list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="List_get"/><tt><b>get( iOList <i>inst</i>, int <i>pos</i> );</b></tt><br>Gets an object from the list by position.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>pos</i></tt></td><td>Position.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="List_getIndex"/><tt><b>getIndex( iOList <i>inst</i> );</b></tt><br>Gets the current pointer position.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="List_insert"/><tt><b>insert( iOList <i>inst</i>, int <i>pos</i>, obj <i>object</i> );</b></tt><br>Inserts an object into the list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>pos</i></tt></td><td>Insert position.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>object</i></tt></td><td>Object to add.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOList</tt></td><td valign="top"><a name="List_inst"/><tt><b>inst( void );</b></tt><br>Object creator.</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="List_next"/><tt><b>next( iOList <i>inst</i> );</b></tt><br>Gets the next object from the list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="List_remove"/><tt><b>remove( iOList <i>inst</i>, int <i>pos</i> );</b></tt><br>Removes an object from the list by position.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>pos</i></tt></td><td>Remove position.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="List_removeObj"/><tt><b>removeObj( iOList <i>inst</i>, obj <i>object</i> );</b></tt><br>Removes an object from the list by reference.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>object</i></tt></td><td>object to be removed.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="List_replace"/><tt><b>replace( iOList <i>inst</i>, int <i>pos</i>, obj <i>object</i> );</b></tt><br>Replaces an object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>pos</i></tt></td><td>Insert position.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>object</i></tt></td><td>New object.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="List_size"/><tt><b>size( iOList <i>inst</i> );</b></tt><br>Gets the number of objects currently in the list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="List_sort"/><tt><b>sort( iOList <i>inst</i>, comparator <i>comp</i> );</b></tt><br>Sorts this list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>List instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>comp</i></tt></td><td>Comparator function.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Map"/><h3>13. object Map</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Hashmap.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Map"/><tt>Summary of object Map<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Map_clear"/><tt><b>clear( iOMap <i>inst</i> );</b></tt><br>Clear the map.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Map_first"/><tt><b>first( iOMap <i>inst</i> );</b></tt><br>Get the first item from the map.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Map_get"/><tt><b>get( iOMap <i>inst</i>, const char* <i>key</i> );</b></tt><br>Get an item from the map.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Key associated with an object.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOList</tt></td><td valign="top"><a name="Map_getList"/><tt><b>getList( iOMap <i>inst</i> );</b></tt><br>Get all mapped objects as a list.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Map_haskey"/><tt><b>haskey( iOMap <i>inst</i>, const char* <i>key</i> );</b></tt><br>Check if a map entry exist with the given key.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>The key to check.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOMap</tt></td><td valign="top"><a name="Map_inst"/><tt><b>inst( void );</b></tt><br>Map object creator.</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Map_next"/><tt><b>next( iOMap <i>inst</i> );</b></tt><br>Get the next item from the map.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Map_put"/><tt><b>put( iOMap <i>inst</i>, const char* <i>key</i>, obj <i>val</i> );</b></tt><br>Put a new item in the map.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Key to associate with object.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>An object ot put in the map.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Map_remove"/><tt><b>remove( iOMap <i>inst</i>, const char* <i>key</i> );</b></tt><br>Remove an item from the map.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Key associated with an object.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Map_size"/><tt><b>size( iOMap <i>inst</i> );</b></tt><br>Get the size of the map. (Number of objects in the map.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Map instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Mem"/><h3>14. object Mem</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Memory operation helper.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Mem"/><tt>Summary of object Mem<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {MEMTYPE_ALLOC=0,MEMTYPE_REALLOC,MEMTYPE_CHECK,MEMTYPE_FREE} memOpType</b></tt><br>Memory operation type.</td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {RocsAttrID=0, RocsCmdLnID, RocsDirID, RocsDocID, RocsEventID, RocsFileID, RocsLibID, RocsListID, RocsMapID, RocsMutexID, RocsNodeID, RocsQueueID, RocsSerialID, RocsSocketID, RocsStrID, RocsStringID, RocsSystemID, RocsThreadID, RocsTraceID, RocsEbcdicID, RocsMsgID, RocsStrTokID, RocsXmlHID, RocsLASTID} RocsMemID</b></tt><br>For internal use only.</td></tr>
+<tr><td valign="top"><tt><i>macro</i></tt></td><td><tt><b>allocMem(size)MemOp.alloc(size,__FILE__,__LINE__)</b></tt><br>Macro for allocating memory.</td></tr>
+<tr><td valign="top"><tt><i>macro</i></tt></td><td><tt><b>reallocMem(p,size)MemOp.realloc(p,size,__FILE__,__LINE__)</b></tt><br>Macro for re-allocating memory.</td></tr>
+<tr><td valign="top"><tt><i>macro</i></tt></td><td><tt><b>freeMem(p)MemOp.free(p,__FILE__,__LINE__)</b></tt><br>Macro for freeing memory.</td></tr>
+<tr><td valign="top"><tt><i>macro</i></tt></td><td><tt><b>allocIDMem(size,id)MemOp.allocTID(size,id,__FILE__,__LINE__)</b></tt><br>For internal use only.</td></tr>
+<tr><td valign="top"><tt><i>macro</i></tt></td><td><tt><b>freeIDMem(p,id)MemOp.freeTID(p,id,__FILE__,__LINE__)</b></tt><br>For internal use only.</td></tr>
+<tr><td valign="top" align="right"><tt>void*</tt></td><td valign="top"><a name="Mem_alloc"/><tt><b>alloc( long <i>size</i>, const char* <i>file</i>, int <i>line</i> );</b></tt><br>Allocate memory and records sourcefile and line. (Use macro allocMem.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>size</i></tt></td><td>Memory size to allocate.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>file</i></tt></td><td>Sourcefile.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>line</i></tt></td><td>Sourceline.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void*</tt></td><td valign="top"><a name="Mem_allocTID"/><tt><b>allocTID( long <i>size</i>, int <i>id</i>, const char* <i>file</i>, int <i>line</i> );</b></tt><br>Allocate memory and records sourcefile and line. (Use macro allocIDMem.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>size</i></tt></td><td>Memory size to allocate.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>See typedef RocsMemID.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>file</i></tt></td><td>Sourcefile.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>line</i></tt></td><td>Sourceline.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_basecpy"/><tt><b>basecpy( void* <i>dst</i>, void* <i>src</i>, int <i>asize</i>, int <i>tsize</i>, void* <i>data</i> );</b></tt><br>A special copy function for creating rocs-based objects.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>dst</i></tt></td><td>Destination.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>src</i></tt></td><td>Source.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>asize</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>tsize</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>data</i></tt></td><td>Object date.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Mem_chr"/><tt><b>chr( const void* <i>buffer</i>, char <i>c</i>, int <i>size</i> );</b></tt><br>Find a char in memoryblock.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>buffer</i></tt></td><td>Buffer to search.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>c</i></tt></td><td>Char to look for.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of memoryblock to be searched.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Mem_cmp"/><tt><b>cmp( const void* <i>dst</i>, const void* <i>src</i>, int <i>size</i> );</b></tt><br>Compairs two memory blocks.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>dst</i></tt></td><td>Destination.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>src</i></tt></td><td>Source.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of source to be compaired.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_copy"/><tt><b>copy( void* <i>dst</i>, const void* <i>src</i>, int <i>size</i> );</b></tt><br>Copies a memory block.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>dst</i></tt></td><td>Destination.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>src</i></tt></td><td>Source.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of source to be copied.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const long*</tt></td><td valign="top"><a name="Mem_dumpAllocCntID"/><tt><b>dumpAllocCntID( void );</b></tt><br>Dumps allocation count by ID.</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_dumpStrings"/><tt><b>dumpStrings( void );</b></tt><br>Print out all allocated strings.</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_free"/><tt><b>free( void* <i>p</i>, const char* <i>file</i>, int <i>line</i> );</b></tt><br>Free up memory and records sourcefile and line. (Use macro freeMem.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>p</i></tt></td><td>Memory block to free up.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>file</i></tt></td><td>Sourcefile.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>line</i></tt></td><td>Sourceline.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_freeObj"/><tt><b>freeObj( void** <i>p</i> );</b></tt><br>Free up obj memory.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>p</i></tt></td><td>Object to free up.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_freeTID"/><tt><b>freeTID( void* <i>p</i>, int <i>id</i>, const char* <i>file</i>, int <i>line</i> );</b></tt><br>Free up memory and records sourcefile and line. (Use macro freeIDMem.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>p</i></tt></td><td>Memory block to free up.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>See typedef RocsMemID.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>file</i></tt></td><td>Sourcefile.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>line</i></tt></td><td>Sourceline.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Mem_getAllocCntID"/><tt><b>getAllocCntID( int <i>id</i> );</b></tt><br>Returns allocation count by ID.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>id</i></tt></td><td>See typedef RocsMemID.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Mem_getAllocCount"/><tt><b>getAllocCount( void );</b></tt><br>Returns number of allocated memory objects.</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Mem_getAllocSize"/><tt><b>getAllocSize( void );</b></tt><br>Returns total allocated memory size.</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Mem_getDumpSize"/><tt><b>getDumpSize( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Mem_getLastOperation"/><tt><b>getLastOperation( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_init"/><tt><b>init( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void*</tt></td><td valign="top"><a name="Mem_realloc"/><tt><b>realloc( void* <i>p</i>, long <i>size</i>, const char* <i>file</i>, int <i>line</i> );</b></tt><br>Re-Allocate memory and records sourcefile and line. (Use macro reallocMem.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>p</i></tt></td><td>Memory block to re-allocate.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>New memory size to allocate.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>file</i></tt></td><td>Sourcefile.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>line</i></tt></td><td>Sourceline.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_resetDump"/><tt><b>resetDump( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_set"/><tt><b>set( void* <i>p</i>, int <i>val</i>, int <i>size</i> );</b></tt><br>Initializes a memory block.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>p</i></tt></td><td>Memory block.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Init value.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size to be initialized.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Mem_setDebug"/><tt><b>setDebug( Boolean <i>debug</i> );</b></tt><br>If set it prints for every allocation and free a line.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>debug</i></tt></td><td>Debug flag.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Mime64"/><h3>15. object Mime64</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Mime64 converter<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Mime64"/><tt>Summary of object Mime64<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Mime64_decode"/><tt><b>decode( unsigned char* <i>dst</i>, int* <i>dlen</i>, const unsigned char* <i>src</i>, int <i>slen</i> );</b></tt><br>decode the input from mime64 to binary</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Mime64_decodeFile"/><tt><b>decodeFile( const char* <i>infile</i>, const char* <i>outfile</i> );</b></tt><br>decode the input file into it's </td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Mime64_encode"/><tt><b>encode( unsigned char* <i>dst</i>, int* <i>dlen</i>, const unsigned char* <i>src</i>, int <i>slen</i> );</b></tt><br>encode the input into mime64</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Mime64_encodeFile"/><tt><b>encodeFile( const char* <i>infile</i>, const char* <i>outfile</i> );</b></tt><br>encode the input file into mime64</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Mime64_sha1"/><tt><b>sha1( const char* <i>str</i> );</b></tt><br>generate a sha1 key</td></tr>
+</table></p>
+<p><a name="Msg"/><h3>16. object Msg</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Message object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Msg"/><tt>Summary of object Msg<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {VOID_DATA, OBJ_DATA, STR_DATA } usrdatatype</b></tt><br>Cargo type.</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Msg_getEvent"/><tt><b>getEvent( iOMsg <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Msg_getSender"/><tt><b>getSender( iOMsg <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Msg_getTimer"/><tt><b>getTimer( iOMsg <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void*</tt></td><td valign="top"><a name="Msg_getUsrData"/><tt><b>getUsrData( iOMsg <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>usrdatatype</tt></td><td valign="top"><a name="Msg_getUsrDataType"/><tt><b>getUsrDataType( iOMsg <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOMsg</tt></td><td valign="top"><a name="Msg_inst"/><tt><b>inst( obj <i>sender</i>, int <i>event</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>sender</i></tt></td><td>Reference to sender.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>event</i></tt></td><td>Event type.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Msg_setEvent"/><tt><b>setEvent( iOMsg <i>inst</i>, int <i>event</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>event</i></tt></td><td>Event type.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Msg_setTimer"/><tt><b>setTimer( iOMsg <i>inst</i>, int <i>timer</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>timer</i></tt></td><td>Timer</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Msg_setUsrData"/><tt><b>setUsrData( iOMsg <i>inst</i>, void* <i>usrdata</i>, usrdatatype <i>type</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Msg instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>usrdata</i></tt></td><td>Cargo.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>type</i></tt></td><td>Cargo type.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Mutex"/><h3>17. object Mutex</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Mutex object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Mutex"/><tt>Summary of object Mutex<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Mutex_getRc"/><tt><b>getRc( iOMutex <i>inst</i> );</b></tt><br>Get last error code.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Mutex instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOMutex</tt></td><td valign="top"><a name="Mutex_inst"/><tt><b>inst( const char* <i>name</i>, Boolean <i>create</i> );</b></tt><br>Object creator
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Mutex name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>create</i></tt></td><td>Create a mutex when not exist.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Mutex_post"/><tt><b>post( iOMutex <i>inst</i> );</b></tt><br>Release the mutext. (release, unlock)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Mutex instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Mutex_trywait"/><tt><b>trywait( iOMutex <i>inst</i>, int <i>time</i> );</b></tt><br>Wait for the mutext.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Mutex instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>time</i></tt></td><td>Time to wait for the mutext.</td><td>*</td><td>ms</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Mutex_wait"/><tt><b>wait( iOMutex <i>inst</i> );</b></tt><br>Wait for the mutext. (request, lock)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Mutex instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Node"/><h3>18. object Node</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+DOM node object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Node"/><tt>Summary of object Node<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {ELEMENT_NODE, TEXT_NODE, PROPERTY_NODE, REMARK_NODE, VARIABLE_NODE} nodetype</b></tt><br>Node type.</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_addAttr"/><tt><b>addAttr( iONode <i>inst</i>, iOAttr <i>attr</i> );</b></tt><br>Add an attribute.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attr</i></tt></td><td>Attribute object.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_addChild"/><tt><b>addChild( iONode <i>inst</i>, iONode <i>child</i> );</b></tt><br>Add a child node.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>child</i></tt></td><td>Child node.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOAttr</tt></td><td valign="top"><a name="Node_findAttr"/><tt><b>findAttr( iONode <i>inst</i>, const char* <i>attrname</i> );</b></tt><br>Search for an attribute with the given name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_findNextNode"/><tt><b>findNextNode( iONode <i>inst</i>, iONode <i>node</i> );</b></tt><br>Find next node with the same name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>node</i></tt></td><td>Node reference of previous find orfindNext.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_findNode"/><tt><b>findNode( iONode <i>inst</i>, const char* <i>nodename</i> );</b></tt><br>Search for a child node with the given name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nodename</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOAttr</tt></td><td valign="top"><a name="Node_getAttr"/><tt><b>getAttr( iONode <i>inst</i>, int <i>idx</i> );</b></tt><br>Get an attribute by index.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>idx</i></tt></td><td>Attribute index.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Node_getAttrCnt"/><tt><b>getAttrCnt( iONode <i>inst</i> );</b></tt><br>Get the number of attributes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Node_getBool"/><tt><b>getBool( iONode <i>inst</i>, const char* <i>attrname</i>, Boolean <i>defval</i> );</b></tt><br>Get an attribute value as boolean.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Value to return if attribute is not found.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_getChild"/><tt><b>getChild( iONode <i>inst</i>, int <i>idx</i> );</b></tt><br>Get an child node by index.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>idx</i></tt></td><td>Child node index.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Node_getChildCnt"/><tt><b>getChildCnt( iONode <i>inst</i> );</b></tt><br>Get the number of child nodes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>double</tt></td><td valign="top"><a name="Node_getFloat"/><tt><b>getFloat( iONode <i>inst</i>, const char* <i>attrname</i>, double <i>defval</i> );</b></tt><br>Get an attribute value as float.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Value to return if attribute is not found.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Node_getInt"/><tt><b>getInt( iONode <i>inst</i>, const char* <i>attrname</i>, int <i>defval</i> );</b></tt><br>Get an attribute value as integer.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Value to return if attribute is not found.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Node_getLong"/><tt><b>getLong( iONode <i>inst</i>, const char* <i>attrname</i>, long <i>defval</i> );</b></tt><br>Get an attribute value as long.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Value to return if attribute is not found.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Node_getName"/><tt><b>getName( iONode <i>inst</i> );</b></tt><br>Get the node name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_getNode"/><tt><b>getNode( iONode <i>inst</i>, const char* <i>nodename</i> );</b></tt><br>Same as findNode but if no node is found it creates one.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nodename</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_getParent"/><tt><b>getParent( iONode <i>inst</i> );</b></tt><br>Get the parent node.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Node_getStr"/><tt><b>getStr( iONode <i>inst</i>, const char* <i>attrname</i>, const char* <i>defval</i> );</b></tt><br>Get an attribute value as string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>defval</i></tt></td><td>Value to return if attribute is not found.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>nodetype</tt></td><td valign="top"><a name="Node_getType"/><tt><b>getType( iONode <i>inst</i> );</b></tt><br>Get the node type.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_inst"/><tt><b>inst( const char* <i>name</i>, iONode <i>parent</i>, nodetype <i>type</i> );</b></tt><br>Object creator
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Node name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>parent</i></tt></td><td>Parent node.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>type</i></tt></td><td>Node type.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_mergeNode"/><tt><b>mergeNode( iONode <i>nodeA</i>, iONode <i>nodeB</i>, Boolean <i>overwrite</i>, Boolean <i>recursive</i>, Boolean <i>keepid</i> );</b></tt><br>Merge nodeB into A.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>nodeA</i></tt></td><td>Node A.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>nodeB</i></tt></td><td>Node B.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>overwrite</i></tt></td><td>Overwrites existing attributes.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>recursive</i></tt></td><td>merge childnodes</td><td>*</td><td></td></tr>
+<tr><td><tt><i>keepid</i></tt></td><td>do not overwrite id attributes at first level</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_removeAttr"/><tt><b>removeAttr( iONode <i>inst</i>, iOAttr <i>attr</i> );</b></tt><br>Removes an attribute.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attr</i></tt></td><td>Attribute object.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_removeAttrByName"/><tt><b>removeAttrByName( iONode <i>inst</i>, const char* <i>name</i> );</b></tt><br>Removes an attribute.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>name</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Node_removeChild"/><tt><b>removeChild( iONode <i>inst</i>, iONode <i>child</i> );</b></tt><br>Remove a child node.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>child</i></tt></td><td>Child node.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setBool"/><tt><b>setBool( iONode <i>inst</i>, const char* <i>attrname</i>, Boolean <i>val</i> );</b></tt><br>Set an attribute value as boolean.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Value to assing given attribute.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setFloat"/><tt><b>setFloat( iONode <i>inst</i>, const char* <i>attrname</i>, double <i>val</i> );</b></tt><br>Set an attribute value as float.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Value to assign.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setInt"/><tt><b>setInt( iONode <i>inst</i>, const char* <i>attrname</i>, int <i>val</i> );</b></tt><br>Set an attribute value as integer.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Value to assing given attribute.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setLong"/><tt><b>setLong( iONode <i>inst</i>, const char* <i>attrname</i>, long <i>val</i> );</b></tt><br>Set an attribute value as long.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Value to assign.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setName"/><tt><b>setName( iONode <i>inst</i>, const char* <i>name</i> );</b></tt><br>Set the node name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>name</i></tt></td><td>New node name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setParent"/><tt><b>setParent( iONode <i>inst</i>, iONode <i>parent</i> );</b></tt><br>Change or set parent of this node.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>parent</i></tt></td><td>Parent node.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setStr"/><tt><b>setStr( iONode <i>inst</i>, const char* <i>attrname</i>, const char* <i>val</i> );</b></tt><br>Set an attribute value as string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>attrname</i></tt></td><td>Attribute name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Value to assing given attribute.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Node_setType"/><tt><b>setType( iONode <i>inst</i>, nodetype <i>type</i> );</b></tt><br>Set the node type.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>type</i></tt></td><td>Node type.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Node_toEscString"/><tt><b>toEscString( iONode <i>inst</i> );</b></tt><br>Serialize this node with escaped attribute values.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Node instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Queue"/><h3>19. object Queue</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Queue object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Queue"/><tt>Summary of object Queue<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {low=0,normal=1,high=2} q_prio</b></tt><br>Priority.</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Queue_count"/><tt><b>count( iOQueue <i>inst</i> );</b></tt><br>Number of messages in the queue.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Queue instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Queue_get"/><tt><b>get( iOQueue <i>inst</i> );</b></tt><br>Read a message.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Queue instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOQueue</tt></td><td valign="top"><a name="Queue_inst"/><tt><b>inst( int <i>size</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>size</i></tt></td><td>Size of queue.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Queue_isEmpty"/><tt><b>isEmpty( iOQueue <i>inst</i> );</b></tt><br>Are messages in the queue?
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Queue instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Queue_post"/><tt><b>post( iOQueue <i>inst</i>, obj <i>object</i>, q_prio <i>prio</i> );</b></tt><br>Post a message.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Queue instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>object</i></tt></td><td>Object to post.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>prio</i></tt></td><td>Message priority.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Queue_setDesc"/><tt><b>setDesc( iOQueue <i>inst</i>, const char* <i>desc</i> );</b></tt><br>Set the Queues description.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Queue instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>desc</i></tt></td><td>Description.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Queue_waitPost"/><tt><b>waitPost( iOQueue <i>inst</i> );</b></tt><br>Wait for a messages.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Queue instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Res"/><h3>20. object Res</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Resource helper object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Res"/><tt>Summary of object Res<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Res_addTranslation"/><tt><b>addTranslation( iORes <i>inst</i>, const char* <i>xml</i> );</b></tt><br>Add translation. Existing IDs are overwritten.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>res instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>xml</i></tt></td><td>Xml string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Res_getMenu"/><tt><b>getMenu( iORes <i>inst</i>, const char* <i>key</i>, Boolean <i>useAccel</i> );</b></tt><br>Get a message by key.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>res instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>useAccel</i></tt></td><td>Use accelerator character in string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Res_getMsg"/><tt><b>getMsg( iORes <i>inst</i>, const char* <i>key</i> );</b></tt><br>Get a message by key.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>res instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Res_getTip"/><tt><b>getTip( iORes <i>inst</i>, const char* <i>key</i> );</b></tt><br>Get a tooltip by key.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>res instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Res_hasKey"/><tt><b>hasKey( iORes <i>inst</i>, const char* <i>key</i> );</b></tt><br>Test if the given key is in the XML.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Res instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>key</i></tt></td><td>Argument key.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iORes</tt></td><td valign="top"><a name="Res_inst"/><tt><b>inst( const char* <i>xml</i>, const char* <i>lang</i> );</b></tt><br>Creates a resource object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>xml</i></tt></td><td>Messages XML as C-String.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>lang</i></tt></td><td>Language.(de,en...)</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Serial"/><h3>21. object Serial</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Serial communication.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Serial"/><tt>Summary of object Serial<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {none=0,even=1,odd=2} serial_parity</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {cts=1,dsr=2,xon=3} serial_flow</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {onestopbit=1,twostopbits=2} serial_stopbits</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {eight=8,seven=7} serial_databits</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {undefined=0,mm=1,dcc=2,mma=3} serial_mode</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int serial_bps</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Serial_available"/><tt><b>available( iOSerial <i>inst</i> );</b></tt><br>Get number of bytes available to read.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_close"/><tt><b>close( iOSerial <i>inst</i> );</b></tt><br>Close the port.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_flush"/><tt><b>flush( iOSerial <i>inst</i> );</b></tt><br>clear output buffer
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_fmt"/><tt><b>fmt( iOSerial <i>inst</i>, const char* <i>format</i>, ... <i></i> );</b></tt><br>Formats a string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>format</i></tt></td><td>Format rules.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Multiple parameters.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Serial_getRc"/><tt><b>getRc( iOSerial <i>inst</i> );</b></tt><br>Get last error.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Serial_getReadCnt"/><tt><b>getReadCnt( iOSerial <i>inst</i> );</b></tt><br>Get actual readed byte count.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Serial_getWaiting"/><tt><b>getWaiting( iOSerial <i>inst</i> );</b></tt><br>Get number of bytes waiting to send.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOSerial</tt></td><td valign="top"><a name="Serial_inst"/><tt><b>inst( const char* <i>device</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>device</i></tt></td><td>Device name like com1 or ttyS0.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_isCTS"/><tt><b>isCTS( iOSerial <i>inst</i> );</b></tt><br>Control To Send.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_isDSR"/><tt><b>isDSR( iOSerial <i>inst</i> );</b></tt><br>Data Set Ready.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_isRI"/><tt><b>isRI( iOSerial <i>inst</i> );</b></tt><br>Ring Indicator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_isUartEmpty"/><tt><b>isUartEmpty( iOSerial <i>inst</i>, Boolean <i>soft</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>soft</i></tt></td><td>no direct IO if soft ist set</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_open"/><tt><b>open( iOSerial <i>inst</i> );</b></tt><br>Try to open and to initialize the port.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_read"/><tt><b>read( iOSerial <i>inst</i>, char* <i>buffer</i>, int <i>count</i> );</b></tt><br>Read some bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>count</i></tt></td><td>Number of bytes to read.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Serial_readln"/><tt><b>readln( iOSerial <i>inst</i>, char* <i>buffer</i> );</b></tt><br>Read till a linefeed is detected.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setBlocking"/><tt><b>setBlocking( iOSerial <i>inst</i>, Boolean <i>blocking</i> );</b></tt><br>Set blocking/non-blocking io.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>blocking</i></tt></td><td>Blocking mode.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setCTS"/><tt><b>setCTS( iOSerial <i>inst</i>, Boolean <i>cts</i> );</b></tt><br>Clear To Send.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>cts</i></tt></td><td>on-off</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setDTR"/><tt><b>setDTR( iOSerial <i>inst</i>, Boolean <i>dtr</i> );</b></tt><br>Data Terminal Ready.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>dtr</i></tt></td><td>on-off</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setDivisor"/><tt><b>setDivisor( iOSerial <i>inst</i>, int <i>divisor</i> );</b></tt><br>Custom Divisor.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setFlow"/><tt><b>setFlow( iOSerial <i>inst</i>, serial_flow <i>flow</i> );</b></tt><br>Set data flow control.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>flow</i></tt></td><td>Data flow control to use.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setLine"/><tt><b>setLine( iOSerial <i>inst</i>, serial_bps <i>bps</i>, serial_databits <i>databits</i>, serial_stopbits <i>stopbits</i>, serial_parity <i>parity</i>, Boolean <i>rtsdisabled</i> );</b></tt><br>Set line settings.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>bps</i></tt></td><td>Line speed.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>databits</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>stopbits</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>parity</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>rtsdisabled</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setOutputFlow"/><tt><b>setOutputFlow( iOSerial <i>inst</i>, Boolean <i>flow</i> );</b></tt><br>set output flow on off
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>flow</i></tt></td><td>on-off</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setPortBase"/><tt><b>setPortBase( iOSerial <i>inst</i>, int <i>addr</i> );</b></tt><br>Set data flow control.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>addr</i></tt></td><td>IO base address of device</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setRTS"/><tt><b>setRTS( iOSerial <i>inst</i>, Boolean <i>rts</i> );</b></tt><br>Request To Send.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>rts</i></tt></td><td>on-off</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setSerialMode"/><tt><b>setSerialMode( iOSerial <i>inst</i>, serial_mode <i>mode</i> );</b></tt><br>Set uart speed for MM or DCC
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>mode</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_setTimeout"/><tt><b>setTimeout( iOSerial <i>inst</i>, int <i>wtime</i>, int <i>trime</i> );</b></tt><br>Set timeout.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>wtime</i></tt></td><td>Write timeout.</td><td>*</td><td>ms</td></tr>
+<tr><td><tt><i>trime</i></tt></td><td>Read timeout.</td><td>*</td><td>ms</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Serial_waitMM"/><tt><b>waitMM( iOSerial <i>inst</i>, int <i>usperiod</i>, int <i>uspause</i> );</b></tt><br>Do busy wait for MM protocol
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>usperiod</i></tt></td><td>Wait time from start of packet to start of packet</td><td>*</td><td></td></tr>
+<tr><td><tt><i>uspause</i></tt></td><td>Wait time from end of packet to start of packet</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Serial_write"/><tt><b>write( iOSerial <i>inst</i>, const char* <i>buffer</i>, int <i>count</i> );</b></tt><br>Write some bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Serial instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Write buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>count</i></tt></td><td>Number of bytes to write.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Socket"/><h3>22. object Socket</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Socket communication.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Socket"/><tt>Summary of object Socket<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void (*socket_listener)(unsigned char* in,int len)</b></tt><br>Socket Listener.</td></tr>
+<tr><td valign="top" align="right"><tt>iOSocket</tt></td><td valign="top"><a name="Socket_accept"/><tt><b>accept( iOSocket <i>inst</i> );</b></tt><br>Accept client connections.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_bind"/><tt><b>bind( iOSocket <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_connect"/><tt><b>connect( iOSocket <i>inst</i> );</b></tt><br>Connect socket with target.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Socket_disConnect"/><tt><b>disConnect( iOSocket <i>inst</i> );</b></tt><br>Disconnect from remote peer.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_fmt"/><tt><b>fmt( iOSocket <i>inst</i>, const char* <i>format</i>, ... <i></i> );</b></tt><br>Formats a string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>format</i></tt></td><td>Format rules.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Multiple parameters.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Socket_getMAC"/><tt><b>getMAC( const char* <i>device</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>device</i></tt></td><td>Device name to query.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Socket_getPeeked"/><tt><b>getPeeked( iOSocket <i>inst</i> );</b></tt><br>Get number of peeked bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Socket_getPeername"/><tt><b>getPeername( iOSocket <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Socket_getRc"/><tt><b>getRc( iOSocket <i>inst</i> );</b></tt><br>Get last error.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Socket_getReceived"/><tt><b>getReceived( iOSocket <i>inst</i> );</b></tt><br>Get number of readed bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Socket_getSended"/><tt><b>getSended( iOSocket <i>inst</i> );</b></tt><br>Get number of written bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>FILE *</tt></td><td valign="top"><a name="Socket_getStream"/><tt><b>getStream( iOSocket <i>inst</i> );</b></tt><br>Get socket stream object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Socket_gethostaddr"/><tt><b>gethostaddr( void );</b></tt><br>Get local host dotted address.</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Socket_gethostname"/><tt><b>gethostname( void );</b></tt><br>Get local hostname.</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Socket_getsockname"/><tt><b>getsockname( iOSocket <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOSocket</tt></td><td valign="top"><a name="Socket_inst"/><tt><b>inst( const char* <i>host</i>, int <i>port</i>, Boolean <i>ssl</i>, Boolean <i>udp</i>, Boolean <i>multicast</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>host</i></tt></td><td>Target hostname.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>port</i></tt></td><td>Target or server port.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ssl</i></tt></td><td>SSL mode.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>udp</i></tt></td><td>UDP mode.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>multicast</i></tt></td><td>Multicast mode.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOSocket</tt></td><td valign="top"><a name="Socket_instSSLserver"/><tt><b>instSSLserver( int <i>port</i>, const char* <i>certFile</i>, const char* <i>keyFile</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>port</i></tt></td><td>Target or server port.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>certFile</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>keyFile</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_isBroken"/><tt><b>isBroken( iOSocket <i>inst</i> );</b></tt><br>Is connection broken?
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_isConnected"/><tt><b>isConnected( iOSocket <i>inst</i> );</b></tt><br>Socket is connected.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_isOpenSSL"/><tt><b>isOpenSSL( void );</b></tt><br>OpenSSL support is enabled.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_isTimedOut"/><tt><b>isTimedOut( iOSocket <i>inst</i> );</b></tt><br>Check if last returncode is a ETIMEDOUT error.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_peek"/><tt><b>peek( iOSocket <i>inst</i>, char* <i>buffer</i>, int <i>size</i> );</b></tt><br>Are some bytes waiting to be read?
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_read"/><tt><b>read( iOSocket <i>inst</i>, char* <i>buffer</i>, int <i>size</i> );</b></tt><br>Read bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Socket_readStr"/><tt><b>readStr( iOSocket <i>inst</i>, char* <i>buffer</i> );</b></tt><br>Read til a terminating zero is detected.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char</tt></td><td valign="top"><a name="Socket_readc"/><tt><b>readc( iOSocket <i>inst</i> );</b></tt><br>Read one character.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Socket_readln"/><tt><b>readln( iOSocket <i>inst</i>, char* <i>buffer</i> );</b></tt><br>Read till a linefeed is detected.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Socket_recvfrom"/><tt><b>recvfrom( iOSocket <i>inst</i>, char* <i>buffer</i>, int <i>size</i>, char* <i>client</i>, int* <i>port</i> );</b></tt><br>Receive udp message.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Read buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>client</i></tt></td><td>Cleint address.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>port</i></tt></td><td>Client port.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Socket_reset"/><tt><b>reset( iOSocket <i>inst</i> );</b></tt><br>Reset the socket; clear flags.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_sendto"/><tt><b>sendto( iOSocket <i>inst</i>, char* <i>buffer</i>, int <i>size</i>, char* <i>client</i>, int <i>port</i> );</b></tt><br>Send udp message.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Write buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>client</i></tt></td><td>Cleint address.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>port</i></tt></td><td>Client port.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_setBlocking"/><tt><b>setBlocking( iOSocket <i>inst</i>, Boolean <i>blocking</i> );</b></tt><br>Set blocking.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>blocking</i></tt></td><td>Set True for blocking mode.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_setBroadcast"/><tt><b>setBroadcast( iOSocket <i>inst</i>, Boolean <i>broadcast</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>broadcast</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_setKeepalive"/><tt><b>setKeepalive( iOSocket <i>inst</i>, Boolean <i>keepalive</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>keepalive</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Socket_setListener"/><tt><b>setListener( iOSocket <i>inst</i>, socket_listener <i>listener</i> );</b></tt><br>NOT IMPLEMENTED!.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>listener</i></tt></td><td>Listener.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Socket_setLocalIP"/><tt><b>setLocalIP( iOSocket <i>inst</i>, const char* <i>ip</i> );</b></tt><br>Local interface IP.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_setNodelay"/><tt><b>setNodelay( iOSocket <i>inst</i>, Boolean <i>flag</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>flag</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_setRcvTimeout"/><tt><b>setRcvTimeout( iOSocket <i>inst</i>, int <i>timeout</i> );</b></tt><br>Set timeout value for reading.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>timeout</i></tt></td><td>Timeout value.</td><td>*</td><td>ms</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_setSndTimeout"/><tt><b>setSndTimeout( iOSocket <i>inst</i>, int <i>timeout</i> );</b></tt><br>Set timeout value for writing.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>timeout</i></tt></td><td>Timeout value.</td><td>*</td><td>ms</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_write"/><tt><b>write( iOSocket <i>inst</i>, const char* <i>buffer</i>, int <i>size</i> );</b></tt><br>Write bytes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Write buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Socket_writec"/><tt><b>writec( iOSocket <i>inst</i>, char <i>c</i> );</b></tt><br>Write one character.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Socket instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>c</i></tt></td><td>Char to write.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Str"/><h3>23. object Str</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+String operation helper.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Str"/><tt>Summary of object Str<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_byteToStr"/><tt><b>byteToStr( unsigned char* <i>bin</i>, int <i>len</i> );</b></tt><br>Converts binary data into a hex string like 0AFE...
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>bin</i></tt></td><td>Input bytes.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>len</i></tt></td><td>Number of bytes to translate.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_cat"/><tt><b>cat( char* <i>dest</i>, const char* <i>src</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>dest</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>src</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_copy"/><tt><b>copy( char* <i>dst</i>, const char* <i>src</i> );</b></tt><br>Copies a string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>dst</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>src</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Str_copynz"/><tt><b>copynz( char* <i>snz</i>, int <i>snzlen</i>, const char* <i>str</i> );</b></tt><br>Copies a zero terminated string as a non-zero terminated string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>snz</i></tt></td><td>Non-zero buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>snzlen</i></tt></td><td>Non-zero buffer length.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>str</i></tt></td><td>Input string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_createStamp"/><tt><b>createStamp( void );</b></tt><br>Creates a timestamp: YYYYmmdd.hhMMss.SSS.</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_createStampNoDots"/><tt><b>createStampNoDots( void );</b></tt><br>Creates a timestamp: YYYYmmddhhMMssSSS.</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_decode4URL"/><tt><b>decode4URL( const char* <i>url</i> );</b></tt><br>replace url escapes with special chars
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>url</i></tt></td><td>URL to decode</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_dup"/><tt><b>dup( const char* <i>src</i> );</b></tt><br>Duplicates a string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>src</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_encode4URL"/><tt><b>encode4URL( const char* <i>url</i> );</b></tt><br>replace special chars with url escapes
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>url</i></tt></td><td>URL to encode</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_endsWith"/><tt><b>endsWith( const char* <i>str1</i>, const char* <i>str2</i> );</b></tt><br>Check if str1 ends with str2.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td>String to check.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td>Ending.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_endsWithi"/><tt><b>endsWithi( const char* <i>str1</i>, const char* <i>str2</i> );</b></tt><br>Check if str1 ends with str2. (ignoring case)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td>String to check.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td>Ending.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_equals"/><tt><b>equals( const char* <i>str1</i>, const char* <i>str2</i> );</b></tt><br>Compares two strings.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_equalsi"/><tt><b>equalsi( const char* <i>str1</i>, const char* <i>str2</i> );</b></tt><br>Equals ignore case.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_equalsn"/><tt><b>equalsn( const char* <i>str1</i>, const char* <i>str2</i>, int <i>cnt</i> );</b></tt><br>Equals till number off char is reached.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>cnt</i></tt></td><td>Number of chars to compare</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_equalsni"/><tt><b>equalsni( const char* <i>str1</i>, const char* <i>str2</i>, int <i>cnt</i> );</b></tt><br>Equals ignore case till number off char is reached.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>cnt</i></tt></td><td>Number of chars to compare</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_find"/><tt><b>find( const char* <i>str</i>, const char* <i>substr</i> );</b></tt><br>Finds a substring.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>substr</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_findc"/><tt><b>findc( const char* <i>str</i>, char <i>c</i> );</b></tt><br>Find the first occurrence of a character.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>String to investigate.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>c</i></tt></td><td>Character to look for.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_findi"/><tt><b>findi( const char* <i>str</i>, const char* <i>substr</i> );</b></tt><br>Finds a substring ignoring case.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>substr</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_fmt"/><tt><b>fmt( const char* <i>format</i>, ... <i></i> );</b></tt><br>Formats a string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>format</i></tt></td><td>Format rules.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Multiple parameters.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_fmtb"/><tt><b>fmtb( char* <i>buffer</i>, const char* <i>format</i>, ... <i></i> );</b></tt><br>Formats a string into a buffer.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>buffer</i></tt></td><td>Buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>format</i></tt></td><td>Format rules.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Multiple parameters.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Str_free"/><tt><b>free( char* <i>str</i> );</b></tt><br>Free up a string allocation.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>String allocation.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Str_getCntLinefeeds"/><tt><b>getCntLinefeeds( const char* <i>str</i> );</b></tt><br>Returns number of linefeed chars found.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_getExtension"/><tt><b>getExtension( const char* <i>str</i> );</b></tt><br>Returns a pointer to the string extension: [readme.txt] would return a pointer to [txt].
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_getLine"/><tt><b>getLine( const char* <i>str</i>, int <i>nr</i> );</b></tt><br>Returns pointer to the specified line.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>nr</i></tt></td><td>Line number.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_getNextLine"/><tt><b>getNextLine( const char* <i>str</i>, int* <i>nr</i> );</b></tt><br>Returns pointer to the next line.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>nr</i></tt></td><td>Line number.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Str_int2snz"/><tt><b>int2snz( char* <i>snz</i>, int <i>snzlen</i>, int <i>val</i> );</b></tt><br>Converts an integer into a non-zero string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>snz</i></tt></td><td>Non-zero buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>snzlen</i></tt></td><td>Non-zero buffer length.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Input value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_isoDate"/><tt><b>isoDate( long <i>tt</i> );</b></tt><br>Creates an ISO date string: YYYY-mm-dd
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>tt</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_isoTime"/><tt><b>isoTime( long <i>tt</i> );</b></tt><br>Creates an ISO time string: hh:MM:ss
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>tt</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Str_len"/><tt><b>len( const char* <i>str</i> );</b></tt><br>Calculates the string length.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Str_long2snz"/><tt><b>long2snz( char* <i>snz</i>, int <i>snzlen</i>, long <i>val</i> );</b></tt><br>Converts an long into a non-zero string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>snz</i></tt></td><td>Non-zero buffer.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>snzlen</i></tt></td><td>Non-zero buffer length.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>val</i></tt></td><td>Input value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Str_replaceAll"/><tt><b>replaceAll( char* <i>str</i>, char <i>charA</i>, char <i>charB</i> );</b></tt><br>Replace all charA's with charB
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>String to change.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>charA</i></tt></td><td>Char to replace</td><td>*</td><td></td></tr>
+<tr><td><tt><i>charB</i></tt></td><td>Replacement</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_replaceAllSub"/><tt><b>replaceAllSub( const char* <i>inputString</i>, const char* <i>substring</i>, const char* <i>replacement</i> );</b></tt><br>Replace all substrings with the replacement.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inputString</i></tt></td><td>Input string</td><td>*</td><td></td></tr>
+<tr><td><tt><i>substring</i></tt></td><td>Substring to replace</td><td>*</td><td></td></tr>
+<tr><td><tt><i>replacement</i></tt></td><td>Replacement</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_replaceAllSubstitutions"/><tt><b>replaceAllSubstitutions( const char* <i>str</i> );</b></tt><br>Replace all environment variables with there current values.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>Input string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_snz2sz"/><tt><b>snz2sz( const char* <i>snz</i>, int <i>snzlen</i> );</b></tt><br>Converts an non-zero string as a zero terminated string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>snz</i></tt></td><td>Non-zero string.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>snzlen</i></tt></td><td>Non-zero string length.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_startsWith"/><tt><b>startsWith( const char* <i>str1</i>, const char* <i>str2</i> );</b></tt><br>Check if str1 starts with str2.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td>String to check.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td>Beginning.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Str_startsWithi"/><tt><b>startsWithi( const char* <i>str1</i>, const char* <i>str2</i> );</b></tt><br>Check if str1 starts with str2. (ignoring case)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str1</i></tt></td><td>String to check.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>str2</i></tt></td><td>Beginning.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>unsigned char*</tt></td><td valign="top"><a name="Str_strToByte"/><tt><b>strToByte( const char* <i>str</i> );</b></tt><br>Converts a hex string into binary data
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>Input string</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Str_strlwr"/><tt><b>strlwr( const char* <i>str</i> );</b></tt><br>Converts all chars into lowercase.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Str_strupr"/><tt><b>strupr( const char* <i>str</i> );</b></tt><br>Converts all chars into uppercase.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Str_trim"/><tt><b>trim( char* <i>str</i> );</b></tt><br>Removes leading and trailing blanks.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>String to trim.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="StrTok"/><h3>24. object StrTok</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+String tokenizer object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="StrTok"/><tt>Summary of object StrTok<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="StrTok_countTokens"/><tt><b>countTokens( iOStrTok <i>inst</i> );</b></tt><br>Get number of tokens.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>String instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="StrTok_hasMoreTokens"/><tt><b>hasMoreTokens( iOStrTok <i>inst</i> );</b></tt><br>There are more tokens left to read.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>String instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOStrTok</tt></td><td valign="top"><a name="StrTok_inst"/><tt><b>inst( const char* <i>str</i>, char <i>sep</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>Initial string value.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>sep</i></tt></td><td>String separator.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="StrTok_nextToken"/><tt><b>nextToken( iOStrTok <i>inst</i> );</b></tt><br>A token.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>String instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="StrTok_replaceAll"/><tt><b>replaceAll( const char* <i>str</i>, char <i>sep</i>, const char* <i>oldTok</i>, const char* <i>newTok</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>Initial string value.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>sep</i></tt></td><td>String separator.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>oldTok</i></tt></td><td>String token to be replaced.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>newTok</i></tt></td><td>Replacement for the old token.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="String"/><h3>25. object String</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+String object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="String"/><tt>Summary of object String<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOString</tt></td><td valign="top"><a name="String_inst"/><tt><b>inst( const char* <i>str</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>Initial string value.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="String_len"/><tt><b>len( iOString <i>inst</i> );</b></tt><br>String length.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>String instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="String_str"/><tt><b>str( iOString <i>inst</i> );</b></tt><br>String value.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>String instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="System"/><h3>26. object System</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+System utilities.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="System"/><tt>Summary of object System<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {OSTYPE_UNIX, OSTYPE_DOS} ostype</b></tt><br>OS type.</td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> int</tt></td><td valign="top"><tt><i><b>vmajor</b></i> = 2</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> int</tt></td><td valign="top"><tt><i><b>vminor</b></i> = 0</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> int</tt></td><td valign="top"><tt><i><b>patch</b></i> = 0</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>builddate</b></i> = $__DATE__</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>buildtime</b></i> = $__TIME__</tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_accessDev"/><tt><b>accessDev( const char* <i>device</i>, Boolean <i>readonly</i> );</b></tt><br>check device access
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>device</i></tt></td><td>device name</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_accessPort"/><tt><b>accessPort( int <i>from</i>, int <i>num</i> );</b></tt><br>try to get port access
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>from</i></tt></td><td>port base address</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="System_availDevice"/><tt><b>availDevice( long <i>handle</i> );</b></tt><br>available from device
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>handle</i></tt></td><td>device handle</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="System_beep"/><tt><b>beep( void );</b></tt><br>Beeps.</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="System_cp1252toISO885915"/><tt><b>cp1252toISO885915( const char* <i>str</i> );</b></tt><br>Translates Windows CP1252 into Latin 15.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>str</i></tt></td><td>CP1252 encoded string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="System_decode"/><tt><b>decode( const byte* <i>b</i>, int <i>len</i>, const char* <i>k</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getBuild"/><tt><b>getBuild( void );</b></tt><br>Get the Rocs build string.</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getErrStr"/><tt><b>getErrStr( int <i>error</i> );</b></tt><br>Translates an error code into a string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>error</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getEyecatcher"/><tt><b>getEyecatcher( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>char</tt></td><td valign="top"><a name="System_getFileSeparator"/><tt><b>getFileSeparator( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="System_getGUID"/><tt><b>getGUID( const char* <i>macdev</i> );</b></tt><br>Get global unique ID. (32 chars long)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>macdev</i></tt></td><td>May be NULL to use the default device for getting the MAC address.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="System_getMillis"/><tt><b>getMillis( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>ostype</tt></td><td valign="top"><a name="System_getOSType"/><tt><b>getOSType( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>char</tt></td><td valign="top"><a name="System_getPathSeparator"/><tt><b>getPathSeparator( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>char</tt></td><td valign="top"><a name="System_getPathSeparator4OS"/><tt><b>getPathSeparator4OS( ostype <i>type</i> );</b></tt><br>Path separator for a specific OS type.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>type</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getPrgExt"/><tt><b>getPrgExt( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getProperty"/><tt><b>getProperty( const char* <i>key</i> );</b></tt><br>Reads an environment variable.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>key</i></tt></td><td>Environment variable key.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getSigStr"/><tt><b>getSigStr( int <i>sig</i> );</b></tt><br>Translates an signal number into a string.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>sig</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>unsigned long</tt></td><td valign="top"><a name="System_getTick"/><tt><b>getTick( void );</b></tt><br>System tick in 10ms.</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="System_getTime"/><tt><b>getTime( int* <i>hours</i>, int* <i>minutes</i>, int* <i>seconds</i> );</b></tt><br>returns milliseconds</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="System_getUNC"/><tt><b>getUNC( const char* <i>filepath</i> );</b></tt><br>Translates a local path into a UNC.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>filepath</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getUnlimEyecatcher"/><tt><b>getUnlimEyecatcher( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getUserName"/><tt><b>getUserName( void );</b></tt><br>Login username.</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="System_getWSName"/><tt><b>getWSName( void );</b></tt><br>Workstation name.</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="System_getpid"/><tt><b>getpid( void );</b></tt><br>Process ID.</td></tr>
+<tr><td valign="top" align="right"><tt>iOSystem</tt></td><td valign="top"><a name="System_inst"/><tt><b>inst( void );</b></tt><br>Object creator. (Singleton)</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_isExpired"/><tt><b>isExpired( const char* <i>s</i>, char** <i>expdate</i>, long* <i>expdays</i>, int <i>vmajor</i>, int <i>vminor</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_isUnix"/><tt><b>isUnix( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_isWindows"/><tt><b>isWindows( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="System_latin2cp850"/><tt><b>latin2cp850( const char* <i>latinstr</i> );</b></tt><br>Translates Latin 15 into CP850.</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="System_latin2utf"/><tt><b>latin2utf( const char* <i>latinstr</i> );</b></tt><br>Translates Latin 15 into UTF-8.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>latinstr</i></tt></td><td>Latin 15 encoded string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="System_openDevice"/><tt><b>openDevice( const char* <i>device</i> );</b></tt><br>open device access
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>device</i></tt></td><td>device name</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_readDevice"/><tt><b>readDevice( long <i>handle</i>, char* <i>buffer</i>, int <i>size</i> );</b></tt><br>read from device
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>handle</i></tt></td><td>device handle</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>byte buffer</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>number of bytes</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>byte</tt></td><td valign="top"><a name="System_readPort"/><tt><b>readPort( int <i>port</i> );</b></tt><br>read a byte to the port</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_releasePort"/><tt><b>releasePort( int <i>from</i>, int <i>num</i> );</b></tt><br>release the port access
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>from</i></tt></td><td>port base address</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_setAdmin"/><tt><b>setAdmin( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="System_system"/><tt><b>system( const char* <i>cmd</i>, Boolean <i>async</i>, Boolean <i>minimized</i> );</b></tt><br>Starts a system command.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>cmd</i></tt></td><td>Command.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>async</i></tt></td><td>Start command async in a separate thread.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>minimized</i></tt></td><td>For windows: start MIN</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_uBusyWait"/><tt><b>uBusyWait( int <i>us</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>us</i></tt></td><td>Wait time in us</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_usWait"/><tt><b>usWait( int <i>us</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>us</i></tt></td><td>Wait time in us</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="System_utf2latin"/><tt><b>utf2latin( const char* <i>utfstr</i> );</b></tt><br>Translates fitting UTF-8 encodings into Lantin 15.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>utfstr</i></tt></td><td>UTF-8 encoded string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="System_writeDevice"/><tt><b>writeDevice( long <i>handle</i>, char* <i>buffer</i>, int <i>size</i> );</b></tt><br>read from device
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>handle</i></tt></td><td>device handle</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>byte buffer</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>number of bytes</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="System_writePort"/><tt><b>writePort( int <i>port</i>, byte <i>val</i> );</b></tt><br>write a byte to the port</td></tr>
+</table></p>
+<p><a name="Thread"/><h3>27. object Thread</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Thread object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Thread"/><tt>Summary of object Thread<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void (*thread_run)(void*)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOThread</tt></td><td valign="top"><a name="Thread_find"/><tt><b>find( const char* <i>name</i> );</b></tt><br>Find a thread by name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Thread name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOThread</tt></td><td valign="top"><a name="Thread_findById"/><tt><b>findById( unsigned long <i>id</i> );</b></tt><br>Find a thread by id.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>id</i></tt></td><td>Thread id.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOList</tt></td><td valign="top"><a name="Thread_getAll"/><tt><b>getAll( void );</b></tt><br>Get a list of all threads.</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Thread_getName"/><tt><b>getName( iOThread <i>inst</i> );</b></tt><br>Thread name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void*</tt></td><td valign="top"><a name="Thread_getParm"/><tt><b>getParm( iOThread <i>inst</i> );</b></tt><br>Get parameter object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Thread_getPost"/><tt><b>getPost( iOThread <i>inst</i> );</b></tt><br>Get post from the queue. (NULL if nothing is in queue.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Thread_hasPost"/><tt><b>hasPost( iOThread <i>inst</i> );</b></tt><br>Check if there is post the queue.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>unsigned long</tt></td><td valign="top"><a name="Thread_id"/><tt><b>id( void );</b></tt><br>Get current thread id.</td></tr>
+<tr><td valign="top" align="right"><tt>iOThread</tt></td><td valign="top"><a name="Thread_inst"/><tt><b>inst( const char* <i>name</i>, thread_run <i>run</i>, void* <i>parm</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>name</i></tt></td><td>Thread name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>run</i></tt></td><td>Thread runner.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>parm</i></tt></td><td>Thread parameters. (User defined.)</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Thread_isPause"/><tt><b>isPause( iOThread <i>inst</i> );</b></tt><br>Pause signaled.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Thread_isQuit"/><tt><b>isQuit( iOThread <i>inst</i> );</b></tt><br>Quit signaled.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Thread_join"/><tt><b>join( iOThread <i>inst</i> );</b></tt><br>Waits for thread termination and returns True if ok.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_kill"/><tt><b>kill( iOThread <i>inst</i> );</b></tt><br>Kill a thread by reference.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_pause"/><tt><b>pause( iOThread <i>inst</i>, Boolean <i>pause</i> );</b></tt><br>set pause flag
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Thread_post"/><tt><b>post( iOThread <i>inst</i>, obj <i>msg</i> );</b></tt><br>Post a message into the queue.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>msg</i></tt></td><td>Post.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Thread_prioPost"/><tt><b>prioPost( iOThread <i>inst</i>, obj <i>msg</i>, int <i>prio</i> );</b></tt><br>Post a message into the queue.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>msg</i></tt></td><td>Post.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>prio</i></tt></td><td>priority</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_requestQuit"/><tt><b>requestQuit( iOThread <i>inst</i> );</b></tt><br>Signals thread to stop as soon as possible.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_requestQuitAll"/><tt><b>requestQuitAll( void );</b></tt><br>Signals all thread to stop as soon as possible.</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_setDescription"/><tt><b>setDescription( iOThread <i>inst</i>, const char* <i>desc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>desc</i></tt></td><td>Description.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_setHigh"/><tt><b>setHigh( iOThread <i>inst</i> );</b></tt><br>Sets the priority to high.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_setStacksize"/><tt><b>setStacksize( iOThread <i>inst</i>, long <i>size</i> );</b></tt><br>Change the default stacksize.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>New stacksize.</td><td>*</td><td>byte</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Thread_sleep"/><tt><b>sleep( int <i>time</i> );</b></tt><br>Sleeps the current thread.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>time</i></tt></td><td>Time to sleep.</td><td>*</td><td>ms</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Thread_start"/><tt><b>start( iOThread <i>inst</i> );</b></tt><br>Starts the thread runner.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>obj</tt></td><td valign="top"><a name="Thread_waitPost"/><tt><b>waitPost( iOThread <i>inst</i> );</b></tt><br>Get post from the queue. (Wait until post comes in queue.)
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Thread instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Trace"/><h3>28. object Trace</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Trace object. (Singleton)<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Trace"/><tt>Summary of object Trace<a href="#"></a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*trcListener )(int level, char* module, char* msg, int rc, Boolean dump)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*ExceptionListener )(int level, char* msg)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {TRCLEVEL_EXCEPTION=0x0001,TRCLEVEL_INFO  =0x0002,TRCLEVEL_WARNING=0x0004,TRCLEVEL_DEBUG  =0x0008,
+                        TRCLEVEL_BYTE     =0x0010,TRCLEVEL_METHOD=0x0020,TRCLEVEL_MEMORY =0x0040,TRCLEVEL_PARAM  =0x0080,
+                        TRCLEVEL_PROTOCOL =0x0100,TRCLEVEL_ERROR =0x0200,TRCLEVEL_PARSE  =0x0400,TRCLEVEL_WRAPPER=0x0800,
+                        TRCLEVEL_USER1    =0x1000,TRCLEVEL_USER2 =0x2000,TRCLEVEL_MONITOR=0x4000,TRCLEVEL_XMLH   =0x8000,
+                        TRCLEVEL_USER     =0xF000,TRCLEVEL_CALC  =0x10000,TRCLEVEL_STATUS=0x20000,TRCLEVEL_ALL   =0xFFFFFF} tracelevel</b></tt><br>Trace levels.</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_dmp"/><tt><b>dmp( const void* <i>cargo</i>, tracelevel <i>level</i>, int <i>id</i>, const char* <i>buffer</i>, int <i>size</i> );</b></tt><br>Trace a binary buffer.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>cargo</i></tt></td><td>Name of calling object or Trace instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>level</i></tt></td><td>Trace level.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>Trace id.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Buffer to trace.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_dump"/><tt><b>dump( const void* <i>cargo</i>, tracelevel <i>level</i>, const char* <i>buffer</i>, int <i>size</i> );</b></tt><br>Trace a binary buffer.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>cargo</i></tt></td><td>Trace instance or Object name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>level</i></tt></td><td>Trace level.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Buffer to trace.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Size of buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOTrace</tt></td><td valign="top"><a name="Trace_get"/><tt><b>get( void );</b></tt><br>Get's the trace object.</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Trace_getCurrentFilename"/><tt><b>getCurrentFilename( iOTrace <i>inst</i> );</b></tt><br>Get the current trace filename.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Trace_getDumpsize"/><tt><b>getDumpsize( iOTrace <i>inst</i> );</b></tt><br>Get trace dumpsize.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const FILE*</tt></td><td valign="top"><a name="Trace_getF"/><tt><b>getF( iOTrace <i>inst</i> );</b></tt><br>Get the current trace FILE object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Trace_getFilename"/><tt><b>getFilename( iOTrace <i>inst</i> );</b></tt><br>Get the trace filename.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>tracelevel</tt></td><td valign="top"><a name="Trace_getLevel"/><tt><b>getLevel( iOTrace <i>inst</i> );</b></tt><br>Get the trace level(s).
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Trace_getOS"/><tt><b>getOS( void );</b></tt><br>Get the current operating system.</td></tr>
+<tr><td valign="top" align="right"><tt>iOTrace</tt></td><td valign="top"><a name="Trace_inst"/><tt><b>inst( tracelevel <i>level</i>, const char* <i>filename</i>, Boolean <i>toStdErr</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>level</i></tt></td><td>Trace level(s) to be traced out.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>filename</i></tt></td><td>Trace filename.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>toStdErr</i></tt></td><td>Trace output also to stderr.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Trace_isStdErr"/><tt><b>isStdErr( iOTrace <i>inst</i> );</b></tt><br>Get trace to stderr.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_printHeader"/><tt><b>printHeader( void );</b></tt><br>Prints the trace header.</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_println"/><tt><b>println( const char* <i>fmt</i>, ... <i></i> );</b></tt><br>Prints one line into the trace.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>fmt</i></tt></td><td>Format string.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Variables for the format string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_set"/><tt><b>set( iOTrace <i>inst</i> );</b></tt><br>Replace or set the singleton with this one.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setAppID"/><tt><b>setAppID( iOTrace <i>inst</i>, const char* <i>id</i> );</b></tt><br>Sets the application id to use in the trace.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>Application ID.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setDumpsize"/><tt><b>setDumpsize( iOTrace <i>inst</i>, int <i>size</i> );</b></tt><br>Set trace dumpsize.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>New dumpsize.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setEbcdicDump"/><tt><b>setEbcdicDump( iOTrace <i>inst</i>, Boolean <i>ebcdic</i> );</b></tt><br>Dump also an ebcdic column.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>ebcdic</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setExceptionFile"/><tt><b>setExceptionFile( iOTrace <i>inst</i>, Boolean <i>useexceptionfile</i> );</b></tt><br>If set, exceptions are also traced in a separate file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>useexceptionfile</i></tt></td><td>Activates an exception file.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setExceptionListener"/><tt><b>setExceptionListener( iOTrace <i>inst</i>, ExceptionListener <i>listener</i>, Boolean <i>timestamp</i>, Boolean <i>all</i> );</b></tt><br>Set an exceptionlistener.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>listener</i></tt></td><td></td><td>*</td><td></td></tr>
+<tr><td><tt><i>timestamp</i></tt></td><td>Send exceptions with timestamp prefix.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>all</i></tt></td><td>Send all traces to the listener.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setFileSize"/><tt><b>setFileSize( iOTrace <i>inst</i>, int <i>size</i> );</b></tt><br>Change the trace max. filesize.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>New filesize.</td><td>*</td><td>KB</td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setFilename"/><tt><b>setFilename( iOTrace <i>inst</i>, const char* <i>filename</i> );</b></tt><br>Change the trace filename.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>filename</i></tt></td><td>New filename.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setInvoke"/><tt><b>setInvoke( iOTrace <i>inst</i>, const char* <i>cmd</i>, Boolean <i>async</i> );</b></tt><br>Command to invoke when writing a new exception file.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>cmd</i></tt></td><td>Command to invoke.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>async</i></tt></td><td>Invoke in separate thread.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setLevel"/><tt><b>setLevel( iOTrace <i>inst</i>, tracelevel <i>level</i> );</b></tt><br>Change the trace level(s).
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>level</i></tt></td><td>Trace level(s).</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setMainThreadId"/><tt><b>setMainThreadId( unsigned long <i>id</i> );</b></tt><br>Set the thread id for main.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>id</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setNrFiles"/><tt><b>setNrFiles( iOTrace <i>inst</i>, int <i>cnt</i> );</b></tt><br>Change the number of files before recycling the oldest.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>cnt</i></tt></td><td>New number of files.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_setStdErr"/><tt><b>setStdErr( iOTrace <i>inst</i>, Boolean <i>tostderr</i> );</b></tt><br>Set trace to stderr.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Trace instance or NULL.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>tostderr</i></tt></td><td></td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_terrno"/><tt><b>terrno( const char* <i>objectname</i>, tracelevel <i>level</i>, int <i>line</i>, int <i>id</i>, int <i>error</i>, const char* <i>fmt</i>, ... <i></i> );</b></tt><br>Trace.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>objectname</i></tt></td><td>Name of calling object.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>level</i></tt></td><td>Trace level.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>line</i></tt></td><td>Sourceline number.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>Trace id.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>error</i></tt></td><td>Error number to be translated.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>fmt</i></tt></td><td>Format string.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Variables for format string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_trace"/><tt><b>trace( const void* <i>cargo</i>, tracelevel <i>level</i>, int <i>id</i>, const char* <i>fmt</i>, ... <i></i> );</b></tt><br>Trace.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>cargo</i></tt></td><td>Trace instance or Object name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>level</i></tt></td><td>Trace level.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>Trace id.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>fmt</i></tt></td><td>Format string.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Variables for format string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Trace_trc"/><tt><b>trc( const char* <i>objectname</i>, tracelevel <i>level</i>, int <i>line</i>, int <i>id</i>, const char* <i>fmt</i>, ... <i></i> );</b></tt><br>Trace.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>objectname</i></tt></td><td>Name of calling object.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>level</i></tt></td><td>Trace level.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>line</i></tt></td><td>Sourceline number.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>id</i></tt></td><td>Trace id.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>fmt</i></tt></td><td>Format string.</td><td>*</td><td></td></tr>
+<tr><td><tt><i></i></tt></td><td>Variables for format string.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="USB"/><h3>29. object USB</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+LibUSB interface<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="USB"/><tt>Summary of object USB<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="USB_close"/><tt><b>close( iOUSB <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOUSB</tt></td><td valign="top"><a name="USB_inst"/><tt><b>inst( void );</b></tt><br>Object creator.</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="USB_open"/><tt><b>open( iOUSB <i>inst</i>, int <i>vendor</i>, int <i>product</i>, int <i>configNr</i>, int <i>interfaceNr</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="USB_read"/><tt><b>read( iOUSB <i>inst</i>, unsigned char* <i>buf</i>, int <i>len</i>, int <i>timeout</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="USB_write"/><tt><b>write( iOUSB <i>inst</i>, unsigned char* <i>buf</i>, int <i>len</i>, int <i>timeout</i> );</b></tt><br></td></tr>
+</table></p>
+<p><a name="WrpInf"/><h3>30. object WrpInf</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Wrapper info object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="WrpInf"/><tt>Summary of object WrpInf<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOList</tt></td><td valign="top"><a name="WrpInf_getVars"/><tt><b>getVars( iONode <i>wrp</i> );</b></tt><br>Get all var nodes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>wrp</i></tt></td><td>Wrapper.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="WrpInf_getWrapper"/><tt><b>getWrapper( iOWrpInf <i>inst</i>, const char* <i>wrpname</i> );</b></tt><br>Get a wrapper by key.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>res instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>wrpname</i></tt></td><td>Wrapper name.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOWrpInf</tt></td><td valign="top"><a name="WrpInf_inst"/><tt><b>inst( const char** <i>xmls</i>, int <i>cnt</i> );</b></tt><br>Creates a resource object.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>xmls</i></tt></td><td>Wrapper XML's as C-String.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>cnt</i></tt></td><td>Number of xml strings.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Xmlh"/><h3>31. object Xmlh</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Xmlh protocol helper object.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Xmlh"/><tt>Summary of object Xmlh<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>header_tagname</b></i> = xmlh</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>xml_tagname</b></i> = xml</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> const char*</tt></td><td valign="top"><tt><i><b>bin_tagname</b></i> = bin</tt><br></td></tr>
+<tr><td valign="top" align="right"><sub><i>const</i></sub><tt> int</tt></td><td valign="top"><tt><i><b>initAllocSize</b></i> = 4096</tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Xmlh_addNode"/><tt><b>addNode( iOXmlh <i>inst</i>, iONode <i>node</i> );</b></tt><br>Add.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>node</i></tt></td><td>Node to add in the Xmlh.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Xmlh_getBinName"/><tt><b>getBinName( iOXmlh <i>inst</i>, int <i>idx</i> );</b></tt><br>Get filename for bin block by index.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>idx</i></tt></td><td>Index.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>long</tt></td><td valign="top"><a name="Xmlh_getBinSize"/><tt><b>getBinSize( iOXmlh <i>inst</i>, int <i>dataIdx</i> );</b></tt><br>Get size of bin block by index.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>dataIdx</i></tt></td><td>Index.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iONode</tt></td><td valign="top"><a name="Xmlh_getNodeByTagName"/><tt><b>getNodeByTagName( iOXmlh <i>inst</i>, const char* <i>name</i>, int <i>idx</i> );</b></tt><br>Get header childnode by name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>name</i></tt></td><td>Name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>idx</i></tt></td><td>Index. (Incase of a list of the same nodes.)</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Xmlh_getSizeByTagName"/><tt><b>getSizeByTagName( iOXmlh <i>inst</i>, const char* <i>name</i>, int <i>idx</i> );</b></tt><br>Get size of block by name.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>name</i></tt></td><td>Name.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>idx</i></tt></td><td>Index. (Incase of a list of the same nodes.)</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>const char*</tt></td><td valign="top"><a name="Xmlh_getXmlName"/><tt><b>getXmlName( iOXmlh <i>inst</i>, int <i>dataIdx</i> );</b></tt><br>Get node for xml block by index.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>dataIdx</i></tt></td><td>Index.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Xmlh_getXmlSize"/><tt><b>getXmlSize( iOXmlh <i>inst</i>, int <i>idx</i> );</b></tt><br>Get size of xml block by index.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>idx</i></tt></td><td>Index.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Xmlh_hasBin"/><tt><b>hasBin( iOXmlh <i>inst</i> );</b></tt><br>Get number of bin nodes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Xmlh_hasXml"/><tt><b>hasXml( iOXmlh <i>inst</i> );</b></tt><br>Get number of xml nodes.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>iOXmlh</tt></td><td valign="top"><a name="Xmlh_inst"/><tt><b>inst( Boolean <i>create</i>, const char* <i>header_tagname</i>, const char* <i>bin_tagname</i> );</b></tt><br>Object creator.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>create</i></tt></td><td>Create a new Xmlh.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>header_tagname</i></tt></td><td>Optional tagname as alternative to xmlh.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>bin_tagname</i></tt></td><td>Optional tagname as alternative to bin.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Xmlh_isError"/><tt><b>isError( iOXmlh <i>inst</i> );</b></tt><br>Get error state of Xmlh.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="Xmlh_read"/><tt><b>read( iOXmlh <i>inst</i>, const byte* <i>buffer</i>, int <i>size</i> );</b></tt><br>Reads the Xmlh from buffer. True if complete header is read.
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>buffer</i></tt></td><td>Buffer with part of Xmlh.</td><td>*</td><td></td></tr>
+<tr><td><tt><i>size</i></tt></td><td>Byte count in buffer.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Xmlh_reset"/><tt><b>reset( iOXmlh <i>inst</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>inst</i></tt></td><td>Xmlh instance.</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+</body>
+</html>

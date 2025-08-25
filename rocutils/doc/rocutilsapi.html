@@ -1,0 +1,52 @@
+<html>
+<head>
+  <title>RocUtils API</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+<h2>RocUtils API</h2>
+XML: <br>
+XML: <br>
+Module: rocutils<br>
+Auto generated at: Fri Aug  3 14:01:51 2018
+<br>
+Index: <a href="rocutilsapi-index.html">rocutilsapi-index.html</a><br>
+<p><a name="Addr"/><h3>1. object Addr</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Addresing converter<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Addr"/><tt>Summary of object Addr<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Addr_fromFADA"/><tt><b>fromFADA( int <i>fada</i>, int* <i>module</i>, int* <i>port</i>, int* <i>gate</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Addr_fromPADA"/><tt><b>fromPADA( int <i>pada</i>, int* <i>module</i>, int* <i>port</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Addr_toFADA"/><tt><b>toFADA( int <i>module</i>, int <i>port</i>, int <i>gate</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="Addr_toPADA"/><tt><b>toPADA( int <i>module</i>, int <i>port</i> );</b></tt><br></td></tr>
+</table></p>
+<p><a name="CRC"/><h3>2. object CRC</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+CRC Calculator.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="CRC"/><tt>Summary of object CRC<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>int</tt></td><td valign="top"><a name="CRC_checkSum16"/><tt><b>checkSum16( byte* <i>packet</i>, int <i>len</i> );</b></tt><br></td></tr>
+</table></p>
+<p><a name="ColorUtils"/><h3>3. object ColorUtils</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Color utilities.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="ColorUtils"/><tt>Summary of object ColorUtils<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="ColorUtils_HSVtoRGB"/><tt><b>HSVtoRGB( double <i>h</i>, double <i>s</i>, double <i>v</i>, int* <i>r</i>, int* <i>g</i>, int* <i>b</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="ColorUtils_RGBtoHSV"/><tt><b>RGBtoHSV( int <i>r</i>, int <i>g</i>, int <i>b</i>, double* <i>h</i>, double* <i>s</i>, double* <i>v</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="ColorUtils_RGBtoXY"/><tt><b>RGBtoXY( int <i>r</i>, int <i>g</i>, int <i>b</i>, float* <i>x</i>, float* <i>y</i> );</b></tt><br></td></tr>
+</table></p>
+<p><a name="Devices"/><h3>4. object Devices</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Serial device lister.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Devices"/><tt>Summary of object Devices<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="Devices_freeList"/><tt><b>freeList( iOList <i>list</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOList</tt></td><td valign="top"><a name="Devices_getDevices"/><tt><b>getDevices( void );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="Devices_getDevicesStr"/><tt><b>getDevicesStr( void );</b></tt><br></td></tr>
+</table></p>
+<p><a name="FileUtils"/><h3>5. object FileUtils</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+File utilities.<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="FileUtils"/><tt>Summary of object FileUtils<a href="#"></a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>char*</tt></td><td valign="top"><a name="FileUtils_findFile"/><tt><b>findFile( const char* <i>directory</i>, const char* <i>filename</i> );</b></tt><br></td></tr>
+</table></p>
+</body>
+</html>

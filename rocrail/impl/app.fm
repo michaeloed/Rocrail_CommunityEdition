@@ -1,0 +1,57 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  3 2018 14:01:50)
+  * Module: RocRail
+  * XML: $Source: /cvsroot/rojav/rocrail/rocrail.xml,v $
+  * XML: $Revision: 1.56 $
+  * Date: Fri Aug  3 14:03:35 2018
+  */
+
+struct OApp AppOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _Main,
+  _broadcastEvent,
+  _ebreak,
+  _getBackTrace,
+  _getClntCon,
+  _getControl,
+  _getIconPath,
+  _getImgPath,
+  _getIni,
+  _getIniFile,
+  _getIniNode,
+  _getLibPath,
+  _getModel,
+  _getNewIni,
+  _getSrcpCon,
+  _getStartTime,
+  _getWeather,
+  _getrevno,
+  _go,
+  _inst,
+  _isConsoleMode,
+  _isCreateModplan,
+  _isRunAtStartup,
+  _isStress,
+  _link,
+  _listThreads,
+  _play,
+  _saveIni,
+  _setIni,
+  _shutdown,
+  _stop,
+  _stopPlay,
+};

@@ -1,0 +1,36 @@
+#!/bin/bash
+set -e
+if [ "$1" = "configure" ]; then
+  chmod 755 /etc/init.d/rocnetnoded
+  chmod 755 /opt/rocnet/rocnetnode.sh
+  update-rc.d rocnetnoded defaults
+
+  if grep "i2c-bcm2708" /etc/modules; then
+    echo "i2c-bcm2708 already listed"
+  else
+    echo "i2c-bcm2708" >> /etc/modules
+  fi
+
+  if grep "i2c-dev" /etc/modules; then
+    echo "i2c-dev already listed"
+  else
+    echo "i2c-dev" >> /etc/modules
+  fi
+
+  if [ -f "/etc/modprobe.d/raspi-blacklist.conf" ]; then
+    sed "s/^blacklist i2c-bcm2708/#blacklist i2c-bcm2708/g" < /etc/modprobe.d/raspi-blacklist.conf > /etc/modprobe.d/raspi-blacklist.conf.tmp
+    cp /etc/modprobe.d/raspi-blacklist.conf.tmp /etc/modprobe.d/raspi-blacklist.conf
+    rm /etc/modprobe.d/raspi-blacklist.conf.tmp
+  fi
+  
+  if [ -f "/etc/inittab" ]; then
+    sed "s/^T0:23:respawn:\/sbin\/getty -L ttyAMA0 115200 vt100/#T0:23:respawn:\/sbin\/getty -L ttyAMA0 115200 vt100/g" < /etc/inittab > /etc/inittab.tmp
+    cp /etc/inittab.tmp /etc/inittab
+    rm /etc/inittab.tmp
+  fi
+  
+  if [ -f "/boot/cmdline.txt" ]; then
+    echo "dwc_otg.lpm_enable=0 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline rootwait" > /boot/cmdline.txt 
+  fi
+  
+fi

@@ -1,0 +1,320 @@
+<html>
+<head>
+  <title>rocview</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-15">
+  <style type='text/css'>
+    body{ font-family: arial; font-size: 10pt;}
+    table{ empty-cells: show; width: 100%; border-collapse: collapse; font-family: arial; font-size: 10pt; padding: 1px 2px 1px 2px;}
+    th{ border: 1px solid black; text-align: center; background: #CCD5DF;}
+    td{ border: 1px solid black;}
+    .heading{ color: #D31409; font-weight: bold; font-size: 14pt;}
+    .link{ color: #D31409; text-decoration: none;}
+  </style>
+</head>
+<body>
+<h2>rocview</h2>
+Module: rocview<br>
+Auto generated at: Thu Sep 20 19:13:31 2018
+<br>
+<p><a name="Commandline options:"/><font class='heading'>1. Commandline options:</font>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><th>Node</th><th>Parent node<br>Attribute/Constant</th><th>vType</th><th>Remark</th><th>Unit</th><th>Default</th><th>Range</th><th>Required</th></tr>
+<tr bgcolor="#e8e8e8"><td><a name="Cmdline"/><small>1.0</small> <b>Cmdline</b> <small>(1)</small></td><td>*root*</td><td></td><td>Commands are listed in column --Default--.</td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td><i></i></td><td align="right"><i>debug</i></td><td><i>const string</i></td><td><i>Set tracelevel debug.</i></td><td><i>-</i></td><td><i>-debug</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>fullscreen</i></td><td><i>const string</i></td><td><i>Start in fullscreen mode.</i></td><td><i>-</i></td><td><i>-fs</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>host</i></td><td><i>const string</i></td><td><i>Specifies target daemon: -h [hostname]</i></td><td><i>-</i></td><td><i>-h</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>info</i></td><td><i>const string</i></td><td><i>Activates info tracelevel.</i></td><td><i>-</i></td><td><i>-info</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>inifile</i></td><td><i>const string</i></td><td><i>Specifies which Inifile to use: -i [file]</i></td><td><i>-</i></td><td><i>-i</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>langfile</i></td><td><i>const string</i></td><td><i>Alternative translations file: -lang [file]</i></td><td><i>-</i></td><td><i>-lang</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>locotabsel</i></td><td><i>const string</i></td><td><i>Loco tab index for selection.</i></td><td><i>-</i></td><td><i>-ls</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>offline</i></td><td><i>const string</i></td><td><i>Starts Gui in offline mode.</i></td><td><i>-</i></td><td><i>-offline</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>parse</i></td><td><i>const string</i></td><td><i>Activates parse tracelevel.</i></td><td><i>-</i></td><td><i>-parse</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>port</i></td><td><i>const string</i></td><td><i>Specifies target port: -p [port]</i></td><td><i>-</i></td><td><i>-p</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>serverpath</i></td><td><i>const string</i></td><td><i>Server path to start Rocrail in a workspace.</i></td><td><i>-</i></td><td><i>-sp</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>tabsel</i></td><td><i>const string</i></td><td><i>Tab index for selection.</i></td><td><i>-</i></td><td><i>-s</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>tabview</i></td><td><i>const string</i></td><td><i>Force tab view in case of a modular layout.</i></td><td><i>-</i></td><td><i>-tabview</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>tabviewrotated</i></td><td><i>const string</i></td><td><i>Keep rotation in tabview.</i></td><td><i>-</i></td><td><i>-tabviewrotated</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>theme</i></td><td><i>const string</i></td><td><i>Theme to use at startup</i></td><td><i>-</i></td><td><i>-theme</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>themespath</i></td><td><i>const string</i></td><td><i>Themes path offset</i></td><td><i>-</i></td><td><i>-themespath</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>trcfile</i></td><td><i>const string</i></td><td><i>Specifies trace filename: -t [file] (Use relative only if using http service.)</i></td><td><i>-</i></td><td><i>-t</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+</table></p>
+<p><a name="accelerator"/><font class='heading'>2. accelerator</font>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><th>Node</th><th>Parent node<br>Attribute/Constant</th><th>vType</th><th>Remark</th><th>Unit</th><th>Default</th><th>Range</th><th>Required</th></tr>
+<tr bgcolor="#e8e8e8"><td><a name="accelerator"/><small>2.0</small> <b>accelerator</b> <small>(1)</small></td><td>*root*</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td><i></i></td><td align="right"><i>ebreak</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>ebreak</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td></td><td><tt>function</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>keycode</tt></td><td>int</td><td>WXK_*</td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>modifier</tt></td><td>int</td><td>0=none 1=alt 2=ctrl</td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+</table></p>
+<p><a name="gui"/><font class='heading'>3. gui</font>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><th>Node</th><th>Parent node<br>Attribute/Constant</th><th>vType</th><th>Remark</th><th>Unit</th><th>Default</th><th>Range</th><th>Required</th></tr>
+<tr bgcolor="#e8e8e8"><td><a name="gui"/><small>3.0</small> <b>gui</b> <small>(1)</small></td><td>*root*</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td><i></i></td><td align="right"><i>buildDate</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>$__DATE__</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>buildTime</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>$__TIME__</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>clock_24h</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>24h</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>clock_ampm</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>ampm</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>clock_default</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>default</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>clock_digital</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>digital</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>clock_none</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>none</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>inifile</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>rocview.ini</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_belarus</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>be</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_bosnian</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>bs</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_bulgarian</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>bg</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_catalan</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>ca</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_chinese</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>zh_TW</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_chinesesimplified</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>zh_CN</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_czech</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>cs</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_danish</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>da</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_dutch</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>nl</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_english</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>en</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_englishAU</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>en_AU</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_englishCA</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>en_CA</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_englishGB</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>en_GB</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_finnish</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>fi</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_french</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>fr</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_german</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>de</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_greek</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>el</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_hungarian</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>hu</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_indonesian</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>id</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_italien</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>it</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_japanese</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>ja</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_korean</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>ko</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_norwegian</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>nb</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_polish</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>pl</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_portuguese</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>pt</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_portuguesebr</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>pt_BR</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_romanian</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>ro</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_russian</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>ru</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_serbianlatin</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>sr_latin</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_slovene</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>sl</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_spanish</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>es</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_swedisch</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>sv</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>lang_turkish</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>tr</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>patch</i></td><td><i>const int</i></td><td><i></i></td><td><i>-</i></td><td><i>999</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>previnifile</i></td><td><i>const string</i></td><td><i>previous ini file name</i></td><td><i>-</i></td><td><i>rocview.ini</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>productname</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>Rocrail</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>releasename</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>Sunrise</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>releasesuffix</i></td><td><i>const string</i></td><td><i></i></td><td><i>-</i></td><td><i>snapshot</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>vmajor</i></td><td><i>const int</i></td><td><i></i></td><td><i>-</i></td><td><i>2</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td><i></i></td><td align="right"><i>vminor</i></td><td><i>const int</i></td><td><i></i></td><td><i>-</i></td><td><i>0</i></td><td><i>-</i></td><td><i>-</i></td></tr>
+<tr><td></td><td><tt>checkupdates</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>clocktype</tt></td><td>string</td><td>clock type select</td><td>-</td><td>default</td><td>default,ampm,24h,none,digital</td><td>No</td></tr>
+<tr><td></td><td><tt>decpath</tt></td><td>string</td><td>reference decoder specifications to this path</td><td>-</td><td>decspecs</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>defaultworkspace</tt></td><td>string</td><td>Open workspace at startup.</td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>dirimagefwd</tt></td><td>string</td><td>image to use for the direction button</td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>dirimagerev</tt></td><td>string</td><td>image to use for the direction button</td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>dispatchmode</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>fsutf8</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>grayicons</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>gridfontsizeadjust</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>helpurl</tt></td><td>string</td><td>WikiOnAStick: http://localhost:8800</td><td>-</td><td>http://wiki.rocrail.net</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>host</tt></td><td>string</td><td>last used rrcon</td><td>-</td><td>localhost</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>id</tt></td><td>string</td><td>rocview ID</td><td>-</td><td>rocview</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>imagepath</tt></td><td>string</td><td>load loco pictures from this path</td><td>-</td><td>images</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>jssupport</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>lang</tt></td><td>string</td><td></td><td>-</td><td>en</td><td>en,de,nl,sv,fr,tr</td><td>No</td></tr>
+<tr><td></td><td><tt>lncvtab</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>locoimagecolumn</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>locosortbyaddress</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>locowidgetstab</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>locowidgetwidth</tt></td><td>int</td><td></td><td>-</td><td>260</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>monitoring</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>monitorsize</tt></td><td>int</td><td></td><td>-</td><td>4</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>openpath</tt></td><td>string</td><td>use this path for init the file open dialog</td><td>-</td><td>.</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>reconnectafterservershutdown</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>rendergc</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>resetspeeddir</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>restorelcctrl</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>restrictedit4auto</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>sensormonitorauto</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showlocoimage</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showlocoimageinblock</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showonlystartschedules</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showroute4switch</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showsecondhand</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showspeedometer</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showtrainidinblock</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>simulatesensors</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>speak4block</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>speakcmd</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>startdefaultworkspace</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>statusboosteruid</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>tabalign</tt></td><td>int</td><td>0 default, 1 left, 2 multiline</td><td>-</td><td>0</td><td>0-2</td><td>No</td></tr>
+<tr><td></td><td><tt>toolbar</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>updatespath</tt></td><td>string</td><td>download updates in this path</td><td>-</td><td>updates</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>updatesserver</tt></td><td>string</td><td>location of updates</td><td>-</td><td>rocrail.net</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>updatestimestamp</tt></td><td>long</td><td>timestamp of last viewed updates xml for the update notifier; this number increases after adding items on the server</td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>useallspeedsteps</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>verticaltoolbar</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>xslpath</tt></td><td>string</td><td>reference stylsheets to this path</td><td>-</td><td>stylesheets</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="trace"/><small>3.1.</small> <b>trace</b> <small>(1)(extern)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a class='link' href="#accelerator"/><small>3.2.</small> <b>accelerator</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="workspaces"/><small>3.3.</small> <b>workspaces</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="workspace"/><small>3.3.1.</small> <b>workspace</b> <small>(n)</small></td><td>childnode of workspaces</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>path</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>title</tt></td><td>string</td><td></td><td>-</td><td>New</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="swctrl"/><small>3.4.</small> <b>swctrl</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>bus</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>iid</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>module</tt></td><td>int</td><td></td><td>-</td><td>1</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="mgv"/><small>3.5.</small> <b>mgv</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>addr1</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>addr2</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>addr3</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>addr4</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>bus</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>iid</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>port1</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>port2</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>port3</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>port4</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>singlegate</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="mgvservo"/><small>3.5.1.</small> <b>mgvservo</b> <small>(n)</small></td><td>childnode of mgv</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>addr</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>bounce</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>leftangle</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>port</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>relay</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>rightangle</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>speed</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="rrcon"/><small>3.6.</small> <b>rrcon</b> <small>(n)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>controlcode</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>host</tt></td><td>string</td><td></td><td>-</td><td>localhost</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>port</tt></td><td>int</td><td></td><td>-</td><td>8051</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>retry</tt></td><td>int</td><td></td><td>-</td><td>1</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>retryinterval</tt></td><td>int</td><td>In mS</td><td>-</td><td>500</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="modpanel"/><small>3.7.</small> <b>modpanel</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>blue</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>cx</tt></td><td>int</td><td></td><td>-</td><td>128</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>cy</tt></td><td>int</td><td></td><td>-</td><td>96</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>green</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>red</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="planpanel"/><small>3.8.</small> <b>planpanel</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>bktext</tt></td><td>float</td><td>finetune blocktext font size: use 1.75 for Win32</td><td>-</td><td>1.25</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>bktext_blue</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>bktext_green</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>bktext_red</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>bktextid</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>blue</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>cx</tt></td><td>int</td><td></td><td>-</td><td>64</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>cy</tt></td><td>int</td><td></td><td>-</td><td>48</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>fill</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>green</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>itemidps</tt></td><td>int</td><td></td><td>-</td><td>7</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>locobook</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>planbook</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>processblockevents</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>processrouteevents</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>raster</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>red</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>scale</tt></td><td>float</td><td></td><td>-</td><td>1.0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>scblue</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>scgreen</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>scred</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showborder</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showcounters</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showid</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showlocked</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showpending</tt></td><td>bool</td><td>Show pending switches with a red background.</td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showsc</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>svgpath</tt></td><td>string</td><td>scan this path for svg symbols</td><td>-</td><td>svg/themes/SpDrS60</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>svgpath2</tt></td><td>string</td><td>scan this path for svg symbols</td><td>-</td><td>.</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>svgpath3</tt></td><td>string</td><td>scan this path for svg symbols</td><td>-</td><td>.</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>svgpath4</tt></td><td>string</td><td>scan this path for svg symbols</td><td>-</td><td>.</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>svgpath5</tt></td><td>string</td><td>scan this path for svg symbols</td><td>-</td><td>.</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>textps</tt></td><td>int</td><td></td><td>-</td><td>10</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>tooltip</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>tracewindow</tt></td><td>bool</td><td></td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="tab"/><small>3.9.</small> <b>tab</b> <small>(n)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>blue</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>green</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>nr</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>red</tt></td><td>int</td><td></td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="splitpanel"/><small>3.10.</small> <b>splitpanel</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>dontwrap</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>main</tt></td><td>int</td><td>vertical plan/message split position</td><td>-</td><td>455</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>msg</tt></td><td>int</td><td>horizontal message/exception split position</td><td>-</td><td>400</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>plan</tt></td><td>int</td><td>horizontal plan/plan split position</td><td>-</td><td>360</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="window"/><small>3.11.</small> <b>window</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>cx</tt></td><td>int</td><td></td><td>-</td><td>900</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>cy</tt></td><td>int</td><td></td><td>-</td><td>600</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>x</tt></td><td>int</td><td></td><td>-</td><td>50</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>xtp</tt></td><td>int</td><td>trackpickerdlg</td><td>-</td><td>50</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>y</tt></td><td>int</td><td></td><td>-</td><td>50</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>ytp</tt></td><td>int</td><td>trackpickerdlg</td><td>-</td><td>50</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="jsmap"/><small>3.12.</small> <b>jsmap</b> <small>(1)(extern)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="mic"/><small>3.13.</small> <b>mic</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td>Mouse Integrated Controller</td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>exitstop</tt></td><td>bool</td><td>stops train after exit MIC mode</td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>step</tt></td><td>int</td><td>speed step per mousewheel notch</td><td>-</td><td>1</td><td>1-9</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="cvconf"/><small>3.14.</small> <b>cvconf</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>lissy</tt></td><td>bool</td><td>program the lissy address and config simultaneously</td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>nrs</tt></td><td>string</td><td>predefined CV's for read,write and copy all</td><td>-</td><td>1,2,3,4,5,6,17,18,29</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>pom</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>save</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>timeout</tt></td><td>int</td><td>timeout on ack</td><td>s</td><td>30</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>usedecspec4all</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="cvcat"/><small>3.14.1.</small> <b>cvcat</b> <small>(n)</small></td><td>childnode of cvconf</td><td></td><td>CV category definition</td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>name</tt></td><td>string</td><td>category name</td><td>-</td><td></td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>nrs</tt></td><td>string</td><td>csv list of CV numbers belonging to this category</td><td>-</td><td></td><td>*</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="lcctrl"/><small>3.15.</small> <b>lcctrl</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>id</tt></td><td>string</td><td>Loco ID</td><td>-</td><td></td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>x</tt></td><td>int</td><td>X position of LocControlDialog</td><td>-</td><td>0</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>y</tt></td><td>int</td><td>Y position of LocControlDialog</td><td>-</td><td>0</td><td>*</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="powerctrl"/><small>3.16.</small> <b>powerctrl</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>cx</tt></td><td>int</td><td>Width of PowerControlDialog</td><td>-</td><td>420</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>cy</tt></td><td>int</td><td>Height of PowerControlDialog</td><td>-</td><td>120</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>show</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>x</tt></td><td>int</td><td>X position of PowerControlDialog</td><td>-</td><td>0</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>y</tt></td><td>int</td><td>Y position of PowerControlDialog</td><td>-</td><td>0</td><td>*</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="sensormonitor"/><small>3.17.</small> <b>sensormonitor</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>cx</tt></td><td>int</td><td>Width of SensorMonitor</td><td>-</td><td>420</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>cy</tt></td><td>int</td><td>Height of SensorMonitor</td><td>-</td><td>120</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>x</tt></td><td>int</td><td>X position of SensorMonitor</td><td>-</td><td>0</td><td>*</td><td>No</td></tr>
+<tr><td></td><td><tt>y</tt></td><td>int</td><td>Y position of SensorMonitor</td><td>-</td><td>0</td><td>*</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="locogrid"/><small>3.18.</small> <b>locogrid</b> <small>(1)</small></td><td>childnode of gui</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>sortcol</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>sortinv</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="colpos"/><small>3.18.1.</small> <b>colpos</b> <small>(1)</small></td><td>childnode of locogrid</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>id</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>pos</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+</table></p>
+<p><a name="release"/><font class='heading'>4. release</font>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><th>Node</th><th>Parent node<br>Attribute/Constant</th><th>vType</th><th>Remark</th><th>Unit</th><th>Default</th><th>Range</th><th>Required</th></tr>
+<tr bgcolor="#e8e8e8"><td><a name="release"/><small>4.0</small> <b>release</b> <small>(1)</small></td><td>*root*</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>alias</tt></td><td>string</td><td></td><td>-</td><td>Harvest</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>remark</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>timestamp</tt></td><td>long</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>version</tt></td><td>string</td><td></td><td>-</td><td>1.0</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="patch"/><small>4.1.</small> <b>patch</b> <small>(n)</small></td><td>childnode of release</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>download</tt></td><td>bool</td><td></td><td>-</td><td>false</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>file</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>nr</tt></td><td>int</td><td></td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>os</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>remark</tt></td><td>string</td><td></td><td>-</td><td></td><td>-</td><td>No</td></tr>
+</table></p>
+<p><a name="theme"/><font class='heading'>5. theme</font>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><th>Node</th><th>Parent node<br>Attribute/Constant</th><th>vType</th><th>Remark</th><th>Unit</th><th>Default</th><th>Range</th><th>Required</th></tr>
+<tr bgcolor="#e8e8e8"><td><a name="theme"/><small>5.0</small> <b>theme</b> <small>(1)</small></td><td>*root*</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>id</tt></td><td>string</td><td>theme name</td><td>-</td><td></td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="panel"/><small>5.1.</small> <b>panel</b> <small>(1)</small></td><td>childnode of theme</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>blue</tt></td><td>int</td><td>background color RGB blue value</td><td>-</td><td>190</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>border</tt></td><td>bool</td><td>show panel border</td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>green</tt></td><td>int</td><td>background color RGB green value</td><td>-</td><td>190</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>red</tt></td><td>int</td><td>background color RGB red value</td><td>-</td><td>190</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="themeblock"/><small>5.2.</small> <b>themeblock</b> <small>(1)</small></td><td>childnode of theme</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>blue</tt></td><td>int</td><td>text color RGB blue value</td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>green</tt></td><td>int</td><td>text color RGB green value</td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>red</tt></td><td>int</td><td>text color RGB red value</td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>showid</tt></td><td>bool</td><td>show block ID</td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+<tr bgcolor="#e8e8e8"><td><a name="shortcut"/><small>5.3.</small> <b>shortcut</b> <small>(1)</small></td><td>childnode of theme</td><td></td><td></td><td></td><td></td><td></td><td>No</td></tr>
+<tr><td></td><td><tt>blue</tt></td><td>int</td><td>sc module background color RGB blue value</td><td>-</td><td>0</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>green</tt></td><td>int</td><td>sc module background color RGB green value</td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>red</tt></td><td>int</td><td>sc module background color RGB red value</td><td>-</td><td>255</td><td>-</td><td>No</td></tr>
+<tr><td></td><td><tt>show</tt></td><td>bool</td><td>show shortcut background</td><td>-</td><td>true</td><td>-</td><td>No</td></tr>
+</table></p>
+</body>
+</html>

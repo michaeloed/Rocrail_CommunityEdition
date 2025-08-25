@@ -1,0 +1,44 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  3 2018 14:01:50)
+  * Module: RocRail
+  * XML: $Source: /cvsroot/rojav/rocrail/rocrail.xml,v $
+  * XML: $Revision: 1.56 $
+  * Date: Fri Aug  3 14:03:35 2018
+  */
+
+struct OSignal SignalOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _getForm,
+  _postForm,
+  _tableHdr,
+  _toHtml,
+  _aspect,
+  _blank,
+  _cmd,
+  _event,
+  _getId,
+  _getState,
+  _green,
+  _inst,
+  _isManualOperated,
+  _isResetManualOperated,
+  _isState,
+  _modify,
+  _red,
+  _white,
+  _yellow,
+};

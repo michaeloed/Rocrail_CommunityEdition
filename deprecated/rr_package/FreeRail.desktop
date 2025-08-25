@@ -1,0 +1,9 @@
+
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Terminal=false
+Exec=/opt/freerail/freerail.sh
+Icon=/opt/freerail/freeraild.png
+Name=FreeRail Server
+Categories=FreeRail;

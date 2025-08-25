@@ -1,0 +1,84 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          freerail
+# Required-Start:    $network
+# X-UnitedLinux-Should-Start: 
+# Required-Stop:     
+# X-UnitedLinux-Should-Stop: 
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts the FreeRail Daemon
+# Description:       Starts the FreeRail Daemon
+### END INIT INFO
+
+# --- Start of options ---
+
+# Path to FreeRail install directory. Default path is /opt/freerail
+freerail_DIR=/opt/freerail
+
+# Path to FreeRail working directory. Default path is the same as in $freerail_DIR
+WORKDIR=$freerail_DIR
+
+# Path to FreeRail library directory. Default path is the same as in $freerail_DIR
+LIBDIR=$freerail_DIR
+
+# Path to FreeRail image directory. Default path is the same as in $freerail_DIR
+IMGDIR=$freerail_DIR
+
+# Check for serial devices at startup. If yes leave this blank, if no set it to -nodevcheck
+DEVCHECK=-nodevcheck
+
+# --- End of options ---
+
+freerail_PID=$(ps -C freerail -o pid=)
+
+if [ ! -e $freerail_DIR/freerail ] ; then
+  echo FreeRail is not installed
+  exit 5
+fi
+
+case "$1" in
+  start)
+    if [ -n "$freerail_PID" ] ; then
+      $0 status
+    else
+      echo "Starting FreeRail (> $freerail_DIR/nohup.out)"
+      rm -f $freerail_DIR/nohup.out
+      nohup $freerail_DIR/freerail $DEVCHECK -w $WORKDIR -l $LIBDIR -img $IMGDIR > $freerail_DIR/nohup.out 2>&1 &
+    fi
+    ;;
+  stop)
+    if [ -n "$freerail_PID" ] ; then
+      echo Shutting down FreeRail
+      kill $freerail_PID
+    else
+      $0 status
+    fi
+    ;;
+  restart)
+    $0 stop
+    sleep 1
+    $0 start
+    ;;
+  status)
+    if [ -n "$freerail_PID" ] ; then
+      echo FreeRail is up and running with PID $freerail_PID
+      exit 4
+    else
+      echo FreeRail is not running
+      exit 5
+    fi
+    ;;
+  deltrace)
+    $0 stop
+    sleep 1
+    echo Erase Trace-Files
+    rm -f $WORKDIR/*.trc
+    $0 start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|status|deltrace}"
+    exit 1
+esac
+exit 0

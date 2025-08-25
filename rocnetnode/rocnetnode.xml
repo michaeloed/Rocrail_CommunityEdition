@@ -1,0 +1,200 @@
+<!--
+ Rocrail - Model Railroad Software
+
+ Copyright (C) 2002-2014 Rob Versluis, Rocrail.net
+
+ 
+  
+
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 2
+ of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+-->
+<Project name="RocNetNode" title="RocNet Node" docname="rocnetnodeapi">
+
+
+  <object name="RocNetNode" use="node,trace,thread,socket,mutex,map,list" include="$rocint/public/digint">
+    <struct name="RocMouse" typedef="*iORocMouse">
+      <var name="ioaddr" vt="int"/>
+      <var name="adaddr" vt="int"/>
+      <var name="lcaddr" vt="int"/>
+      <var name="io" vt="byte"/>
+      <var name="P1" vt="int"/>
+      <var name="V_raw" vt="int"/>
+      <var name="prev_V_raw" vt="int"/>
+      <var name="dir" vt="Boolean"/>
+      <var name="prev_dir" vt="Boolean"/>
+      <var name="lightstrig" vt="int"/>
+      <var name="lights" vt="Boolean"/>
+      <var name="prev_lights" vt="Boolean"/>
+      <var name="fgtrig" vt="int"/>
+      <var name="fgroup" vt="int"/>
+      <var name="fn[8]" vt="int"/>
+      <var name="prev_fn[8]" vt="int"/>
+      <var name="strig[8]" vt="int"/>
+      <var name="runLEDcnt" vt="int"/>
+      <var name="runLED" vt="Boolean"/>
+      </struct>
+    <struct name="Port" typedef="*iOPort">
+      <var name="port" vt="int"/>
+      <var name="ionr" vt="int"/>
+      <var name="iotype" vt="int" remark="0=i2c-1, 1=i2c-0, 3=direct"/>
+      <var name="type" vt="int"/>
+      <var name="delay" vt="int"/>
+      <var name="ontimer" vt="unsigned long"/>
+      <var name="offtimer" vt="unsigned long"/>
+      <var name="state" vt="int"/>
+      <var name="acktimer" vt="int"/>
+      <var name="ackretry" vt="int"/>
+      <var name="ackpending" vt="Boolean"/>
+      <var name="blink" vt="Boolean"/>
+      <var name="toggle" vt="Boolean"/>
+      <var name="eventid" vt="int"/>
+      <var name="eventport" vt="int"/>
+    </struct>
+    <struct name="Channel" typedef="*iOChannel">
+			<var name="channel" vt="int"/>
+			<var name="delay" vt="int"/>
+			<var name="onsteps" vt="int"/>
+      <var name="offsteps" vt="int"/>
+			<var name="onpos" vt="int"/>
+			<var name="offpos" vt="int"/>
+      <var name="curpos" vt="int"/>
+      <var name="porttype" vt="int"/>
+			<var name="options" vt="int"/>
+      <var name="blink" vt="Boolean"/>
+			<var name="state" vt="int"/>
+      <var name="ready" vt="Boolean"/>
+			<var name="idle" vt="int"/>
+			<var name="sleep" vt="Boolean"/>
+			</struct>
+    <struct name="MacroLine" typedef="*iOMacroLine">
+      <var name="delay" vt="int"/>
+      <var name="port" vt="int"/>
+      <var name="type" vt="int"/>
+      <var name="value" vt="int"/>
+      <var name="blink" vt="Boolean"/>
+      </struct>
+    <struct name="Macro" typedef="*iOMacro">
+	    <var name="slowdown" vt="int"/>
+	    <var name="repeat" vt="int"/>
+	    <var name="minutes" vt="int"/>
+	    <var name="hours" vt="int"/>
+	    <var name="wday" vt="int"/>
+      <var name="line[16]" vt="struct MacroLine"/>
+    </struct>
+    <fun name="inst" vt="this">
+      <param name="ini" vt="iONode"/>
+    </fun>
+    <fun name="Main" vt="int">
+      <param name="inst" vt="this" remark="RocNetNode instance"/>
+      <param name="argc" vt="int" remark="Commandline argument count"/>
+      <param name="argv" vt="char**" remark="Commandline arguments"/>
+    </fun>
+    <fun name="shutdown" vt="Boolean"/>
+    <fun name="stop" vt="void"/>
+    <fun name="sysHalt" vt="void"/>
+    <fun name="sysUpdate" vt="void">
+      <param name="revision" vt="int"/>
+      <param name="offline" vt="int"/>
+      </fun>
+    <data>
+      <var name="ini" vt="iONode"/>
+      <var name="digintini" vt="iONode"/>
+      <var name="rfidini" vt="iONode"/>
+      <var name="reader" vt="iOThread"/>
+      <var name="scanner" vt="iOThread"/>
+      <var name="pwm" vt="iOThread"/>
+      <var name="macroprocessor" vt="iOThread"/>
+      <var name="run" vt="Boolean"/>
+      <var name="power" vt="Boolean"/>
+      <var name="identack" vt="Boolean"/>
+      <var name="iorc" vt="int"/>
+      <var name="id" vt="int"/>
+      <var name="location" vt="int"/>
+      <var name="addr" vt="const char*"/>
+      <var name="port" vt="int"/>
+      <var name="nrio" vt="int"/>
+      <var name="readUDP" vt="iOSocket"/>
+      <var name="writeUDP" vt="iOSocket"/>
+      <var name="ports[129]" vt="iOPort"/>
+      <var name="channels[129]" vt="iOChannel"/>
+      <var name="pDI" vt="iIDigInt"/>
+      <var name="pRFID" vt="iIDigInt"/>
+      <var name="i2cdevice" vt="const char*"/>
+      <var name="i2cdescriptor" vt="int"/>
+      <var name="iotype" vt="int"/>
+      <var name="ip[6]" vt="int"/>
+      <var name="ipsize" vt="int"/>
+      <var name="iomap[8]" vt="int"/>
+      <var name="i2caddr[8]" vt="Boolean"/>
+      <var name="i2caddr40[8]" vt="Boolean"/>
+      <var name="i2caddrError[8]" vt="int"/>
+      <var name="i2caddr40Error[8]" vt="int"/>
+      <var name="iodata[16]" vt="byte"/>
+      <var name="sack" vt="Boolean"/>
+      <var name="rfid" vt="Boolean"/>
+      <var name="adcsensor" vt="Boolean"/>
+      <var name="adcthreshold" vt="int"/>
+      <var name="usepb" vt="Boolean"/>
+      <var name="tl_info" vt="Boolean"/>
+      <var name="tl_monitor" vt="Boolean"/>
+      <var name="i2cmux" vt="iOMutex"/>
+      <var name="startofday" vt="Boolean"/>
+      <var name="adcstartofday" vt="Boolean"/>
+      <var name="LED1" vt="int"/>
+      <var name="LED2" vt="int"/>
+      <var name="PB1" vt="int"/>
+      <var name="LED1timer" vt="int"/>
+      <var name="LED2timer" vt="int"/>
+      <var name="PB1timer" vt="int"/>
+      <var name="show" vt="Boolean"/>
+      <var name="cstype" vt="int"/>
+      <var name="csdevice" vt="int"/>
+      <var name="inifile" vt="const char*"/>
+      <var name="libpath" vt="const char*"/>
+      <var name="consoleMode" vt="Boolean"/>
+      <var name="pendingHalt" vt="Boolean"/>
+      <var name="macro[129]" vt="iOMacro"/>
+      <var name="class" vt="int"/>
+      <var name="rocmouses[8]" vt="iORocMouse"/>
+      <var name="rocmousescanner" vt="iOThread"/>
+      <var name="adcsensorscanner" vt="iOThread"/>
+      <var name="adcsensorcounter[32]" vt="int"/>
+      <var name="adcsensorvalue[32]" vt="int"/>
+      <var name="adcsensortimer[32]" vt="long"/>
+      <var name="stress" vt="Boolean"/>
+      <var name="nickname[64]" vt="char"/>
+      <var name="lastrfid[64]" vt="char"/>
+      <var name="ismobile" vt="Boolean"/>
+      <var name="Vraw" vt="int"/>
+      <var name="Vdir" vt="Boolean"/>
+      <var name="Vmass" vt="int"/>
+      <var name="Vmax" vt="int"/>
+      <var name="VPWM" vt="int"/>
+      <var name="VPWML" vt="int"/>
+      <var name="VPWMR" vt="int"/>
+      <var name="RPM" vt="int"/>
+      <var name="motorPWM" vt="iOThread"/>
+      <var name="fchanged" vt="int"/>
+      <var name="fn[32]" vt="Boolean"/>
+      <var name="rfidMsg[128]" vt="byte"/>
+      <var name="rfidAck" vt="Boolean"/>
+      <var name="rfidAckRetry" vt="int"/>
+      <var name="rfidAckTimer" vt="unsigned long"/>
+      <var name="rfidAckWD" vt="iOThread"/>
+      </data>
+  </object>
+
+
+</Project>

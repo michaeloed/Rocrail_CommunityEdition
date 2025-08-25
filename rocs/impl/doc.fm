@@ -1,0 +1,48 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  2 2018 14:02:35)
+  * Module: rocs
+  * XML: $Source: /home/cvs/xspooler/rocs/rocs.xml,v $
+  * XML: $Revision: 1.85 $
+  * Date: Thu Aug  2 14:02:39 2018
+  */
+
+struct ODoc DocOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  "UTF-8",
+  "ISO-8859-15",
+  _getBool,
+  _getDocNode,
+  _getEncoding,
+  _getEncodingProperty,
+  _getInt,
+  _getRootNode,
+  _getStr,
+  _isHTMLEscapes,
+  _isIgnoreCase,
+  _isUTF2Latin,
+  _isUTF8Encoded,
+  _isUTF8Encoding,
+  _isUniCodeEscapes,
+  _node2String,
+  _parse,
+  _setEncoding,
+  _setHTMLEscapes,
+  _setIgnoreCase,
+  _setUTF2Latin,
+  _setUniCodeEscapes,
+  _setXMLProlog,
+};

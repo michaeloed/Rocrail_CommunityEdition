@@ -1,0 +1,48 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Sep 20 2018 14:23:23)
+  * Module: RocLcDr
+  * XML: $Source: /cvsroot/rojav/roclcdr/roclcdr.xml,v $
+  * XML: $Revision: 1.6 $
+  * Date: Thu Sep 20 14:23:25 2018
+  */
+
+struct OLcDriver LcDriverOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _brake,
+  _curblock,
+  _drive,
+  _getCurblock,
+  _getCurroute,
+  _getGotoblock,
+  _getScheduleIdx,
+  _getschedule,
+  _gettour,
+  _go,
+  _goNet,
+  _gogo,
+  _gotoblock,
+  _info,
+  _isRun,
+  _reset,
+  _stepvirtual,
+  _stop,
+  _stopNet,
+  _useschedule,
+  _usetour,
+  _version,
+  _inst,
+};

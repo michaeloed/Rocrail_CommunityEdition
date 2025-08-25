@@ -1,0 +1,671 @@
+<html>
+<head>
+  <title>RocDigs API</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+<h2>RocDigs API</h2>
+XML: $Source: /cvsroot/rojav/rocdigs/rocdigs.xml,v $<br>
+XML: $Revision: 1.14 $<br>
+Module: RocDigs<br>
+Auto generated at: Fri Aug  3 14:03:49 2018
+<br>
+Index: <a href="rocdigsapi-index.html">rocdigsapi-index.html</a><br>
+<p><a name="Barjut"/><h3>1. object Barjut</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Barjut"/><tt>Summary of object Barjut, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOBarjut</tt></td><td valign="top"><a name="Barjut_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="BiDiB"/><h3>2. object BiDiB</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+bidib.org<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="BiDiB"/><tt>Summary of object BiDiB, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_init)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_connect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_disconnect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_read)(obj,byte*)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_write)(obj,byte*,byte,byte*,int,void*)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_available)(obj)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOBiDiB</tt></td><td valign="top"><a name="BiDiB_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="CBUS"/><h3>3. object CBUS</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+CBUS<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="CBUS"/><tt>Summary of object CBUS, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_connect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_disconnect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_read)(obj,byte*,int)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_write)(obj,byte*,int)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_available)(obj)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOCBUS</tt></td><td valign="top"><a name="CBUS_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="CTI"/><h3>4. object CTI</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="CTI"/><tt>Summary of object CTI, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOCTI</tt></td><td valign="top"><a name="CTI_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Clock"/><h3>5. object Clock</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+clock driver object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Clock"/><tt>Summary of object Clock, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOClock</tt></td><td valign="top"><a name="Clock_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DCC232"/><h3>6. object DCC232</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Easy DCC for RS232<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DCC232"/><tt>Summary of object DCC232, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {CV_READ=1, CV_WRITE} sprogcmd</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iODCC232</tt></td><td valign="top"><a name="DCC232_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DCCar"/><h3>7. object DCCar</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DCCar"/><tt>Summary of object DCCar, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iODCCar</tt></td><td valign="top"><a name="DCCar_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DDX"/><h3>8. object DDX</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+DDX object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DDX"/><tt>Summary of object DDX, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iODDX</tt></td><td valign="top"><a name="DDX_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DINAMO"/><h3>9. object DINAMO</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+DINAMO object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DINAMO"/><tt>Summary of object DINAMO, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {DATA_FLAG=0x80, TOGGLE_FLAG=0x40, FAULT_FLAG=0x20, HOLD_FLAG=0x10, VER3_FLAG=0x08, CNT_MASK=0x07} __dinamoheader</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {SYS_CMD=0x01, SYS_RESET_FAULT=0x00, SYS_SET_HFI=0x01, SYS_GET_VER=0x02, SYS_GET_FIRMVER=0x0A, SYS_GET_INFO=0x03, SYS_SET_FLASH=0x04,
+                        SYS_SET_EVENT=0x20} __dinamosyscmds</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iODINAMO</tt></td><td valign="top"><a name="DINAMO_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DMX4ALL"/><h3>10. object DMX4ALL</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+DMX4ALL<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DMX4ALL"/><tt>Summary of object DMX4ALL, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iODMX4ALL</tt></td><td valign="top"><a name="DMX4ALL_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DMXArtNet"/><h3>11. object DMXArtNet</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+ArtNetNode<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DMXArtNet"/><tt>Summary of object DMXArtNet, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iODMXArtNet</tt></td><td valign="top"><a name="DMXArtNet_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="DMXEUROLITE"/><h3>12. object DMXEUROLITE</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+DMX USB Pro<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="DMXEUROLITE"/><tt>Summary of object DMXEUROLITE, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iODMXEUROLITE</tt></td><td valign="top"><a name="DMXEUROLITE_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="ECoS"/><h3>13. object ECoS</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+ECoS object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="ECoS"/><tt>Summary of object ECoS, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOECoS</tt></td><td valign="top"><a name="ECoS_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="ESUNavi"/><h3>14. object ESUNavi</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+ESU Navigator<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="ESUNavi"/><tt>Summary of object ESUNavi, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOESUNavi</tt></td><td valign="top"><a name="ESUNavi_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="EasyDCC"/><h3>15. object EasyDCC</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="EasyDCC"/><tt>Summary of object EasyDCC, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {CV_READ=1, CV_WRITE} sprogcmd</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOEasyDCC</tt></td><td valign="top"><a name="EasyDCC_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="EditsPro"/><h3>16. object EditsPro</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="EditsPro"/><tt>Summary of object EditsPro, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOEditsPro</tt></td><td valign="top"><a name="EditsPro_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="GOT"/><h3>17. object GOT</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+GamesOnTrack<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="GOT"/><tt>Summary of object GOT, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOGOT</tt></td><td valign="top"><a name="GOT_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="HSI88"/><h3>18. object HSI88</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+HSI-88 object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="HSI88"/><tt>Summary of object HSI88, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {HSI88_OK=1, HSI88_ERROR, HSI88_CTSERR, HSI88_SNDERR, HSI88_RCVERR} HSI88state</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOHSI88</tt></td><td valign="top"><a name="HSI88_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="HUE"/><h3>19. object HUE</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Philips HUE<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="HUE"/><tt>Summary of object HUE, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {HUE_GETBRIDGECONFIG=1, HUE_GETLIGHTSTATE, HUE_GETLIGHTS } huecmd</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOHUE</tt></td><td valign="top"><a name="HUE_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Infracar"/><h3>20. object Infracar</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Infracar"/><tt>Summary of object Infracar, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOInfracar</tt></td><td valign="top"><a name="Infracar_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Inter10"/><h3>21. object Inter10</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Inter10"/><tt>Summary of object Inter10, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOInter10</tt></td><td valign="top"><a name="Inter10_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="LRc135"/><h3>22. object LRc135</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+railcom object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="LRc135"/><tt>Summary of object LRc135, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOLRc135</tt></td><td valign="top"><a name="LRc135_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="LocoNet"/><h3>23. object LocoNet</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="LocoNet"/><tt>Summary of object LocoNet, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_connect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_disconnect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_read)(obj,byte*)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_write)(obj,byte*,int)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_available)(obj)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LocoNet_ascii2byte"/><tt><b>ascii2byte( const char* <i>in</i>, int <i>len</i>, byte* <i>out</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LocoNet_byte2ascii"/><tt><b>byte2ascii( const byte* <i>in</i>, int <i>len</i>, char* <i>out</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>byte</tt></td><td valign="top"><a name="LocoNet_checksum"/><tt><b>checksum( const byte* <i>cmd</i>, int <i>len</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LocoNet_getSlot"/><tt><b>getSlot( iOLocoNet <i>inst</i>, int <i>slot</i>, byte <i>wait4opc</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOLocoNet</tt></td><td valign="top"><a name="LocoNet_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+<tr><td valign="top" align="right"><tt>void</tt></td><td valign="top"><a name="LocoNet_stateChanged"/><tt><b>stateChanged( iOLocoNet <i>inst</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="LocoNet_transact"/><tt><b>transact( iOLocoNet <i>inst</i>, byte* <i>out</i>, int <i>outsize</i>, byte* <i>in</i>, int* <i>insize</i>, byte <i>waitforOPC_OK</i>, byte <i>waitforOPC_FAIL</i>, Boolean <i>post2slotserver</i> );</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>Boolean</tt></td><td valign="top"><a name="LocoNet_write"/><tt><b>write( iOLocoNet <i>inst</i>, byte* <i>out</i>, int <i>outsize</i> );</b></tt><br></td></tr>
+</table></p>
+<p><a name="MCS2"/><h3>24. object MCS2</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+rocNet object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="MCS2"/><tt>Summary of object MCS2, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOMCS2</tt></td><td valign="top"><a name="MCS2_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="MGBOX"/><h3>25. object MGBOX</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+rocNet object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="MGBOX"/><tt>Summary of object MGBOX, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOMGBOX</tt></td><td valign="top"><a name="MGBOX_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Massoth"/><h3>26. object Massoth</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+NCE<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Massoth"/><tt>Summary of object Massoth, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOMassoth</tt></td><td valign="top"><a name="Massoth_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="MttmFcc"/><h3>27. object MttmFcc</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+NCE<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="MttmFcc"/><tt>Summary of object MttmFcc, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOMttmFcc</tt></td><td valign="top"><a name="MttmFcc_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Muet"/><h3>28. object Muet</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Muet"/><tt>Summary of object Muet, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {WRITE_FLAG=0x80, DATA_MASK=0x7F} __slxheader</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOMuet</tt></td><td valign="top"><a name="Muet_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="NCE"/><h3>29. object NCE</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+NCE<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="NCE"/><tt>Summary of object NCE, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iONCE</tt></td><td valign="top"><a name="NCE_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="OM32"/><h3>30. object OM32</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+OM32 object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="OM32"/><tt>Summary of object OM32, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {DATA_FLAG=0x80, RETRANSMIT_FLAG=0x40, FIXED_FLAG=0x03, ADDR_MASK=0x1C} __om32header</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOOM32</tt></td><td valign="top"><a name="OM32_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="OpenDCC"/><h3>31. object OpenDCC</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+ECoS object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="OpenDCC"/><tt>Summary of object OpenDCC, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOOpenDCC</tt></td><td valign="top"><a name="OpenDCC_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="P50"/><h3>32. object P50</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+P50 object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="P50"/><tt>Summary of object P50, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {P50_OK=1, P50_ERROR, P50_CTSERR, P50_SNDERR, P50_RCVERR} p50state</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOP50</tt></td><td valign="top"><a name="P50_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="P50x"/><h3>33. object P50x</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+P50x object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="P50x"/><tt>Summary of object P50x, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOP50x</tt></td><td valign="top"><a name="P50x_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="PerIR"/><h3>34. object PerIR</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="PerIR"/><tt>Summary of object PerIR, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOPerIR</tt></td><td valign="top"><a name="PerIR_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="RCI"/><h3>35. object RCI</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+RCI object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="RCI"/><tt>Summary of object RCI, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iORCI</tt></td><td valign="top"><a name="RCI_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="RFID12"/><h3>36. object RFID12</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="RFID12"/><tt>Summary of object RFID12, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iORFID12</tt></td><td valign="top"><a name="RFID12_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Raptor"/><h3>37. object Raptor</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Raptor<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Raptor"/><tt>Summary of object Raptor, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iORaptor</tt></td><td valign="top"><a name="Raptor_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="RcLink"/><h3>38. object RcLink</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="RcLink"/><tt>Summary of object RcLink, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iORcLink</tt></td><td valign="top"><a name="RcLink_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Rmx"/><h3>39. object Rmx</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+NCE<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Rmx"/><tt>Summary of object Rmx, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iORmx</tt></td><td valign="top"><a name="Rmx_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Roco"/><h3>40. object Roco</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Roco"/><tt>Summary of object Roco, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iORoco</tt></td><td valign="top"><a name="Roco_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="RocoMP"/><h3>41. object RocoMP</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="RocoMP"/><tt>Summary of object RocoMP, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iORocoMP</tt></td><td valign="top"><a name="RocoMP_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="SLX"/><h3>42. object SLX</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+P50 object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="SLX"/><tt>Summary of object SLX, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {SLX_OK=1, SLX_ERROR, SLX_SNDERR, SLX_RCVERR} slxstate</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {WRITE_FLAG=0x80, DATA_MASK=0x7F} __slxheader</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOSLX</tt></td><td valign="top"><a name="SLX_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="SPL"/><h3>43. object SPL</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Serial programable LEDs<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="SPL"/><tt>Summary of object SPL, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOSPL</tt></td><td valign="top"><a name="SPL_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="SRCP"/><h3>44. object SRCP</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+SRCP object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="SRCP"/><tt>Summary of object SRCP, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {SRCP_STATE_OK=1, SRCP_STATE_ERROR} srcpstate</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_init)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_connect)(obj,Boolean)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_disconnect)(obj,Boolean)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_read)(obj,char*,Boolean)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_write)(obj,const char*,char*,Boolean)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_available)(obj)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOSRCP</tt></td><td valign="top"><a name="SRCP_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Sprog"/><h3>45. object Sprog</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+SPROG II<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Sprog"/><tt>Summary of object Sprog, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {CV_READ=1, CV_WRITE} sprogcmd</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOSprog</tt></td><td valign="top"><a name="Sprog_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="TamsMC"/><h3>46. object TamsMC</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+ECoS object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="TamsMC"/><tt>Summary of object TamsMC, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOTamsMC</tt></td><td valign="top"><a name="TamsMC_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Virtual"/><h3>47. object Virtual</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Virtual"/><tt>Summary of object Virtual, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOVirtual</tt></td><td valign="top"><a name="Virtual_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="XNMM"/><h3>48. object XNMM</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="XNMM"/><tt>Summary of object XNMM, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOXNMM</tt></td><td valign="top"><a name="XNMM_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="XpressNet"/><h3>49. object XpressNet</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="XpressNet"/><tt>Summary of object XpressNet, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_connect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_disconnect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_read)(obj,byte*,Boolean*)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_write)(obj,byte*,Boolean*)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_init)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_available)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_translate)(obj, void*)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOXpressNet</tt></td><td valign="top"><a name="XpressNet_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Z21"/><h3>50. object Z21</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Z21"/><tt>Summary of object Z21, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {DECMODE_DEF=0, DECMODE_DCC, DECMODE_MM} decmode</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOZ21</tt></td><td valign="top"><a name="Z21_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="ZS2"/><h3>51. object ZS2</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="ZS2"/><tt>Summary of object ZS2, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {WRITE_FLAG=0x80, DATA_MASK=0x7F} __slxheader</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOZS2</tt></td><td valign="top"><a name="ZS2_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="Zimo"/><h3>52. object Zimo</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="Zimo"/><tt>Summary of object Zimo, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOZimo</tt></td><td valign="top"><a name="Zimo_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="ZimoBin"/><h3>53. object ZimoBin</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="ZimoBin"/><tt>Summary of object ZimoBin, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOZimoBin</tt></td><td valign="top"><a name="ZimoBin_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="ZimoCAN"/><h3>54. object ZimoCAN</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="ZimoCAN"/><tt>Summary of object ZimoCAN, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_connect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_disconnect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_read)(obj,byte*)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_write)(obj,byte*,int)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_available)(obj)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOZimoCAN</tt></td><td valign="top"><a name="ZimoCAN_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="rocNet"/><h3>55. object rocNet</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+rocNet object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="rocNet"/><tt>Summary of object rocNet, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_connect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>void(*sublib_disconnect)(obj)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>int(*sublib_read)(obj,byte*)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_write)(obj,byte*,int)</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>Boolean(*sublib_available)(obj)</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOrocNet</tt></td><td valign="top"><a name="rocNet_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+<p><a name="uConS88"/><h3>56. object uConS88</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+µCon S88 Master<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="uConS88"/><tt>Summary of object uConS88, implementing <a href="#$../rocint/rocint.xml:DigInt">$../rocint/rocint.xml:DigInt</a></tt></th></tr>
+<tr><td valign="top" align="right"><tt>iOuConS88</tt></td><td valign="top"><a name="uConS88_inst"/><tt><b>inst( const iONode <i>ini</i>, const iOTrace <i>trc</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>ini</i></tt></td><td>Ini node</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trc</i></tt></td><td>Trace instance</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+</body>
+</html>

@@ -1,0 +1,54 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  2 2018 14:02:35)
+  * Module: rocs
+  * XML: $Source: /home/cvs/xspooler/rocs/rocs.xml,v $
+  * XML: $Revision: 1.85 $
+  * Date: Thu Aug  2 14:02:39 2018
+  */
+
+struct OTrace TraceOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _dmp,
+  _dump,
+  _get,
+  _getCurrentFilename,
+  _getDumpsize,
+  _getF,
+  _getFilename,
+  _getLevel,
+  _getOS,
+  _inst,
+  _isStdErr,
+  _printHeader,
+  _println,
+  _set,
+  _setAppID,
+  _setDumpsize,
+  _setEbcdicDump,
+  _setExceptionFile,
+  _setExceptionListener,
+  _setFileSize,
+  _setFilename,
+  _setInvoke,
+  _setLevel,
+  _setMainThreadId,
+  _setNrFiles,
+  _setStdErr,
+  _terrno,
+  _trace,
+  _trc,
+};

@@ -1,0 +1,60 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  3 2018 14:01:50)
+  * Module: RocRail
+  * XML: $Source: /cvsroot/rojav/rocrail/rocrail.xml,v $
+  * XML: $Revision: 1.56 $
+  * Date: Fri Aug  3 14:03:35 2018
+  */
+
+struct ORoute RouteOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _getForm,
+  _postForm,
+  _tableHdr,
+  _toHtml,
+  _cmd,
+  _getBlockSignalSide,
+  _getDirection,
+  _getFromBlock,
+  _getFromBlockSide,
+  _getId,
+  _getMaxKmh,
+  _getToBlock,
+  _getToBlockSide,
+  _getVelocity,
+  _go,
+  _hasPermission,
+  _hasSwitchCommands,
+  _hasThrownSwitch,
+  _inst,
+  _isClosed,
+  _isFree,
+  _isLocked,
+  _isManual,
+  _isSet,
+  _isSetCrossingblockSignals,
+  _isState,
+  _isSwapPost,
+  _link,
+  _lock,
+  _modify,
+  _reset,
+  _setClass,
+  _setClosed,
+  _unLink,
+  _unLock,
+};

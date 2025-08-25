@@ -1,0 +1,445 @@
+<!DOCTYPE html> 
+<html>
+<!--
+ This is part of FreeRail - Model Railway Software
+ 
+ Copyright: See AUTHORS at the top-level directory of this project and
+ at GitHub https://github.com/michaeloed/FreeRail/
+ 
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3
+ of the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program. If not, see http://www.gnu.org/licenses/.
+-->
+<head>
+	<title>FreeRail Web Client</title>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+	
+  <!--
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
+	<script src="http://code.jquery.com/jquery-1.11.2.min.js"></script>
+	<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+  -->
+  <link rel="stylesheet" href="jquery/jquery.mobile-1.4.5.min.css">
+  <script src="jquery/jquery-1.11.2.min.js"></script>
+  <script src="jquery/jquery.mobile-1.4.5.min.js"></script>
+  <script src="rocweb.js"></script>
+  <link rel="stylesheet" href="rocweb.css" />
+  <link rel="apple-touch-icon" sizes="76x76" href="rocweb-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="icon" sizes="128x128" href="rocweb-icon.png">
+</head>
+
+<body id="planpanel" onload="loadPlan()" style="overflow-x: scroll !important;">
+
+
+  <div id="header" data-role="header" data-position="fixed" style="overflow:hidden;">
+    <h1 id="title" onclick="openClock('title')">Rocweb</h1>
+    <div data-role="controlgroup" data-type="horizontal" class="ui-btn-left">
+      <a href="#" id="headerThrottle" title="Throttle" class="ui-btn ui-btn-icon-right ui-icon-grid ui-btn-icon-notext" onclick="openThrottle()">Throttle</a>
+      <a href="#" id="headerPower" title="Power" class="ui-btn ui-btn-icon-right ui-icon-power ui-btn-icon-notext" onclick="actionPower()">Power</a>
+      <a href="#" id="headerAuto" title="Automatic" class="ui-btn ui-btn-icon-right ui-icon-recycle ui-btn-icon-notext" onclick="actionAuto('on')">Automode</a>
+      <a href="#" id="headerStop" title="Stop all" class="ui-btn ui-btn-icon-right ui-icon-delete ui-btn-icon-notext" onclick="actionAuto('off')">Automode</a>
+    </div>  
+    <div data-role="controlgroup" data-type="horizontal" class="ui-btn-right">
+      <a id="headerEBreak" title="Emergency break" href="#" class="ui-btn ui-btn-icon-right ui-icon-alert ui-btn-icon-notext" onclick="actionEBreak()">EBreak</a>
+      <a id="headerZoom" title="Zoom" href="#" class="ui-btn ui-btn-icon-right ui-icon-eye ui-btn-icon-notext" onclick="openZoom(false)">Zoom</a>
+      <a id="headerUp" title="Level up" href="#" class="ui-btn ui-btn-icon-right ui-icon-arrow-u ui-btn-icon-notext" onclick="actionLevelUp()">Up</a>
+      <a id="headerDown" title="Level down" href="#" class="ui-btn ui-btn-icon-right ui-icon-arrow-d ui-btn-icon-notext" onclick="actionLevelDown()">Down</a>
+      <a id="headerMenu" title="Menu" href="#popupMenu" class="ui-btn ui-btn-icon-right ui-icon-bars ui-btn-icon-notext" onclick="initMenu()">Menu</a>
+    </div>  
+  </div>
+
+  <div data-role="popup" id="popupBlock" data-transition="flow" class="ui-popup" data-theme="a" data-position-to="origin" style="min-width:360px !important;">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div id="divBlock" style="padding:10px 10px;">
+  <label id="blockTitle">Block</label>
+  <center><img id="locoImageBlock" src="noimg.png" height="50px" onclick="onBlockLocoImage()"/></center>
+  <div id="labBlockLocoID"></div>
+  <!--
+  <select name="locoBlockSelect" id="locoBlockSelect">
+  </select>
+  -->
+  <div class="ui-grid-a">
+    <div class="ui-block-a"><select name="scheduleBlockSelect" id="scheduleBlockSelect">
+    </select></div>
+    <div class="ui-block-b"><select name="blockBlockSelect" id="blockBlockSelect">
+    </select></div>
+    <div class="ui-block-a"><select name="trainBlockSelect" id="trainBlockSelect">
+    </select></div>
+    <div class="ui-block-b"><a id="labBlockTrain" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockTrain()">Assign train</a></div>
+    <div class="ui-block-a"><a id="labBlockStart" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockStart(false)">Start</a></div>
+    <div class="ui-block-b"><a id="labBlockStop" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockStop()">Stop</a></div>
+    <div class="ui-block-a"><a id="labBlockManual" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockStart(true)">Manual</a></div>
+    <div class="ui-block-b"><a id="labBlockReset" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockReset(true)">Reset</a></div>
+    <div class="ui-block-a"><a id="labBlockSwapPlacing" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockSwapPlacing()">Swap placing</a></div>
+    <div class="ui-block-b"><a id="labBlockSwapEnter" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockSwapEnter()">Swap enter side</a></div>
+    <div class="ui-block-a"><a id="labBlockClose" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockClose()">Close</a></div>
+    <div class="ui-block-b"><a id="labBlockOpen" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onBlockOpen()">Open</a></div>
+  </div>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupTurntable" data-transition="flow" class="ui-popup" data-theme="a" data-position-to="origin" style="min-width:360px !important;">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px;">
+  <label id="turntableTitle">Turntable</label>
+    <div class="ui-grid-a">
+      <div class="ui-block-a"><a id="labTTNext" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onTurntableNext()">Next</a></div>
+      <div class="ui-block-b"><a id="labTTPrev" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onTurntablePrevious()">Previous</a></div>
+      <div class="ui-block-a"><a id="labTTGoto" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onTurntableGotoTrack()">Go</a></div>
+      <div class="ui-block-b"><select name="TrackTTSelect" id="trackTTSelect"></select></div>
+    </div>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupClock" data-transition="flow" class="ui-popup" data-theme="a" data-position-to="origin" style="min-width:360px !important;">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px;">
+  <label id="clockTitle">Clock</label>
+  <div class="ui-grid-b ui-responsive">
+  <div class="ui-block-a"><center><label id="labClockDivider">Divider</center></div>
+  <div class="ui-block-b"><center><label id="labClockHour">Hour</center></div>
+  <div class="ui-block-c"><center><label id="labClockMinute">Minute</center></div>
+  <div class="ui-block-a"><input data-clear-btn="false" data-mini="true" name="clockDivider" id="clockDivider" value="0" min="0" max="60" type="number"></div>
+  <div class="ui-block-b"><input data-clear-btn="false" data-mini="true" name="clockHour" id="clockHour" value="0" min="0" max="23" type="number"></div>
+  <div class="ui-block-c"><input data-clear-btn="false" data-mini="true" name="clockMinute" id="clockMinute" value="0" min="0" max="59" type="number"></div>
+  <div class="ui-block-a"><a id="labClockSet" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onClockSet()">Set</a></div>
+  <div class="ui-block-b"><a id="labClockFreeze" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onClock(false)">Freeze</a></div>
+  <div class="ui-block-c"><a id="labClockResume" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onClock(true)">Resume</a></div>
+  </div>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupFiddleYard" data-transition="flow" class="ui-popup" data-theme="a" data-position-to="origin" style="min-width:360px !important;">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px;">
+  <label id="fiddleyardTitle">FiddleYard</label>
+  <div class="ui-grid-a">
+    <div class="ui-block-a"><a id="labFYNext" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onFiddleYardNext()">Next</a></div>
+    <div class="ui-block-b"><a id="labFYPrev" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onFiddleYardPrevious()">Previous</a></div>
+    <div class="ui-block-a"><a id="labFYGoto" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onFiddleYardGotoTrack()">Go</a></div>
+    <div class="ui-block-b"><select name="TrackFYSelect" id="trackFYSelect"></select></div>
+  </div>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupStageBlock" data-transition="flow" class="ui-popup" data-theme="a" data-position-to="origin">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px;">
+  <label id="stageblockTitle">Staging Block</label>
+  <div class="ui-grid-a">
+    <div class="ui-block-a"><a id="labStageClose" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onStageClose()">Close</a></div>
+    <div class="ui-block-b"><a id="labStageOpen" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onStageOpen()">Open</a></div>
+    <div class="ui-block-a"><a id="labStageCloseExit" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onStageCloseExit()">Close exit</a></div>
+    <div class="ui-block-b"><a id="labStageOpenExit" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onStageOpenExit()">Open exit</a></div>
+  </div>
+  <div><a id="labStageCompress" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onStageCompress()">Compress</a></div>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupSystem" data-transition="flow" class="ui-popup" data-theme="a" data-position-to="origin">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px;">
+  <label id="systemTitle">System</label>
+  <div><a id="systemInitField" href="#" class="ui-shadow ui-btn ui-icon-refresh ui-btn-icon-left ui-corner-all" style="text-align:left;" onclick="actionSystemInitfield()">Init field</a></div>
+  <div><a id="systemQuerySensors" href="#" class="ui-shadow ui-btn ui-icon-clock ui-btn-icon-left ui-corner-all" style="text-align:left;" onclick="actionSystemQuerySensors()">Query sensors</a></div>
+  <div><a id="systemEmergencyBreak" href="#" class="ui-shadow ui-btn ui-icon-alert ui-btn-icon-left ui-corner-all" style="text-align:left;" onclick="actionEBreak()">Emergency break</a></div>
+  <div><a id="systemShutdown" href="#" class="ui-shadow ui-btn ui-icon-action ui-btn-icon-left ui-corner-all" style="text-align:left;" onclick="actionShutdown()">Shutdown server</a></div>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupAuto" data-transition="flow" class="ui-popup" data-theme="a" data-position-to="origin">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px;">
+  <label id="autoTitle">System</label>
+  <div><a id="systemStartAll" href="#" class="ui-shadow ui-btn ui-corner-all" style="text-align:left;" onclick="actionStartAll()">Start all</a></div>
+  <div><a id="systemStopAll" href="#" class="ui-shadow ui-btn ui-corner-all" style="text-align:left;" onclick="actionStopAll()">Stop all</a></div>
+  <div><a id="systemSoftReset" href="#" class="ui-shadow ui-btn ui-corner-all" style="text-align:left;" onclick="actionSoftReset()">Soft reset</a></div>
+  <div><a id="systemHardReset" href="#" class="ui-shadow ui-btn ui-corner-all" style="text-align:left;" onclick="actionHardReset()">Hard reset</a></div>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupHelp" data-transition="slidedown" class="ui-popup" data-theme="a" data-position-to="origin">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px;">
+  <label id="helpTitle">Help</label>
+  <table id="helpTable">
+  <tr><th>Key<th>Long click function
+  <tr><td>F1-F4  <td>Throttle selection
+  <tr><td>RE     <td>Power OFF
+  <tr><td>FG     <td>Emergency Break
+  <tr><td>F9     <td>Add a consist loco
+  <tr><td>F10    <td>Delete a consist loco
+  <tr><td>F11    <td>Show the complete consist including the master loco
+  <tr><td>F13    <td>Manual mode ON/OFF
+  <tr><td>F14    <td>Shunting ON/OFF
+  <tr><td>Lights <td>Dispatch 
+  </table>
+  <br>
+  <div style="text-align: center;"><a id="helpLink" href="TBD" target="_blank">Rocweb Wiki</a></div>
+  </div>
+  </div>
+
+  <div data-role="panel" id="popupMenu" data-position="right"  data-display="overlay"> 
+ <!--div data-role="popup" id="popupMenu" class="ui-popup" data-theme="a" data-position-to="origin"-->
+  <!--a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a-->
+  <div style="padding:10px 10px;">
+  <a href="https://www.github.com/michaeloed/FreeRail"><img src="logo.png" width="160px"/></a>
+  <button id="menuInfo" data-rel="close" class="ui-btn ui-icon-info ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openInfo()">Info</button>
+  <button id="menuSystem" data-rel="close" class="ui-btn ui-icon-star ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openSystem()">System</button>
+  <button id="menuAuto" data-rel="close" class="ui-btn ui-icon-recycle ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openAuto()">System</button>
+  <button id="menuOptions" data-rel="close" class="ui-btn ui-icon-gear ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openOptions()">Options</button>
+  <button id="menuGuest" data-rel="close" class="ui-btn ui-icon-user ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openGuest()">Guest loco</button>
+  <!--<button id="menuTrains" data-rel="close" class="ui-btn ui-icon-shop ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openTrains()">Trains</button>-->
+  <!--<button id="menuDisconnect" data-rel="close" class="ui-btn ui-icon-action ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="Disconnect(true)">Disconnect</button>-->
+  <button id="menuZoom" data-rel="close" class="ui-btn ui-icon-eye ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openZoom(true)">Zoom</button>
+  <button id="menuHelp" data-rel="close" class="ui-btn ui-icon-search ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openHelp()">Help</button>
+  <button id="menuTrace" data-rel="close" class="ui-btn ui-icon-bullets ui-corner-all ui-btn-icon-left" style="text-align:left;" onclick="openTrace()">Trace</button>
+  <select name="levelSelect" id="levelSelect" style="text-align:left;">
+  </select>
+  <select name="colorSelect" id="colorSelect" style="text-align:left;">
+    <option id="colorNone" value="none" style="text-align:left;">Transparent</option>
+    <option id="colorGreen" value="green" style="text-align:left;">Green</option>
+    <option id="colorGrey" value="grey" style="text-align:left;">Grey</option>
+    <option id="colorWhite" value="white" style="text-align:left;">White</option>
+    <option id="colorBlue" value="blue" style="text-align:left;">Blue</option>
+    <option id="colorUser" value="user" style="text-align:left;">User</option>
+  </select>
+  <select name="languageSelect" id="languageSelect" style="text-align:left;">
+    <option id="langEN" value="en" style="text-align:left;">English</option>
+    <option id="langDE" value="de" style="text-align:left;">Deutsch</option>
+    <option id="langNL" value="nl" style="text-align:left;">Nederlands</option>
+    <option id="langFR" value="fr" style="text-align:left;">Français</option>
+  </select>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupInfo" data-transition="turn" class="ui-popup" data-theme="a">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div style="padding:10px 10px; text-align: center;">
+  <img src="logo.png" height="60px"/>
+  <label>Copyright &copy; 2002-2015 Rob Versluis</label>
+  <div style="text-align: left;">
+    <div style="display: inline-block;">FreeRail version:<br>Workspace:</div>
+    <div class="divborder" id="serverInfo" style="display: inline-block;"></div>
+  </div>
+  <a href="http://www.github.com/michaeloed/FreeRail">FreeRail on GitHub</a>
+  </div>
+  </div>
+
+  <div data-role="popup" id="popupOptions" data-transition="flow" class="ui-popup" data-theme="a">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+  <div id="divOptions" style="padding:10px 10px;">
+    <label id="optionsTitle">Options</label>
+    <div data-role="fieldcontain">
+    <fieldset data-role="controlgroup">
+      <input type="checkbox" name="optionDebug" id="optionDebug" class="custom" onclick="onOptionDebug()" />
+      <label id="labOptionDebug" title="Trace debug info on the JavaScript console" for="optionDebug">Debug</label>
+      <input type="checkbox" name="optionSimSensors" id="optionSimSensors" class="custom" onclick="onOptionSimSensors()" />
+      <label id="labOptionSimSensors" title="Simulate sensor events by clicking on it" for="optionSimSensors">Simulate sensors</label>
+      <input type="checkbox" name="optionShowAllSchedules" id="optionShowAllSchedules" class="custom" onclick="onOptionShowAllSchedules()" />
+      <label id="labOptionShowAllSchedules" title="Show all schedules which includes the selected block" for="optionShowAllSchedules">Show all schedules</label>
+      <input type="checkbox" name="optionModuleView" id="optionModuleView" class="custom" onclick="onOptionModuleView()" />
+      <label id="labOptionModuleView" title="Switch directly to module view in case the loaded plan is modular." for="optionModuleView">Module view</label>
+      <input type="checkbox" name="optionShowOcc" id="optionShowOcc" class="custom" onclick="onOptionShowOcc()" />
+      <label id="labOptionShowOcc" for="optionShowOcc">Show occupancy</label>
+      <input type="checkbox" name="optionShowRoutes" id="optionShowRoutes" class="custom" onclick="onOptionShowRoutes()" />
+      <label id="labOptionShowRoutes" for="optionShowRoutes">Show routes</label>
+      <input type="checkbox" name="optionShowRoutesOnSwitches" id="optionShowRoutesOnSwitches" class="custom" onclick="onOptionShowRoutesOnSwitches()" />
+      <label id="labOptionShowRoutesOnSwitches" for="optionShowRoutesOnSwitches">Show routes on switches</label>
+      <input type="checkbox" name="optionAllSpeedSteps" id="optionAllSpeedSteps" class="custom" onclick="onOptionAllSpeedSteps()" />
+      <label id="labOptionAllSpeedSteps" for="optionAllSpeedSteps">All speed steps</label>
+      <input type="checkbox" name="optionSpeedButtons" id="optionSpeedButtons" class="custom" onclick="onOptionSpeedButtons()" />
+      <label id="labOptionSpeedButtons" for="optionSpeedButtons">Speed buttons</label>
+      <input type="checkbox" name="optionBinState" id="optionBinState" class="custom" onclick="onOptionSpeedButtons()" />
+      <label id="labOptionBinState" for="optionBinState">Binary state control</label>
+      <input type="checkbox" name="optionShowBlockID" id="optionShowBlockID" class="custom" onclick="onOptionShowBlockID()" />
+      <label id="labOptionShowBlockID" for="optionShowBlockID">Show block ID</label>
+      <input type="checkbox" name="optionShowTrainID" id="optionShowTrainID" class="custom" onclick="onOptionShowTrainID()" />
+      <label id="labOptionShowTrainID" for="optionShowTrainID">Show train ID</label>
+      <input type="checkbox" name="optionShowLocoImage" id="optionShowLocoImage" class="custom" onclick="onOptionShowLocoImage()" />
+      <label id="labOptionShowLocoImage" for="optionShowLocoImage">Show loco image</label>
+      <input type="checkbox" name="optionAnalogClock" id="optionAnalogClock" class="custom" onclick="onOptionAnalogClock()" />
+      <label id="labOptionAnalogClock" for="optionAnalogClock">Show loco image</label>
+      <input type="checkbox" name="optionSecondHand" id="optionSecondHand" class="custom" onclick="onOptionSecondHand()" />
+      <label id="labOptionSecondHand" for="optionSecondHand">Show second hand</label>
+      <input type="checkbox" name="optionMonitor" id="optionMonitor" class="custom" onclick="onOptionMonitor()" />
+      <label id="labOptionMonitor" for="optionMonitor">Trace</label>
+    </fieldset>
+    </div>
+    <div data-role="fieldcontain">
+    <fieldset data-role="controlgroup" data-type="horizontal" >
+      <input type="radio" id="locoCatEngine" name="radio-choice-1" value="engine" onclick="onCatEngine()"/>
+      <label id="labLocoCatEngine" title="Sort the Loco selection list by engine type" for="locoCatEngine">Engine</label>
+      <input type="radio" id="locoCatEra" name="radio-choice-1" value="era" onclick="onCatEra()"/>
+      <label id="labLocoCatEra" title="Sort the Loco selection list by Era" for="locoCatEra">Era</label>
+      <input type="radio" id="locoCatRoadname" name="radio-choice-1" value="roadname" onclick="onCatRoadname()"/>
+      <label id="labLocoCatRoadname" title="Sort the Loco selection list by Roadname" for="locoCatRoadname">Roadname</label>
+    </fieldset>
+    </div> 
+    <div data-role="fieldcontain">
+    <fieldset data-role="controlgroup" data-type="horizontal" >
+      <input type="radio" id="locoSortID" name="radio-choice-2" value="id" onclick="onLocoSort('id')"/>
+      <label id="labLocoSortID" for="locoSortID">ID</label>
+      <input type="radio" id="locoSortAddress" name="radio-choice-2" value="address" onclick="onLocoSort('address')"/>
+      <label id="labLocoSortAddress" for="locoSortAddress">Address</label>
+    </fieldset>
+    </div> 
+    <table width="100%"><tr>
+    <td nowrap="nowrap"><label id="labUserColor">User color:</label>
+    <td><input size="3" type="text" name="userColorRed" id="userColorRed" value="" placeholder="R" data-theme="a">
+    <td><input size="3" type="text" name="userColorGreen" id="userColorGreen" value="" placeholder="G" data-theme="a">
+    <td><input size="3" type="text" name="userColorBlue" id="userColorBlue" value="" placeholder="B" data-theme="a">
+    <td><a href="#" class="ui-shadow ui-btn ui-corner-all ui-icon-check ui-btn-icon-notext" onclick="onUserColor()">Set</a>
+    </table>
+    <table width="100%">
+    <tr>
+    <td><label id="labSliderDelta" for="sliderDelta">Slider delta</label>    
+    <td><input data-clear-btn="false" name="sliderDelta" id="sliderDelta" value="3" type="number">
+    <tr>
+    <td><label id="labControlCode" for="controlCode">Control code</label>    
+    <td><input data-clear-btn="false" name="controlCode" id="controlCode" value="">
+    <tr>
+    <td><label id="labSlaveCode" for="slaveCode">Control code</label>    
+    <td><input data-clear-btn="false" name="slaveCode" id="slaveCode" value="">
+  </div>
+  </div>
+
+  
+  <div data-role="popup" id="popupThrottle" class="ui-popup" data-transition="flow" data-theme="a" data-dismissible="false" style="max-width:360px !important;">
+  <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+    <div style="padding:5px 5px;">
+    <center><img id="locoImage" src="noimg.png" height="50px" onclick="onLocoImage()"/></center>
+    <div id="locoStatus"></div>
+    <div id="locoDescription"></div>
+    <div id="locoConsist" onclick="onMaster()"></div>
+
+    <div class="ui-grid-d">
+    <div class="ui-block-a"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F1" onclick="onFunction('F1', 1)">F1</a></div>
+    <div class="ui-block-b"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F2" onclick="onFunction('F2', 2)">F2</a></div>
+    <div class="ui-block-c"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F3" onclick="onFunction('F3', 3)">F3</a></div>
+    <div class="ui-block-d"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F4" onclick="onFunction('F4', 4)">F4</a></div>
+    <div class="ui-block-e"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="ST" onclick="onST()">ST</a></div>
+
+    <div class="ui-block-a"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F5" onclick="onFunction('F5', 5)">F5</a></div>
+    <div class="ui-block-b"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F6" onclick="onFunction('F6', 6)">F6</a></div>
+    <div class="ui-block-c"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F7" onclick="onFunction('F7', 7)">F7</a></div>
+    <div class="ui-block-d"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F8" onclick="onFunction('F8', 8)">F8</a></div>
+    <div class="ui-block-e"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="RE" onclick="onRE()">RE</a></div>
+
+    <div class="ui-block-a"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F9" onclick="onFunction('F9', 9)">F9</a></div>
+    <div class="ui-block-b"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F10" onclick="onFunction('F10', 10)">F10</a></div>
+    <div class="ui-block-c"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F11" onclick="onFunction('F11', 11)">F11</a></div>
+    <div class="ui-block-d"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F12" onclick="onFunction('F12', 12)">F12</a></div>
+    <div class="ui-block-e"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="FG" onclick="onFG()">FG</a></div>
+
+    <div class="ui-block-a" style="width:40%"><a href="#" id="direction" class="ui-shadow ui-btn ui-corner-all" onclick="onDirection()">Dir &gt;</a></div>
+    <div class="ui-block-b"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F13" onclick="onFunction('F13', 13)">F13</a></div>
+    <div class="ui-block-c"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F14" onclick="onFunction('F14', 14)">F14</a></div>
+    <div class="ui-block-d"><a href="#" class="ui-shadow ui-btn ui-corner-all" id="F0" onclick="onLights()">F0</a></div>
+    </div>
+    
+    <div id="binStateDiv" class="ui-grid-c">
+      <div class="ui-block-a"><input data-clear-btn="false" data-mini="true" name="binStateAddress" id="binStateAddress" value="0" type="number"></div>
+      <div class="ui-block-b"><a href="#" style="font-size:14px;" data-mini="true" class="ui-shadow ui-btn ui-corner-all" id="binStateSet" onclick="onBinState(1)">Set</a></div>
+      <div class="ui-block-c"><a href="#" style="font-size:14px;" data-mini="true" class="ui-shadow ui-btn ui-corner-all" id="binStateReset" onclick="onBinState(0)">Reset</a></div>
+      <div class="ui-block-d"><select name="secondaryAddress" id="secondaryAddress" data-role="slider" data-mini="true" data-theme="a"><option value="off">P</option><option value="on">S</option></select></div>
+    </div>
+    
+    <div id="speedSliderDiv" class="full-width-slider">
+      <input type="range" name="speedSlider" id="speedSlider" value="0" min="0" max="100" data-highlight="true">
+    </div>
+    <div id="speedButtonsDiv" class="ui-grid-a">
+      <div class="ui-block-a"><a id="VUp" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onVDown()"><img src="down.png"/></a></div>
+      <div class="ui-block-b"><a id="VDown" href="#" class="ui-shadow ui-btn ui-corner-all" onclick="onVUp()"><img src="up.png"/></a></div>
+    </div>
+    </div>
+ </div>
+ 
+ 
+ <div data-role="popup" id="popupLocoSelect" data-transition="slide" class="ui-popup" data-theme="a">
+ <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+   <div style="padding:10px 10px;">
+     <label id="locoSelectTitle">Loco list</label>
+     <div id="locoSelectList" data-role="collapsibleset" data-theme="a">
+     </div>
+   </div>
+ </div>
+
+ <div data-role="popup" id="popupText" data-transition="flow" class="ui-popup" data-theme="a">
+ <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+   <div style="padding:10px 10px;">
+     <label id="textTitle">Text</label>
+     <input type="text" name="newText" id="newText" value="" placeholder="new text" data-theme="a">
+     <button id="changeText" class="ui-btn ui-corner-all" onclick="onChangeText()">OK</button>
+   </div>
+ </div>
+   
+ <div data-role="popup" id="popupTrace" data-transition="flip" class="ui-popup" data-theme="a">
+ <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+   <div style="padding:10px 10px;">
+     <label id="traceTitle"><b>Trace</b></label>
+     <textarea id="traceText" readonly rows="20" cols="100" style="background-color: #EEEEEE;font-family: monospace !important; overflow-x: scroll; word-wrap: normal; white-space: pre; font-size: 9pt">
+       &#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;&#10;
+     </textarea>
+     <label id="traceState">-</label>
+     <button id="traceClear" class="ui-btn ui-corner-all" onclick="onTraceClear()">Clear</button>
+   </div>
+ </div>
+   
+ <div data-role="popup" id="popupGuestLoco" data-transition="flow" class="ui-popup" data-theme="a">
+ <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+   <div style="padding:10px 10px;">
+   <label id="titleGuestLoco">Guest loco</label>
+     <input type="text" name="guestAddress" id="guestAddress" value="" placeholder="Address" data-theme="a">
+     <input type="text" name="guestShortID" id="guestShortID" value="" placeholder="Short ID" data-theme="a">
+     <div data-role="fieldcontain">
+     <fieldset data-role="controlgroup" data-type="horizontal" >
+       <input type="radio" id="guestStep14" name="radio-choice-1" value="14" onclick="onGuestSteps('14')"/>
+       <label for="guestStep14">14</label>
+       <input type="radio" id="guestStep28" name="radio-choice-1" value="28" onclick="onGuestSteps('28')"/>
+       <label for="guestStep28">28</label>
+       <input type="radio" id="guestStep128" name="radio-choice-1" value="128" onclick="onGuestSteps('128')"/>
+       <label for="guestStep128">128</label>
+     </fieldset>
+     </div>    
+     <div data-role="fieldcontain">
+     <fieldset data-role="controlgroup" data-type="horizontal" >
+       <input type="radio" id="guestProtDCC" name="radio-choice-2" value="dcc" onclick="onGuestProt('N')"/>
+       <label for="guestProtDCC">DCC</label>
+       <input type="radio" id="guestProtMM" name="radio-choice-2" value="mm" onclick="onGuestProt('M')"/>
+       <label for="guestProtMM">MM</label>
+       <input type="radio" id="guestProtMFX" name="radio-choice-2" value="mfx" onclick="onGuestProt('F')"/>
+       <label for="guestProtMFX">MFX</label>
+     </fieldset>
+     </div>    
+     <button id="guestAdd" class="ui-btn ui-corner-all" onclick="onAddGuest()">Add</button>
+   </div>
+ </div>
+
+ <div data-role="popup" id="popupZoom" data-transition="slide" class="ui-popup" data-theme="a">
+ <a href="#" data-rel="back" class="ui-btn ui-corner-all ui-shadow ui-btn ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a>
+   <div style="padding:10px 10px;">
+    <div class="ui-grid-b">
+    <div class="ui-block-a"><a href="#" class="ui-shadow ui-btn ui-corner-all ui-icon-minus ui-btn-icon-left ui-btn-icon-notext" id="ZoomOut" onclick="onZoom(false)">In</a></div>
+    <div class="ui-block-b"><a href="#" class="ui-shadow ui-btn ui-corner-all ui-icon-home ui-btn-icon-left ui-btn-icon-notext" id="Zoom100" onclick="onZoom100()">100%</a></div>
+    <div class="ui-block-c"><a href="#" class="ui-shadow ui-btn ui-corner-all ui-icon-plus ui-btn-icon-left ui-btn-icon-notext" id="ZoomIn" onclick="onZoom(true)">Out</a></div>
+   </div>
+   </div>
+ </div>
+ 
+ </body>
+
+</html>

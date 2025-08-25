@@ -1,0 +1,10 @@
+Package: freerail
+Version: <BZR>
+Section: other
+Priority: optional
+Architecture: <ARCH>
+Depends: libwxgtk2.8-0 | libwxgtk3.0-0
+Installed-Size: 34000
+Maintainer: tbd
+Description: FreeRail - Model Railway Control Software
+Homepage: https://www.github.com/michaeloed/FreeRail

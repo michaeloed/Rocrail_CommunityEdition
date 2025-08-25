@@ -1,0 +1,83 @@
+Get FreeRail Sources
+
+git clone https://github.com/michaeloed/FreeRail.git FreeRail
+
+Updating the local tree
+cd FreeRail
+git pull
+
+Build FreeRail from source (Linux)
+Follow the README in the project root (WIP)
+
+
+Build FreeRail from source (Windows)
+Follow the README in the project root (WIP)
+
+
+Problems
+  ▪ Many header and source files are generated in the build process and are not in the repository!
+  ▪ If you have problems compiling the rocs library, the object generator binary does not fit to your Linux system. Try make fromtar.
+  ▪ After changing the rocs.xml you must also commit the rocs-gen.tar.gz in svn!!!
+
+
+
+
+
+Compile FreeRail with MinGW, MSYS and wxWidgets
+
+Building the FreeRail binaries for Windows using GNU tools.
+
+Install MinGw:
+Download from http://www.mingw.org the latest mingw-5.1.3.exe setup. (http://sourceforge.net/project/showfiles.php?group_id=2435&package_id=240780)
+Start the setup after it has been downloaded.
+Select:
+  ▪ base
+  ▪ g++
+  ▪ make
+Install it as proposed in c:\mingw.
+Set the start of the user PATH environment variable to: “C:\mingw\bin;…” (The three dots represents the rest of the variable value.)
+rename the mingw32-make.exe into make.exe
+Attention: On Vista you will get the error gcc: installation problem, cannot exec `cc1' while trying to compile FreeRail with MinGW version 5.1.3. The configure of wxwidgets fails too. It seems that the only workaround is to copy the files in C:\MinGW\libexec\gcc\mingw32\3.4.2 to C:\MinGW\bin.
+
+Get the sources:
+See the previous sections.
+
+Build the project:
+Follow the README in the project root (WIP)
+
+Install MSys:
+Get from http://www.mingw.org the latest MSYS-1.0.10.exe setup and install it as proposed, and answer yes to all questions and tell it where you installed mingw. (http://sourceforge.net/project/showfiles.php?group_id=2435&package_id=24963) If all went OK you have an MSYS shortcut on the desktop you will need later on. (The make file is named back again to mingw32-make.exe but msys has its own make.)
+
+Install wxWidgets:
+Download from http://www.wxwidgets.org wxMSW - installer for Windows Execute the setup and install the it as proposed in C:\wxWidgets-2.8.4
+
+Build the wxWidgets libraries:
+Now double click on the MSYS shortcut to open a unix like shell and try this:
+cd c:
+cd wxWidgets-2.8.4
+mkdir mingw
+cd mingw
+../configure --disable-shared --enable-unicode --enable-mslu
+make BUILD=release
+The configure will take some time to finish depending on your hardware. If you are planning an ANSI build you must leave out the ”–enable-unicode” and ”–enable-mslu” options. But the make will take longer than you can imagine to finish. … But after a very long time the libraries are build:
+C:\wxWidgets-2.8.4\mingw>dir lib
+06.09.2007  22:12           158.846 libwxexpat-2.8.a
+06.09.2007  22:08           147.328 libwxjpeg-2.8.a
+06.09.2007  22:06           169.646 libwxpng-2.8.a
+06.09.2007  22:04           101.362 libwxregexu-2.8.a
+06.09.2007  22:11           327.360 libwxtiff-2.8.a
+06.09.2007  22:05            72.716 libwxzlib-2.8.a
+06.09.2007  22:31         2.083.884 libwx_baseu-2.8.a
+06.09.2007  22:34           311.274 libwx_baseu_net-2.8.a
+07.09.2007  00:18            46.142 libwx_baseu_xml-2.8.a
+07.09.2007  00:05         1.636.616 libwx_mswu_adv-2.8.a
+07.09.2007  00:40           567.984 libwx_mswu_aui-2.8.a
+06.09.2007  23:54         9.032.418 libwx_mswu_core-2.8.a
+07.09.2007  00:16         1.317.914 libwx_mswu_html-2.8.a
+07.09.2007  00:17           184.232 libwx_mswu_qa-2.8.a
+07.09.2007  00:54         1.903.786 libwx_mswu_richtext-2.8.a
+07.09.2007  00:37         1.644.622 libwx_mswu_xrc-2.8.a
+Move or copy the library from C:\wxWidgets-2.8.4\mingw\lib to C:\wxWidgets-2.8.4\lib-unicode Or if you builded the ANSI version: C:\wxWidgets-2.8.4\mingw\lib to C:\wxWidgets-2.8.4\lib-ansi Now it is time to try to build the Rocview.exe. Work your way down the directory tree you just moved or copied until you find a directory named wx, containing the file setup.h. Copy this file to the wxWidgets-2.8.*\include directory.
+
+Building the Rocview:
+Follow the README in the project root (WIP)

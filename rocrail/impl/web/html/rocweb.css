@@ -1,0 +1,96 @@
+.item {
+ position:absolute;
+ text-align:center;
+ border:0px
+}
+
+.itemV {
+ position:absolute;
+ text-align:center;
+ border:0px; 
+ -webkit-transform: rotate(90deg); 
+ -moz-transform: rotate(90deg);
+}
+
+.itemtext {
+ white-space: nowrap;
+ vertical-align:middle;
+}
+
+.itemtextV {
+ white-space: nowrap;
+ vertical-align:middle; 
+ horizontal-align:middle; 
+ -webkit-transform: rotate(90deg); 
+ -webkit-transform-origin: 50% 50%; 
+ -moz-transform: rotate(90deg); 
+ -moz-transform-origin: 50% 50%;
+}
+
+.itemtextVnorth {
+ white-space: nowrap;
+ vertical-align:middle; 
+ horizontal-align:middle; 
+ -webkit-transform: rotate(270deg); 
+ -webkit-transform-origin: 50% 50%; 
+ -moz-transform: rotate(270deg); 
+ -moz-transform-origin: 50% 50%;
+}
+
+.itemtextVsouth {
+ white-space: nowrap;
+ vertical-align:middle; 
+ horizontal-align:middle; 
+ -webkit-transform: rotate(90deg); 
+ -webkit-transform-origin: 50% 50%; 
+ -moz-transform: rotate(90deg); 
+ -moz-transform-origin: 50% 50%;
+}
+
+.imageV {
+ -webkit-transform: rotate(90deg); 
+ -moz-transform: rotate(90deg);
+}
+.
+divborder {
+ border: 1px solid #000; 
+ text-align: left; 
+ padding: 10px;
+}
+
+.full-width-slider .ui-slider-input {display: none; width: 0px;}
+.full-width-slider .ui-slider-track {margin-left: 15px;}
+/* the thumb will not listen... .full-width-slider .ui-slider-handle {height: 50px;}*/
+
+#speedSliderDiv .ui-slider-handle {
+    height: 60px;
+    /*width: 50px;*/
+    top: -8px;
+    /*margin-left: -25px;*/
+    background: darkgrey;
+}
+#speedSliderDiv {
+    height: 65px;
+    margin-top: 20px;
+    margin-left: 15px;
+    margin-right: 15px;
+}
+
+*:not(textarea):not(text):not(input) {
+ -webkit-user-select: none; /* disable selection/Copy of UIWebView */
+ -webkit-touch-callout: none; /* disable the IOS popup when long-press on a link */
+ -moz-user-select: none;
+ -moz-touch-callout: none;
+}
+
+
+.led-green {
+    width: 8px;
+    height: 8px;
+    background-color: #690;
+    border-radius: 50%;
+}
+
+th, td {
+  padding: 2px;
+}

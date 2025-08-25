@@ -1,0 +1,35 @@
+Cross Compile with MinGW
+FreeRail cross compiled on Ubuntu for Windows unicode:
+get the cross compiler:
+
+sudo apt-get install mingw32
+
+get from http://www.wxwidgets.org the wxall sources and decompress it in your home directory.
+
+cd wxWidgets-3.0
+run configure like:
+
+./configure --prefix=/usr/i586-mingw32msvc --host=i586-mingw32msvc --target=i586-mingw32msvc --with-msw --enable-unicode --enable-mslu --disable-shared
+
+make the wx libraries:
+
+make
+
+install it:
+
+sudo make install
+
+build the freerail modules:
+
+cd FreeRail
+make all PLATFORM=WIN32 TOOLPREFIX=i586-mingw32msvc- LIBSUFFIX=-i586-mingw32msvc MINGWINSTALL=/usr/i586-mingw32msvc
+
+see also: http://www.wxwidgets.org/wiki/index.php/Cross-Compiling_Under_Linux
+strip the binaries
+
+cd FreeRail/winbin
+i586-mingw32msvc-strip *.dll
+i586-mingw32msvc-strip *.exe
+
+
+run inno setup with wine and create the package

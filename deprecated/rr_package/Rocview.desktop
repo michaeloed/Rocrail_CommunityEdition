@@ -1,0 +1,10 @@
+
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Exec=/opt/freerail/rocview.sh %f
+Icon=/opt/freerail/freerail.xpm
+Name=Rocview
+Categories=FreeRail;
+MimeType=application/xml;
+

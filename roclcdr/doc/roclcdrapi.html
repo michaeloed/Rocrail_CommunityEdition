@@ -1,0 +1,31 @@
+<html>
+<head>
+  <title>RocRail LocDriver API</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+<h2>RocRail LocDriver API</h2>
+XML: $Source: /cvsroot/rojav/roclcdr/roclcdr.xml,v $<br>
+XML: $Revision: 1.6 $<br>
+Module: RocLcDr<br>
+Auto generated at: Mon Sep 17 23:30:20 2018
+<br>
+Index: <a href="roclcdrapi-index.html">roclcdrapi-index.html</a><br>
+<p><a name="LcDriver"/><h3>1. object LcDriver</h3>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+Loc driver object<br>
+<tr bgcolor="#e8e8e8"><th colspan="2" align="left"><a name="LcDriver"/><tt>Summary of object LcDriver, implementing <a href="#$../rocint/rocint.xml:LcDriverInt">$../rocint/rocint.xml:LcDriverInt</a></tt></th></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {LC_IDLE=0,LC_FINDDEST,LC_INITDEST,LC_CHECKROUTE,LC_PRE2GO,LC_GO,LC_EXITBLOCK,LC_OUTBLOCK,
+              LC_ENTERBLOCK,LC_RE_ENTERBLOCK,LC_PRE2INBLOCK,LC_INBLOCK,LC_PRE_WAITBLOCK,LC_WAITBLOCK,LC_TIMER,LC_WAIT4EVENT,
+              LC_PAUSE,LC_MANAGED,LC_FREE} lc_state</b></tt><br></td></tr>
+<tr><td valign="top"><tt><i>typedef</i></tt></td><td><tt><b>enum {LC_DIR_FORWARDS=0,LC_DIR_BACKWARDS} lc_direction</b></tt><br></td></tr>
+<tr><td valign="top" align="right"><tt>iOLcDriver</tt></td><td valign="top"><a name="LcDriver_inst"/><tt><b>inst( const iOLoc <i>loc</i>, const iOModel <i>model</i>, const iOTrace <i>trace</i>, iONode <i>ctrl</i> );</b></tt><br>
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+<tr><td><tt><i>loc</i></tt></td><td>Loc object</td><td>*</td><td></td></tr>
+<tr><td><tt><i>model</i></tt></td><td>Model object</td><td>*</td><td></td></tr>
+<tr><td><tt><i>trace</i></tt></td><td>Trace object</td><td>*</td><td></td></tr>
+</table>
+</td></tr>
+</table></p>
+</body>
+</html>

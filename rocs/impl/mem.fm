@@ -1,0 +1,32 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  2 2018 14:02:35)
+  * Module: rocs
+  * XML: $Source: /home/cvs/xspooler/rocs/rocs.xml,v $
+  * XML: $Revision: 1.85 $
+  * Date: Thu Aug  2 14:02:39 2018
+  */
+
+struct OMem MemOp = {
+  _mem_alloc,
+  _mem_allocTID,
+  _mem_basecpy,
+  _mem_chr,
+  _mem_cmp,
+  _mem_copy,
+  _mem_dumpAllocCntID,
+  _dumpStrings,
+  _mem_free,
+  _mem_freeObj,
+  _mem_freeTID,
+  _mem_getAllocCntID,
+  _mem_getAllocCount,
+  _mem_getAllocSize,
+  _mem_getDumpSize,
+  _mem_getLastOperation,
+  _mem_init,
+  _mem_realloc,
+  _mem_resetDump,
+  _mem_set,
+  _mem_setDebug,
+};

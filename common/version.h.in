@@ -1,0 +1,2 @@
+const int revisionnr = @REV@;
+const char* commithash = "@COMMIT@";

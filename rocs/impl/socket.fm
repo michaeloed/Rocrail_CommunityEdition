@@ -1,0 +1,64 @@
+/** ------------------------------------------------------------
+  * A U T O   G E N E R A T E D
+  * Generator: Rocs ogen (build Aug  2 2018 14:02:35)
+  * Module: rocs
+  * XML: $Source: /home/cvs/xspooler/rocs/rocs.xml,v $
+  * XML: $Revision: 1.85 $
+  * Date: Thu Aug  2 14:02:39 2018
+  */
+
+struct OSocket SocketOp = {
+  {
+    NULL,
+    __del,
+    __name,
+    __serialize,
+    __deserialize,
+    __toString,
+    __count,
+    __clone,
+    __equals,
+    __properties,
+    __id,
+    __event,
+  },
+  _acceptSocket,
+  _bind,
+  rocs_socket_connect,
+  _disConnect,
+  _fmt,
+  _getMAC,
+  _getPeeked,
+  rocs_socket_getPeername,
+  _getRc,
+  _getReceived,
+  _getSended,
+  _getStream,
+  _gethostaddr,
+  _gethostname,
+  _getsockname,
+  _inst,
+  _instSSLserver,
+  _isBroken,
+  _isConnected,
+  _isOpenSSL,
+  _isTimedOut,
+  rocs_socket_peek,
+  rocs_socket_read,
+  _readStr,
+  _readcSocket,
+  _readln,
+  rocs_socket_recvfrom,
+  _resetSocket,
+  rocs_socket_sendto,
+  rocs_socket_setBlocking,
+  rocs_socket_setBroadcast,
+  rocs_socket_setKeepalive,
+  NULL,
+  _setLocalIP,
+  rocs_socket_setNodelay,
+  rocs_socket_setRcvTimeout,
+  rocs_socket_setSndTimeout,
+  rocs_socket_write,
+  _writecSocket,
+};

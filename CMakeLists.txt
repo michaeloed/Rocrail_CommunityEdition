@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.3)
+cmake_minimum_required (VERSION 4.1)
 project (FreeRail)
 
 execute_process(COMMAND git rev-list --count HEAD OUTPUT_VARIABLE REV OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -51,5 +51,5 @@ add_subdirectory(roclcdr)
 add_subdirectory(rocnetnode)
 add_subdirectory(rocview)
 # Qt Viewer
-add_subdirectory(freerailview)
+# add_subdirectory(freerailview)
 

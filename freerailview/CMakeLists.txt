@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 4.1)
 message(STATUS "Configure freerailview")
 
 # Find includes in corresponding build directories

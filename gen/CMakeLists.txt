@@ -1,5 +1,5 @@
 project(rocint)
-cmake_minimum_required(VERSION 2.8)
+# cmake_minimum_required(VERSION 2.8)
 
 add_custom_target(rocint_gen
 				  COMMAND ${CMAKE_SOURCE_DIR}/rocs/bin/ogen ${CMAKE_SOURCE_DIR}/rocint/rocint.xml
